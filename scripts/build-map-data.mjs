@@ -20,7 +20,6 @@ const adm1SimplifyTolerance = 0.03;
 const fallbackSimplifyTolerance = 0.015;
 const fallbackSimplifyToleranceByCountryId = new Map([["CAN", 0.008]]);
 const singleRegionAdm0SimplifyToleranceByCountryId = new Map([["CAN", 0.01]]);
-const singleRegionAdm1UnionSimplifyTolerance = 0.005;
 const subdivisionBorderSimplifyTolerance = 0.03;
 const subdivisionBorderMatchTolerance = 0.02;
 const minimumSubdivisionBorderLength = 1e-6;
@@ -139,7 +138,6 @@ const singleRegionCountries = [
 ];
 
 const singleRegionAdm0CountryIds = new Set(["CAN"]);
-const singleRegionAdm1UnionCountryIds = new Set([]);
 
 const nonSovereignFallbackOwners = {
   akrotiri: "GBR",
@@ -188,7 +186,6 @@ async function main() {
     })),
   );
   const singleRegionAdm0Geometries = await loadSingleRegionAdm0Geometries();
-  const singleRegionAdm1UnionGeometries = await loadSingleRegionAdm1UnionGeometries();
 
   const countries = [];
   const regions = [];
@@ -308,9 +305,7 @@ async function main() {
     }
     const fallbackGeometry = conformSingleRegionFallbackGeometry(
       fallbackCountryId,
-      singleRegionAdm0Geometries.get(fallbackCountryId) ??
-        singleRegionAdm1UnionGeometries.get(fallbackCountryId) ??
-        worldGeometry,
+      singleRegionAdm0Geometries.get(fallbackCountryId) ?? worldGeometry,
       regions,
     );
     regions.push({
@@ -604,39 +599,6 @@ function subtractPolygonalGeometries(geometry, cutters) {
   } catch {
     return null;
   }
-}
-
-async function loadSingleRegionAdm1UnionGeometries() {
-  const geometries = new Map();
-  const countriesById = new Map(singleRegionCountries.map((country) => [country.iso3, country]));
-
-  for (const countryId of singleRegionAdm1UnionCountryIds) {
-    const country = countriesById.get(countryId);
-    if (!country) continue;
-
-    try {
-      const meta = await fetchCachedJson(
-        `https://www.geoboundaries.org/api/current/gbOpen/${country.iso3}/ADM1/`,
-      );
-      const geojson = await fetchCachedJson(meta.simplifiedGeometryGeoJSON || meta.gjDownloadURL);
-      const adm1Geometries = geojson.features
-        .map((regionFeature) => simplifyGeometry(regionFeature.geometry, singleRegionAdm1UnionSimplifyTolerance))
-        .filter(isPolygonalGeometry);
-      const unionedGeometry = mergePolygonalGeometries(adm1Geometries);
-      if (unionedGeometry) {
-        geometries.set(country.iso3, unionedGeometry);
-        console.log(`Built ${country.iso3}: single fallback from ${adm1Geometries.length} ADM1 regions`);
-      }
-    } catch (error) {
-      console.warn(
-        `Could not build ${country.iso3} single-region ADM1 union: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
-  }
-
-  return geometries;
 }
 
 async function loadSingleRegionAdm0Geometries() {
