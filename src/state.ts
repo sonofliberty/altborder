@@ -290,14 +290,20 @@ function withCurrentRegionOwner(region: RegionRecord, ownerId: string | undefine
 }
 
 function normalizeCustomCounter(snapshot: EditorSnapshot): EditorSnapshot {
-  const nextCounter = Object.keys(snapshot.entities).reduce((counter, entityId) => {
-    const match = /^CUSTOM_(\d+)$/.exec(entityId);
-    if (!match) return counter;
-    return Math.max(counter, Number(match[1]) + 1);
-  }, snapshot.customCounter);
+  const usedCustomIds = [...Object.keys(snapshot.entities), ...Object.keys(snapshot.customRegions)];
+  const nextCounter = usedCustomIds.reduce(
+    (counter, id) => Math.max(counter, getCustomCounterFloor(id)),
+    snapshot.customCounter,
+  );
 
   if (nextCounter === snapshot.customCounter) return snapshot;
   return { ...snapshot, customCounter: nextCounter };
+}
+
+function getCustomCounterFloor(id: string): number {
+  const match = /^CUSTOM_(\d+)(?:$|-)/.exec(id);
+  if (!match) return 0;
+  return Number(match[1]) + 1;
 }
 
 function pruneEmptyCustomEntities(entities: Record<string, CountryEntity>): void {

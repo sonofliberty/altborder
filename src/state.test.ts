@@ -241,6 +241,30 @@ describe("scenario custom regions", () => {
     expect(separated?.snapshot.entities.CUSTOM_001.name).toBe("Newland");
     expect(separated?.snapshot.entities.CUSTOM_002.name).toBe("Beta Coast");
   });
+
+  it("advances stale custom counters from custom region ids", () => {
+    const data = makeMapData();
+    const customRegion: RegionRecord = {
+      id: "CUSTOM_001-TERRITORY",
+      name: "Transferred Newland",
+      ownerId: "AAA",
+      type: "Custom divided territory",
+      geometry: data.regions[0].geometry,
+    };
+
+    const restored = applyScenarioPayload(data, {
+      version: 1,
+      title: "Transferred custom region",
+      description: "",
+      customCounter: 1,
+      entityChanges: {},
+      regionOwnerChanges: [[customRegion.id, "AAA"]],
+      customRegions: [customRegion],
+    });
+
+    expect(restored.customRegions[customRegion.id]?.ownerId).toBe("AAA");
+    expect(restored.customCounter).toBe(2);
+  });
 });
 
 describe("region transfers", () => {
