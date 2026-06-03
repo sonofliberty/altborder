@@ -4,7 +4,8 @@ import type { GeoProjection } from "d3-geo";
 import type { FeatureCollection, Geometry } from "geojson";
 import mapDataFixture from "../public/data/map-data.json";
 import { subtractGeoJsonGeometries, unionGeoJsonGeometriesClosingGaps } from "./geometrySplit";
-import { combineProjectedPathData, projectGeometryToPathData } from "./projectedPath";
+import { projectGeometryToPathData } from "./projectedPath";
+import type { ProjectedPathData } from "./projectedPath";
 import type { MapData } from "./types";
 
 const identityProjection = geoIdentity().reflectY(false) as unknown as GeoProjection;
@@ -368,6 +369,28 @@ function getRegionGeometry(data: MapData, regionId: string): Geometry {
   const region = data.regions.find((candidate) => candidate.id === regionId);
   if (!region) throw new Error(`Missing region ${regionId}`);
   return region.geometry;
+}
+
+function combineProjectedPathData(projectedPaths: Array<ProjectedPathData | null>): ProjectedPathData | null {
+  let pathData = "";
+  let strokePathData = "";
+  let bounds: ProjectedPathData["bounds"] | null = null;
+
+  for (const projected of projectedPaths) {
+    if (!projected) continue;
+    pathData += projected.pathData;
+    strokePathData += projected.strokePathData;
+    bounds = bounds
+      ? {
+          minX: Math.min(bounds.minX, projected.bounds.minX),
+          minY: Math.min(bounds.minY, projected.bounds.minY),
+          maxX: Math.max(bounds.maxX, projected.bounds.maxX),
+          maxY: Math.max(bounds.maxY, projected.bounds.maxY),
+        }
+      : projected.bounds;
+  }
+
+  return pathData && bounds ? { pathData, strokePathData, bounds } : null;
 }
 
 function countLongHorizontalSegments(pathData: string): number {

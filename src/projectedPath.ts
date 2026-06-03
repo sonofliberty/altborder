@@ -19,21 +19,6 @@ type GeoPathWithDigits = ReturnType<typeof geoPath> & {
   digits?: (digits: number) => ReturnType<typeof geoPath>;
 };
 
-export function combineProjectedPathData(projectedPaths: Array<ProjectedPathData | null>): ProjectedPathData | null {
-  let pathData = "";
-  let strokePathData = "";
-  let bounds: ProjectedBounds | null = null;
-
-  for (const projected of projectedPaths) {
-    if (!projected) continue;
-    pathData += projected.pathData;
-    strokePathData += projected.strokePathData;
-    bounds = mergeBounds(bounds, projected.bounds);
-  }
-
-  return pathData && bounds ? { pathData, strokePathData, bounds } : null;
-}
-
 export function geometryToSvgPath(
   geometry: Geometry,
   projection: GeoProjection,
