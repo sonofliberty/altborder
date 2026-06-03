@@ -115,6 +115,24 @@ describe("generated ADM1 coverage", () => {
     expect(hasLongHorizontalExteriorSegment(sakha.geometry)).toBe(false);
   });
 
+  it("emits polygonal map geometry without degenerate rings", () => {
+    const data = mapDataFixture as MapData;
+    const degenerateRings = [];
+
+    for (const region of data.regions) {
+      if (isPolygonalGeometry(region.geometry)) {
+        degenerateRings.push(...degeneratePolygonRingIds(region.id, region.geometry));
+      }
+    }
+    for (const country of data.baseCountries) {
+      if (isPolygonalGeometry(country.geometry)) {
+        degenerateRings.push(...degeneratePolygonRingIds(country.entityId, country.geometry));
+      }
+    }
+
+    expect(degenerateRings).toEqual([]);
+  });
+
   it("generates shared subdivision border linework for multi-region countries", () => {
     const data = mapDataFixture as MapData;
     const regionIds = new Set(data.regions.map((region) => region.id));
@@ -345,6 +363,23 @@ function hasLongHorizontalExteriorSegment(geometry: Polygon | MultiPolygon): boo
       return Math.abs(position[0] - previous[0]) > 40 && Math.abs(position[1] - previous[1]) < 0.05;
     });
   });
+}
+
+function degeneratePolygonRingIds(id: string, geometry: Polygon | MultiPolygon): string[] {
+  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+  const degenerateRings = [];
+
+  for (let polygonIndex = 0; polygonIndex < polygons.length; polygonIndex += 1) {
+    const polygon = polygons[polygonIndex];
+    for (let ringIndex = 0; ringIndex < polygon.length; ringIndex += 1) {
+      const ring = polygon[ringIndex];
+      if (ring.length < 4 || Math.abs(ringSignedArea(ring)) <= 1e-12) {
+        degenerateRings.push(`${id}:${polygonIndex}:${ringIndex}`);
+      }
+    }
+  }
+
+  return degenerateRings;
 }
 
 function linealPartsHaveLength(geometry: MapData["subdivisionBorders"][number]["geometry"]): boolean {

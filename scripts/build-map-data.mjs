@@ -19,13 +19,17 @@ const cacheDir = path.join(root, ".cache/geoboundaries");
 const adm1SimplifyTolerance = 0.03;
 const fallbackSimplifyTolerance = 0.015;
 const fallbackSimplifyToleranceByCountryId = new Map([["CAN", 0.008]]);
-const singleRegionAdm0SimplifyToleranceByCountryId = new Map([["CAN", 0.01]]);
+const singleRegionAdm0SimplifyToleranceByCountryId = new Map([
+  ["CAN", 0.01],
+  ["VAT", 0.00001],
+]);
 const subdivisionBorderSimplifyTolerance = 0.03;
 const subdivisionBorderMatchTolerance = 0.02;
 const minimumSubdivisionBorderLength = 1e-6;
 const minimumPolygonArea = 0.005;
 const minimumClippedAreaRetentionRatio = 0.2;
 const coordinatePrecision = 2;
+const fallbackPolygonCoordinatePrecision = 5;
 const fetchTimeoutMs = 180_000;
 const reader = new GeoJSONReader(new GeometryFactory());
 const writer = new GeoJSONWriter();
@@ -137,7 +141,7 @@ const singleRegionCountries = [
   { iso3: "MLT", name: "Malta", aliases: ["Malta"] },
 ];
 
-const singleRegionAdm0CountryIds = new Set(["CAN"]);
+const singleRegionAdm0CountryIds = new Set(["CAN", "VAT"]);
 
 const nonSovereignFallbackOwners = {
   akrotiri: "GBR",
@@ -1213,19 +1217,21 @@ function rewindForD3(geometry) {
 
 function roundGeometry(geometry) {
   if (geometry.type === "Polygon") {
-    return {
-      type: "Polygon",
-      coordinates: geometry.coordinates.map((ring) => ring.map(roundPoint)),
-    };
+    const rounded = roundPolygonalGeometry(geometry, coordinatePrecision);
+    return (
+      pruneDegeneratePolygonRings(rounded) ??
+      pruneDegeneratePolygonRings(roundPolygonalGeometry(geometry, fallbackPolygonCoordinatePrecision)) ??
+      rounded
+    );
   }
 
   if (geometry.type === "MultiPolygon") {
-    return {
-      type: "MultiPolygon",
-      coordinates: geometry.coordinates.map((polygon) =>
-        polygon.map((ring) => ring.map(roundPoint)),
-      ),
-    };
+    const rounded = roundPolygonalGeometry(geometry, coordinatePrecision);
+    return (
+      pruneDegeneratePolygonRings(rounded) ??
+      pruneDegeneratePolygonRings(roundPolygonalGeometry(geometry, fallbackPolygonCoordinatePrecision)) ??
+      rounded
+    );
   }
 
   if (geometry.type === "LineString") {
@@ -1245,10 +1251,55 @@ function roundGeometry(geometry) {
   return geometry;
 }
 
-function roundPoint(point) {
+function roundPolygonalGeometry(geometry, precision) {
+  if (geometry.type === "Polygon") {
+    return {
+      type: "Polygon",
+      coordinates: geometry.coordinates.map((ring) =>
+        ring.map((point) => roundPoint(point, precision)),
+      ),
+    };
+  }
+
+  return {
+    type: "MultiPolygon",
+    coordinates: geometry.coordinates.map((polygon) =>
+      polygon.map((ring) => ring.map((point) => roundPoint(point, precision))),
+    ),
+  };
+}
+
+function pruneDegeneratePolygonRings(geometry) {
+  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+  const keptPolygons = polygons
+    .map((polygon) => {
+      const [shell, ...holes] = polygon;
+      if (!ringHasArea(shell)) return null;
+      return [shell, ...holes.filter(ringHasArea)];
+    })
+    .filter(Boolean);
+
+  if (keptPolygons.length === 0) return null;
+  if (keptPolygons.length === 1) {
+    return {
+      type: "Polygon",
+      coordinates: keptPolygons[0],
+    };
+  }
+  return {
+    type: "MultiPolygon",
+    coordinates: keptPolygons,
+  };
+}
+
+function ringHasArea(ring) {
+  return Array.isArray(ring) && ring.length >= 4 && ringArea(ring) > 1e-12;
+}
+
+function roundPoint(point, precision = coordinatePrecision) {
   return [
-    Number(point[0].toFixed(coordinatePrecision)),
-    Number(point[1].toFixed(coordinatePrecision)),
+    Number(point[0].toFixed(precision)),
+    Number(point[1].toFixed(precision)),
   ];
 }
 
