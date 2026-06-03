@@ -2,11 +2,16 @@ import { describe, expect, it } from "vitest";
 import colorScheme from "./color-scheme.json";
 import {
   customCountryAccentColor,
-  getCountryColor,
   getFallbackCountryColor,
   isHexColor,
   normalizeCountryColorName,
-} from "./colorScheme";
+} from "./colorRuntime";
+
+type CountryColorInput = {
+  id?: string;
+  name: string;
+  aliases?: string[];
+};
 
 describe("country color scheme", () => {
   it("keeps runtime color constants in sync with the generated color scheme", () => {
@@ -64,4 +69,18 @@ function hashString(value: string): number {
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
+}
+
+function getCountryColor(input: CountryColorInput): string {
+  const idColor = input.id ? colorScheme.curatedColorsById[input.id as keyof typeof colorScheme.curatedColorsById] : undefined;
+  if (idColor) return idColor;
+
+  for (const name of [input.name, ...(input.aliases ?? [])]) {
+    const color = colorScheme.curatedColorsByName[
+      normalizeCountryColorName(name) as keyof typeof colorScheme.curatedColorsByName
+    ];
+    if (color) return color;
+  }
+
+  return getFallbackCountryColor(input.id || input.name);
 }

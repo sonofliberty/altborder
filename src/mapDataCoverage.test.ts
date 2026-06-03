@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import mapDataFixture from "../public/data/map-data.json";
 import colorScheme from "./color-scheme.json";
-import { normalizeCountryColorName } from "./colorScheme";
+import { normalizeCountryColorName } from "./colorRuntime";
 import { buildRegionAdjacency } from "./regionAdjacency";
 import type { Geometry, MultiPolygon, Polygon, Position } from "geojson";
 import type { MapData } from "./types";
