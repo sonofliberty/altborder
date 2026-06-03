@@ -185,7 +185,10 @@ function isPolygonCoordinates(value: unknown): boolean {
 }
 
 function isLinearRing(value: unknown): boolean {
-  return Array.isArray(value) && value.length >= 4 && value.every(isPosition);
+  if (!Array.isArray(value) || value.length < 4 || !value.every(isPosition)) return false;
+  const first = value[0];
+  const last = value[value.length - 1];
+  return first[0] === last[0] && first[1] === last[1];
 }
 
 function isPosition(value: unknown): boolean {
