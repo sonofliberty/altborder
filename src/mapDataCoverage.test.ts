@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import mapDataFixture from "../public/data/map-data.json";
 import colorScheme from "./color-scheme.json";
-import { normalizeCountryColorName } from "./colorRuntime";
 import { buildRegionAdjacency } from "./regionAdjacency";
 import type { Geometry, MultiPolygon, Polygon, Position } from "geojson";
 import type { MapData } from "./types";
@@ -260,6 +259,10 @@ function countryUsesFallbackColor(id: string, name: string): boolean {
       normalizeCountryColorName(name) as keyof typeof colorScheme.curatedColorsByName
     ];
   return !idColor && !nameColor;
+}
+
+function normalizeCountryColorName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function countryBoundaryRecords(data: MapData) {

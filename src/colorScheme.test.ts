@@ -4,7 +4,6 @@ import {
   customCountryAccentColor,
   getFallbackCountryColor,
   isHexColor,
-  normalizeCountryColorName,
 } from "./colorRuntime";
 
 type CountryColorInput = {
@@ -83,4 +82,8 @@ function getCountryColor(input: CountryColorInput): string {
   }
 
   return getFallbackCountryColor(input.id || input.name);
+}
+
+function normalizeCountryColorName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }

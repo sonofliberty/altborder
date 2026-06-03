@@ -27,10 +27,6 @@ export function getFallbackCountryColor(value: string): string {
   return fallbackPalette[hashString(value) % fallbackPalette.length];
 }
 
-export function normalizeCountryColorName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, "");
-}
-
 export function isHexColor(value: string): boolean {
   return hexColorPattern.test(value);
 }
