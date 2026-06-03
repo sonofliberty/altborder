@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CountryEntity, RegionRecord } from "./types";
-import { getSelectedTransferRegions, getValidTransferFocus } from "./transferContext";
+import { getSelectedTransferRegions, getValidTransferFocus, isValidTransferTarget } from "./transferContext";
 
 describe("transfer context helpers", () => {
   it("falls back to the first selected region when the focused region is removed", () => {
@@ -53,6 +53,18 @@ describe("transfer context helpers", () => {
     });
 
     expect(regions.map((entry) => entry.displayName)).toEqual(["Aargau", "Bern", "Zurich"]);
+  });
+
+  it("rejects missing and self transfer targets", () => {
+    const entities = {
+      AAA: country("AAA", "Alpha"),
+      BBB: country("BBB", "Beta"),
+    };
+
+    expect(isValidTransferTarget({ targetEntityId: "BBB", selectedEntityId: "AAA", entities })).toBe(true);
+    expect(isValidTransferTarget({ targetEntityId: "", selectedEntityId: "AAA", entities })).toBe(false);
+    expect(isValidTransferTarget({ targetEntityId: "CCC", selectedEntityId: "AAA", entities })).toBe(false);
+    expect(isValidTransferTarget({ targetEntityId: "AAA", selectedEntityId: "AAA", entities })).toBe(false);
   });
 });
 

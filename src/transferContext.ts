@@ -110,3 +110,15 @@ export function orderTransferTargetEntities({
     otherTargets: validTargets.filter((entity) => !neighborEntityIds.has(entity.id)),
   };
 }
+
+export function isValidTransferTarget({
+  targetEntityId,
+  selectedEntityId,
+  entities,
+}: {
+  targetEntityId: string;
+  selectedEntityId: string;
+  entities: Record<string, CountryEntity>;
+}): boolean {
+  return Boolean(targetEntityId && targetEntityId !== selectedEntityId && entities[targetEntityId]);
+}

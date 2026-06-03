@@ -61,6 +61,7 @@ import {
   getNeighborTargetEntityIds,
   getSelectedTransferRegions,
   getValidTransferFocus,
+  isValidTransferTarget,
   orderTransferTargetEntities,
 } from "./transferContext";
 import { isSubdivisionBorderVisible } from "./subdivisionBorders";
@@ -487,6 +488,14 @@ export default function App() {
 
   const selectedEntity = snapshot && selectedEntityId ? snapshot.entities[selectedEntityId] : undefined;
   const targetEntity = snapshot && targetEntityId ? snapshot.entities[targetEntityId] : undefined;
+  const hasValidTransferTarget = Boolean(
+    entities &&
+    isValidTransferTarget({
+      targetEntityId,
+      selectedEntityId,
+      entities,
+    }),
+  );
   const activeModeUsesRegions = mode === "transfer";
 
   const renderGeometriesByEntityId = useMemo(() => {
@@ -1114,6 +1123,10 @@ export default function App() {
       setTargetEntityId("");
     }
 
+    if (targetEntityId && targetEntityId === selectedEntityId) {
+      setTargetEntityId("");
+    }
+
     setMergeSelection((current) => {
       const next = new Set([...current].filter((entityId) => activeEntityIdSet.has(entityId)));
       if (sameStringSet([...current], [...next])) return current;
@@ -1449,7 +1462,7 @@ export default function App() {
   }
 
   function applyTransfer() {
-    if (!snapshot || !targetEntityId || selectedRegions.size === 0 || readOnly) return;
+    if (!snapshot || !entities || !hasValidTransferTarget || selectedRegions.size === 0 || readOnly) return;
     const regionIds = [...selectedRegions];
     const nextSelectedEntityId = targetEntityId;
     setShare(null);
@@ -2448,7 +2461,7 @@ export default function App() {
               ) : null}
               <button
                 className="primary wide"
-                disabled={readOnly || !targetEntity || selectedRegions.size === 0}
+                disabled={readOnly || !targetEntity || !hasValidTransferTarget || selectedRegions.size === 0}
                 onClick={applyTransfer}
               >
                 <Check size={16} /> Transfer {selectedRegions.size || ""} region(s)
