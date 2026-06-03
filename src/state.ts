@@ -262,6 +262,7 @@ export function applyScenarioPayload(data: MapData, payload: ScenarioPayload): E
   };
 
   for (const region of payload.customRegions || []) {
+    if (region.id in base.regionOwners) continue;
     if (region.ownerId && next.entities[region.ownerId]) {
       next.customRegions[region.id] = { ...region };
       next.regionOwners[region.id] = region.ownerId;
@@ -319,7 +320,11 @@ function createSerializableSnapshot(base: EditorSnapshot, snapshot: EditorSnapsh
 
   for (const [regionId, ownerId] of Object.entries(next.regionOwners)) {
     const isBaseRegion = regionId in base.regionOwners;
-    const isCustomRegion = regionId in next.customRegions;
+    let isCustomRegion = regionId in next.customRegions;
+    if (isBaseRegion && isCustomRegion) {
+      delete next.customRegions[regionId];
+      isCustomRegion = false;
+    }
     if (!isBaseRegion && !isCustomRegion) {
       delete next.regionOwners[regionId];
       continue;

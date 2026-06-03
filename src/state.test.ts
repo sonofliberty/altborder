@@ -265,6 +265,39 @@ describe("scenario custom regions", () => {
     expect(restored.customRegions[customRegion.id]?.ownerId).toBe("AAA");
     expect(restored.customCounter).toBe(2);
   });
+
+  it("rejects custom regions that collide with base region ids", () => {
+    const data = makeMapData();
+    const collidingRegion: RegionRecord = {
+      id: "BBB_1",
+      name: "Fake Beta",
+      ownerId: "AAA",
+      type: "Custom divided territory",
+      geometry: data.regions[0].geometry,
+    };
+    const restored = applyScenarioPayload(data, {
+      version: 1,
+      title: "Colliding custom region",
+      description: "",
+      customCounter: 1,
+      entityChanges: {},
+      regionOwnerChanges: [["BBB_1", "AAA"]],
+      customRegions: [collidingRegion],
+    });
+
+    const payload = createScenarioPayload(data, {
+      ...restored,
+      customRegions: {
+        ...restored.customRegions,
+        [collidingRegion.id]: collidingRegion,
+      },
+    });
+
+    expect(restored.customRegions.BBB_1).toBeUndefined();
+    expect(restored.regionOwners.BBB_1).toBe("AAA");
+    expect(payload.customRegions).toEqual([]);
+    expect(payload.regionOwnerChanges).toContainEqual(["BBB_1", "AAA"]);
+  });
 });
 
 describe("region transfers", () => {
