@@ -19,3 +19,11 @@ describe("scenario metadata UI", () => {
     expect(appSource).toContain("selectedEntity || inspectFocusedRegion || snapshot?.description");
   });
 });
+
+describe("pointer capture handling", () => {
+  it("guards pointer-capture release after cancellation", () => {
+    expect(appSource).toContain("releasePointerCaptureIfHeld(event.currentTarget, pointerId)");
+    expect(appSource).toContain("releasePointerCaptureIfHeld(event.currentTarget, event.pointerId)");
+    expect(appSource).toContain("element.hasPointerCapture(pointerId)");
+  });
+});

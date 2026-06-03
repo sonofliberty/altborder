@@ -1778,7 +1778,7 @@ export default function App() {
           setDivideIslandPoint(null);
         }
       }
-      event.currentTarget.releasePointerCapture(pointerId);
+      releasePointerCaptureIfHeld(event.currentTarget, pointerId);
       return;
     }
 
@@ -1795,7 +1795,7 @@ export default function App() {
         }
       }
       panRef.current = null;
-      event.currentTarget.releasePointerCapture(event.pointerId);
+      releasePointerCaptureIfHeld(event.currentTarget, event.pointerId);
       syncZoomStateNow();
       settleMapMoving();
     }
@@ -2738,6 +2738,12 @@ function getRegionIdAtClientPoint(clientX: number, clientY: number): string | nu
     .elementFromPoint(clientX, clientY)
     ?.closest("[data-region-id]")
     ?.getAttribute("data-region-id") ?? null;
+}
+
+function releasePointerCaptureIfHeld(element: Element, pointerId: number): void {
+  if (element.hasPointerCapture(pointerId)) {
+    element.releasePointerCapture(pointerId);
+  }
 }
 
 function zoomAroundPoint(current: ZoomState, cursor: SvgPoint, factor: number): ZoomState {
