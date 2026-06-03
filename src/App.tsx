@@ -236,15 +236,13 @@ export default function App() {
         return;
       }
 
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-      if (event.shiftKey && document.activeElement === firstElement) {
-        event.preventDefault();
-        lastElement.focus();
-      } else if (!event.shiftKey && document.activeElement === lastElement) {
-        event.preventDefault();
-        firstElement.focus();
-      }
+      event.preventDefault();
+      const activeIndex = focusableElements.findIndex((element) => element === document.activeElement);
+      const currentIndex = activeIndex >= 0 ? activeIndex : 0;
+      const nextIndex = event.shiftKey
+        ? (currentIndex - 1 + focusableElements.length) % focusableElements.length
+        : (currentIndex + 1) % focusableElements.length;
+      focusableElements[nextIndex].focus();
     }
 
     document.addEventListener("keydown", handleDialogKeyDown);
