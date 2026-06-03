@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { feature } from "topojson-client";
 import simplify from "@turf/simplify";
 import rewind from "@turf/rewind";
@@ -287,7 +287,7 @@ async function main() {
       geometry: worldGeometry,
     });
 
-    if (selectedNames.has(normalizeName(worldName))) {
+    if (shouldSkipWorldFallback(normalizedWorldName, countryNameToId)) {
       continue;
     }
 
@@ -1036,6 +1036,10 @@ function normalizeName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
+export function shouldSkipWorldFallback(normalizedWorldName, countryNameToId) {
+  return selectedNames.has(normalizedWorldName) && countryNameToId.has(normalizedWorldName);
+}
+
 function simplifyGeometry(geometry, tolerance) {
   if (!geometry) {
     return geometry;
@@ -1303,7 +1307,9 @@ function roundPoint(point, precision = coordinatePrecision) {
   ];
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
