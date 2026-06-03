@@ -146,6 +146,8 @@ describe("generated ADM1 coverage", () => {
       expect(baseOwnerByRegionId.get(secondRegionId), border.id).toBe(border.ownerId);
       expect(["LineString", "MultiLineString"], border.id).toContain(border.geometry.type);
       expect(linealPartsHaveLength(border.geometry), border.id).toBe(true);
+      expect(border.regionIds, border.id).toEqual([...border.regionIds].sort());
+      expect(border.id, border.id).toBe(`${border.ownerId}:${firstRegionId}:${secondRegionId}`);
     }
   });
 

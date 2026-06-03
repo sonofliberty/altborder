@@ -405,10 +405,11 @@ function buildSubdivisionBorders(countries, regions) {
         const geometry = sharedSubdivisionBorderGeometry(first.boundary, second.boundary);
         if (!geometry) continue;
 
+        const regionIds = [first.id, second.id].sort();
         borders.push({
-          id: `${country.id}:${first.id}:${second.id}`,
+          id: `${country.id}:${regionIds[0]}:${regionIds[1]}`,
           ownerId: country.id,
-          regionIds: [first.id, second.id],
+          regionIds,
           geometry,
         });
       }
