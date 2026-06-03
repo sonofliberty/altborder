@@ -27,3 +27,10 @@ describe("pointer capture handling", () => {
     expect(appSource).toContain("element.hasPointerCapture(pointerId)");
   });
 });
+
+describe("transient interaction state", () => {
+  it("clears active brush state when changing tools or clearing selection", () => {
+    expect(appSource.match(/setIsBrushDown\(false\);/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(appSource).toContain("setBrushEnabled(false)");
+  });
+});

@@ -1218,6 +1218,7 @@ export default function App() {
       future: [],
     });
     setSelectedRegions(new Set());
+    setIsBrushDown(false);
     setTransferFocusedRegionId("");
     setMergeSelection(new Set());
     setTargetEntityId("");
@@ -1229,6 +1230,7 @@ export default function App() {
     setSelectedRegions(new Set());
     setTransferFocusedRegionId("");
     setMergeSelection(new Set());
+    setIsBrushDown(false);
     setBrushEnabled(false);
     setShare(null);
     clearDivideDraft();
@@ -1240,6 +1242,7 @@ export default function App() {
     setSelectedRegions(new Set());
     setTransferFocusedRegionId("");
     setMergeSelection(new Set());
+    setIsBrushDown(false);
     setMergeName("");
     clearDivideDraft();
   }
