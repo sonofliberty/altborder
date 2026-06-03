@@ -16,6 +16,12 @@ describe("country underlay rendering", () => {
     expect(appSource).toContain('fillRule="evenodd"');
   });
 
+  it("clears derived geometry caches when custom region geometry changes", () => {
+    expect(appSource).toMatch(
+      /useEffect\(\(\) => \{\s+countryUnderlayCacheRef\.current\.clear\(\);\s+countryLabelLayoutCacheRef\.current\.clear\(\);\s+\}, \[customRegionRecords\]\);/,
+    );
+  });
+
   it("builds changed-country underlay fills from unioned original geometry", () => {
     expect(appSource).toContain("hasTransferredOwnershipChanges(");
     expect(appSource).toContain("baseCountryByEntityId.get(baseEntityId)?.geometry");

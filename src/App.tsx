@@ -319,6 +319,11 @@ export default function App() {
     return geometries;
   }, [customRegionRecords, data]);
 
+  useEffect(() => {
+    countryUnderlayCacheRef.current.clear();
+    countryLabelLayoutCacheRef.current.clear();
+  }, [customRegionRecords]);
+
   const renderBaseCountryByEntityId = useMemo(() => {
     if (!data) return new Map<string, { geometry: Geometry }>();
     return new Map(
