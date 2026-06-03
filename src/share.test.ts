@@ -126,6 +126,31 @@ describe("share helpers", () => {
     });
   });
 
+  it("rejects entity records with invalid colors", async () => {
+    const encoded = await encodeSharePayload({
+      version: 1,
+      title: "Broken map",
+      description: "",
+      customCounter: 1,
+      entityChanges: {
+        CUSTOM_001: {
+          id: "CUSTOM_001",
+          name: "Broken",
+          color: "not-a-color",
+          regionIds: [],
+          isCustom: true,
+        },
+      },
+      regionOwnerChanges: [],
+      customRegions: [],
+    } as unknown as ScenarioPayload);
+
+    await expect(decodeSharePayload(encoded)).resolves.toEqual({
+      ok: false,
+      error: "The shared map link is invalid.",
+    });
+  });
+
   it("rejects ownerless custom regions in shared payloads", async () => {
     const encoded = await encodeSharePayload({
       version: 1,
