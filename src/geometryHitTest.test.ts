@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import { geoNaturalEarth1 } from "d3-geo";
 import type { Geometry, Position } from "geojson";
 import mapDataFixture from "../public/data/map-data.json";
-import { findRegionAtProjectedPoint, type HitTestRegion } from "./geometryHitTest";
+import { findRegionAtProjectedPoint } from "./geometryHitTest";
 import type { MapData } from "./types";
 
 const identityProject = (position: Position) => [position[0], position[1]] as [number, number];
+type HitTestRegion = Parameters<typeof findRegionAtProjectedPoint>[1][number];
 
 describe("findRegionAtProjectedPoint", () => {
   it("finds a polygon region by projected point", () => {

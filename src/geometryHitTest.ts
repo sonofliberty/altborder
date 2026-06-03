@@ -3,7 +3,7 @@ import type { ProjectedBounds } from "./mapZoom";
 
 export type ProjectPoint = (position: Position) => [number, number] | null | undefined;
 
-export type HitTestRegion = {
+type HitTestRegion = {
   id: string;
   geometry: Geometry;
   bounds: ProjectedBounds | null;
