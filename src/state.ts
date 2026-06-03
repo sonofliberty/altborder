@@ -63,6 +63,7 @@ export function updateEntityRegions(snapshot: EditorSnapshot): EditorSnapshot {
     }
     next.customRegions[regionId] = withCurrentRegionOwner(region, ownerId);
   }
+  next.regionNameOverrides = pruneInactiveRegionNameOverrides(next);
   pruneEmptyCustomEntities(next.entities);
   return next;
 }
@@ -202,9 +203,10 @@ export function makeCustomEntityId(counter: number): string {
 
 export function createScenarioPayload(data: MapData, snapshot: EditorSnapshot): ScenarioPayload {
   const base = createInitialSnapshot(data);
+  const normalizedSnapshot = createSerializableSnapshot(base, snapshot);
   const entityChanges: Record<string, CountryEntity> = {};
 
-  for (const [id, entity] of Object.entries(snapshot.entities)) {
+  for (const [id, entity] of Object.entries(normalizedSnapshot.entities)) {
     if (entity.isCustom && entity.regionIds.length === 0) continue;
     const baseEntity = base.entities[id];
     if (
@@ -217,24 +219,24 @@ export function createScenarioPayload(data: MapData, snapshot: EditorSnapshot): 
     }
   }
 
-  const regionOwnerChanges = Object.entries(snapshot.regionOwners).filter(
+  const regionOwnerChanges = Object.entries(normalizedSnapshot.regionOwners).filter(
     ([regionId, ownerId]) => base.regionOwners[regionId] !== ownerId,
   );
 
   return {
     version: 1,
-    title: snapshot.title,
-    description: snapshot.description,
-    customCounter: snapshot.customCounter,
+    title: normalizedSnapshot.title,
+    description: normalizedSnapshot.description,
+    customCounter: normalizedSnapshot.customCounter,
     entityChanges,
     regionOwnerChanges,
-    regionNameOverrides: snapshot.regionNameOverrides,
-    customRegions: Object.values(snapshot.customRegions)
+    regionNameOverrides: pruneInactiveRegionNameOverrides(normalizedSnapshot),
+    customRegions: Object.values(normalizedSnapshot.customRegions)
       .filter((region) => {
-        const ownerId = snapshot.regionOwners[region.id];
-        return Boolean(ownerId && snapshot.entities[ownerId]);
+        const ownerId = normalizedSnapshot.regionOwners[region.id];
+        return Boolean(ownerId && normalizedSnapshot.entities[ownerId]);
       })
-      .map((region) => withCurrentRegionOwner(region, snapshot.regionOwners[region.id])),
+      .map((region) => withCurrentRegionOwner(region, normalizedSnapshot.regionOwners[region.id])),
   };
 }
 
@@ -293,4 +295,36 @@ function pruneEmptyCustomEntities(entities: Record<string, CountryEntity>): void
       delete entities[entityId];
     }
   }
+}
+
+function createSerializableSnapshot(base: EditorSnapshot, snapshot: EditorSnapshot): EditorSnapshot {
+  const next = cloneSnapshot(snapshot);
+
+  for (const [regionId, ownerId] of Object.entries(next.regionOwners)) {
+    const isBaseRegion = regionId in base.regionOwners;
+    const isCustomRegion = regionId in next.customRegions;
+    if (!isBaseRegion && !isCustomRegion) {
+      delete next.regionOwners[regionId];
+      continue;
+    }
+    if (ownerId && !next.entities[ownerId]) {
+      if (isCustomRegion) {
+        delete next.customRegions[regionId];
+        delete next.regionOwners[regionId];
+      } else {
+        next.regionOwners[regionId] = base.regionOwners[regionId] ?? "";
+      }
+    }
+  }
+
+  return updateEntityRegions(next);
+}
+
+function pruneInactiveRegionNameOverrides(snapshot: EditorSnapshot): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(snapshot.regionNameOverrides).filter(([regionId]) => {
+      const ownerId = snapshot.regionOwners[regionId];
+      return Boolean(ownerId && snapshot.entities[ownerId]);
+    }),
+  );
 }

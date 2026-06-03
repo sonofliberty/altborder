@@ -67,6 +67,63 @@ describe("scenario custom regions", () => {
     expect(restored.regionNameOverrides.BBB_1).toBe("Renamed Beta");
   });
 
+  it("drops region name overrides for missing or inactive regions", () => {
+    const data = makeMapData();
+    const snapshot = renameRegion(createInitialSnapshot(data), "BBB_1", "Renamed Beta");
+    snapshot.regionNameOverrides.MISSING = "Ghost";
+    snapshot.regionNameOverrides.AAA_ALL = "Dormant Alpha";
+    snapshot.regionOwners.AAA_ALL = "";
+
+    const payload = createScenarioPayload(data, snapshot);
+    const restored = applyScenarioPayload(data, {
+      ...payload,
+      regionNameOverrides: {
+        BBB_1: "Renamed Beta",
+        MISSING: "Ghost",
+        AAA_ALL: "Dormant Alpha",
+      },
+      regionOwnerChanges: [["AAA_ALL", ""]],
+    });
+
+    expect(payload.regionNameOverrides).toEqual({ BBB_1: "Renamed Beta" });
+    expect(restored.regionNameOverrides).toEqual({ BBB_1: "Renamed Beta" });
+  });
+
+  it("does not serialize custom entities that only own unknown regions", () => {
+    const data = makeMapData();
+    const snapshot = createInitialSnapshot(data);
+    snapshot.customCounter = 2;
+    snapshot.entities.CUSTOM_001 = {
+      id: "CUSTOM_001",
+      name: "Ghostland",
+      color: "#A85F4F",
+      regionIds: ["MISSING"],
+      isCustom: true,
+    };
+    snapshot.regionOwners.MISSING = "CUSTOM_001";
+    snapshot.regionNameOverrides.MISSING = "Ghost";
+
+    const payload = createScenarioPayload(data, snapshot);
+
+    expect(payload.entityChanges.CUSTOM_001).toBeUndefined();
+    expect(payload.regionOwnerChanges).not.toContainEqual(["MISSING", "CUSTOM_001"]);
+    expect(payload.regionNameOverrides).toEqual({});
+  });
+
+  it("does not serialize invalid owners for base regions", () => {
+    const data = makeMapData();
+    const snapshot = createInitialSnapshot(data);
+    snapshot.regionOwners.BBB_1 = "MISSING_OWNER";
+    snapshot.regionNameOverrides.BBB_1 = "Renamed Beta";
+
+    const payload = createScenarioPayload(data, snapshot);
+    const restored = applyScenarioPayload(data, payload);
+
+    expect(payload.regionOwnerChanges).not.toContainEqual(["BBB_1", "MISSING_OWNER"]);
+    expect(payload.regionNameOverrides).toEqual({ BBB_1: "Renamed Beta" });
+    expect(restored.regionOwners.BBB_1).toBe("BBB");
+  });
+
   it("preserves an intentionally empty scenario title", () => {
     const data = makeMapData();
     const snapshot = createInitialSnapshot(data);
@@ -124,6 +181,9 @@ describe("scenario custom regions", () => {
         },
       },
       regionOwnerChanges: [[customRegion.id, ""]],
+      regionNameOverrides: {
+        [customRegion.id]: "Cleared name",
+      },
       customRegions: [customRegion],
     };
 
@@ -131,6 +191,7 @@ describe("scenario custom regions", () => {
 
     expect(restored.customRegions[customRegion.id]).toBeUndefined();
     expect(restored.regionOwners[customRegion.id]).toBeUndefined();
+    expect(restored.regionNameOverrides[customRegion.id]).toBeUndefined();
     expect(restored.entities.CUSTOM_001).toBeUndefined();
   });
 });
