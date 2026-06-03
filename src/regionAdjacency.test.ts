@@ -41,6 +41,29 @@ describe("buildRegionAdjacency", () => {
 
     expect(adjacency.get("left")?.has("right")).toBe(true);
   });
+
+  it("does not connect boundaries that only touch tolerance at one end", () => {
+    const adjacency = buildRegionAdjacency(
+      [
+        region("left", square(0, 0, 1, 10)),
+        region("slanted", {
+          type: "Polygon",
+          coordinates: [
+            [
+              [1.0004, 0],
+              [2, 0],
+              [2, 10],
+              [1.1, 10],
+              [1.0004, 0],
+            ],
+          ],
+        }),
+      ],
+      0.001,
+    );
+
+    expect(adjacency.get("left")?.has("slanted")).toBe(false);
+  });
 });
 
 describe("transfer target ordering", () => {

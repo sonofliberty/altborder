@@ -14,14 +14,12 @@ describe("layoutCountryLabel", () => {
       name: "Small",
       geometries: [square(0, 0, 10, 10)],
       project: identityProject,
-      zoomScale: 2,
     });
     const large = layoutCountryLabel({
       id: "large",
       name: "Large",
       geometries: [square(0, 0, 100, 100)],
       project: identityProject,
-      zoomScale: 2,
     });
 
     expect(small).not.toBeNull();
@@ -35,7 +33,6 @@ describe("layoutCountryLabel", () => {
       name: "Box",
       geometries: [square(0, 0, 30, 20)],
       project: identityProject,
-      zoomScale: 2,
     });
 
     expect(label).not.toBeNull();
@@ -63,7 +60,6 @@ describe("layoutCountryLabel", () => {
         coordinates: [coordinates],
       }],
       project: identityProject,
-      zoomScale: 4,
     });
 
     expect(label).not.toBeNull();
@@ -78,34 +74,11 @@ describe("layoutCountryLabel", () => {
       name: "Multi",
       geometries: [multiSquare([squareCoordinates(0, 0, 8, 8), squareCoordinates(50, 50, 90, 90)])],
       project: identityProject,
-      zoomScale: 2,
     });
 
     expect(label).not.toBeNull();
     expect(label!.x).toBeGreaterThan(50);
     expect(label!.y).toBeGreaterThan(50);
-  });
-
-  it("hides tiny labels until zoom makes them readable", () => {
-    const hidden = layoutCountryLabel({
-      id: "tiny",
-      name: "Tiny",
-      geometries: [square(0, 0, 2, 2)],
-      project: identityProject,
-      zoomScale: 1,
-    });
-    const visible = layoutCountryLabel({
-      id: "tiny",
-      name: "Tiny",
-      geometries: [square(0, 0, 2, 2)],
-      project: identityProject,
-      zoomScale: 30,
-    });
-
-    expect(hidden).not.toBeNull();
-    expect(visible).not.toBeNull();
-    expect(hidden!.visible).toBe(false);
-    expect(visible!.visible).toBe(true);
   });
 
   it("shrinks long names to fit available geometry", () => {
@@ -114,14 +87,12 @@ describe("layoutCountryLabel", () => {
       name: "Short",
       geometries: [square(0, 0, 80, 40)],
       project: identityProject,
-      zoomScale: 2,
     });
     const long = layoutCountryLabel({
       id: "long",
       name: "A Very Long Country Name",
       geometries: [square(0, 0, 80, 40)],
       project: identityProject,
-      zoomScale: 2,
     });
 
     expect(short).not.toBeNull();
@@ -135,7 +106,6 @@ describe("layoutCountryLabel", () => {
       name: "Skinnyland",
       geometries: [skinnyPolygon()],
       project: identityProject,
-      zoomScale: 30,
     });
 
     expect(label).not.toBeNull();
@@ -172,7 +142,6 @@ describe("layoutCountryLabel", () => {
           name: country.name,
           geometries,
           project: (position) => projection([position[0], position[1]]),
-          zoomScale: 30,
         });
       });
 
@@ -210,7 +179,6 @@ describe("layoutCountryLabel", () => {
         name: country.name,
         geometries,
         project: (position) => projection([position[0], position[1]]),
-        zoomScale: 30,
       });
 
       expect(label).not.toBeNull();

@@ -84,7 +84,6 @@ describe("getCountryLabelGeometries", () => {
       name: germany.name,
       geometries,
       project: (position) => projection([position[0], position[1]]),
-      zoomScale: 30,
     });
     const germanyPolygons = projectGeometryRings(germanyBase.geometry, (position) => projection([position[0], position[1]]));
 

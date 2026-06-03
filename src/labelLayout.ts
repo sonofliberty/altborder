@@ -1,5 +1,5 @@
 import type { Geometry, Position } from "geojson";
-import { countryLabelCharWidthRatio, countryLabelMinScreenFontSize } from "./labelConstants";
+import { countryLabelCharWidthRatio } from "./labelConstants";
 
 export type ProjectPoint = (position: Position) => [number, number] | null | undefined;
 
@@ -14,7 +14,6 @@ export type FittedCountryLabel = {
   height: number;
   angle: number;
   priority: number;
-  visible: boolean;
 };
 
 export type CountryLabelInput = {
@@ -22,7 +21,6 @@ export type CountryLabelInput = {
   name: string;
   geometries: Geometry[];
   project: ProjectPoint;
-  zoomScale: number;
   priority?: number;
 };
 
@@ -78,7 +76,6 @@ export function layoutCountryLabel(input: CountryLabelInput): FittedCountryLabel
     height: label.height,
     angle: label.angle,
     priority: input.priority ?? 0,
-    visible: label.fontSize * input.zoomScale >= countryLabelMinScreenFontSize,
   };
 }
 

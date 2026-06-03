@@ -138,7 +138,7 @@ function nearlyCollinearOverlapLength(first: Segment, second: Segment, tolerance
 
   const distanceStart = pointLineDistance(second.start, first.start, first.end);
   const distanceEnd = pointLineDistance(second.end, first.start, first.end);
-  if (Math.min(distanceStart, distanceEnd) > tolerance) return 0;
+  if (Math.max(distanceStart, distanceEnd) > tolerance) return 0;
 
   const axis: Position = [firstVector[0] / firstLength, firstVector[1] / firstLength];
   const firstMin = Math.min(projectOnAxis(first.start, axis), projectOnAxis(first.end, axis));

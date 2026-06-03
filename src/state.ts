@@ -1,4 +1,4 @@
-import type { CountryEntity, EditorSnapshot, MapData, ScenarioPayload } from "./types";
+import type { CountryEntity, EditorSnapshot, MapData, RegionRecord, ScenarioPayload } from "./types";
 
 export function createInitialSnapshot(data: MapData): EditorSnapshot {
   const regionOwners: Record<string, string> = {};
@@ -54,6 +54,16 @@ export function updateEntityRegions(snapshot: EditorSnapshot): EditorSnapshot {
       next.entities[ownerId].regionIds.push(regionId);
     }
   }
+  for (const [regionId, region] of Object.entries(next.customRegions)) {
+    const ownerId = next.regionOwners[regionId];
+    if (!ownerId || !next.entities[ownerId]) {
+      delete next.customRegions[regionId];
+      delete next.regionOwners[regionId];
+      continue;
+    }
+    next.customRegions[regionId] = withCurrentRegionOwner(region, ownerId);
+  }
+  pruneEmptyCustomEntities(next.entities);
   return next;
 }
 
@@ -112,10 +122,20 @@ export function transferRegions(
     regionIds: [...targetEntity.regionIds, ...addedTargetRegionIds],
   };
 
+  const nextCustomRegions = { ...snapshot.customRegions };
+  for (const regionId of movedRegionIds) {
+    const customRegion = nextCustomRegions[regionId];
+    if (customRegion) {
+      nextCustomRegions[regionId] = withCurrentRegionOwner(customRegion, targetEntityId);
+    }
+  }
+  pruneEmptyCustomEntities(nextEntities);
+
   return {
     ...snapshot,
     entities: nextEntities,
     regionOwners: nextRegionOwners,
+    customRegions: nextCustomRegions,
   };
 }
 
@@ -160,7 +180,6 @@ export function separateRegionAsCountry(
     color,
     regionIds: [regionId],
     isCustom: true,
-    createdFrom: `${sourceEntityId}:${regionId}`,
   };
 
   return {
@@ -186,6 +205,7 @@ export function createScenarioPayload(data: MapData, snapshot: EditorSnapshot): 
   const entityChanges: Record<string, CountryEntity> = {};
 
   for (const [id, entity] of Object.entries(snapshot.entities)) {
+    if (entity.isCustom && entity.regionIds.length === 0) continue;
     const baseEntity = base.entities[id];
     if (
       !baseEntity ||
@@ -209,7 +229,12 @@ export function createScenarioPayload(data: MapData, snapshot: EditorSnapshot): 
     entityChanges,
     regionOwnerChanges,
     regionNameOverrides: snapshot.regionNameOverrides,
-    customRegions: Object.values(snapshot.customRegions),
+    customRegions: Object.values(snapshot.customRegions)
+      .filter((region) => {
+        const ownerId = snapshot.regionOwners[region.id];
+        return Boolean(ownerId && snapshot.entities[ownerId]);
+      })
+      .map((region) => withCurrentRegionOwner(region, snapshot.regionOwners[region.id])),
   };
 }
 
@@ -217,9 +242,9 @@ export function applyScenarioPayload(data: MapData, payload: ScenarioPayload): E
   const base = createInitialSnapshot(data);
   const next: EditorSnapshot = {
     ...base,
-    title: payload.title || base.title,
-    description: payload.description || "",
-    customCounter: payload.customCounter || base.customCounter,
+    title: payload.title ?? base.title,
+    description: payload.description ?? "",
+    customCounter: payload.customCounter ?? base.customCounter,
     entities: {
       ...base.entities,
       ...Object.fromEntries(
@@ -231,13 +256,12 @@ export function applyScenarioPayload(data: MapData, payload: ScenarioPayload): E
     },
     regionOwners: { ...base.regionOwners },
     regionNameOverrides: { ...(payload.regionNameOverrides || {}) },
-    customRegions: Object.fromEntries(
-      (payload.customRegions || []).map((region) => [region.id, { ...region }]),
-    ),
+    customRegions: {},
   };
 
   for (const region of payload.customRegions || []) {
     if (region.ownerId && next.entities[region.ownerId]) {
+      next.customRegions[region.id] = { ...region };
       next.regionOwners[region.id] = region.ownerId;
     }
   }
@@ -249,4 +273,24 @@ export function applyScenarioPayload(data: MapData, payload: ScenarioPayload): E
   }
 
   return updateEntityRegions(next);
+}
+
+function withCurrentRegionOwner(region: RegionRecord, ownerId: string | undefined): RegionRecord {
+  if (ownerId === undefined || region.ownerId === ownerId) {
+    return region;
+  }
+  if (!ownerId) {
+    const regionWithoutOwner = { ...region };
+    delete regionWithoutOwner.ownerId;
+    return regionWithoutOwner;
+  }
+  return { ...region, ownerId };
+}
+
+function pruneEmptyCustomEntities(entities: Record<string, CountryEntity>): void {
+  for (const [entityId, entity] of Object.entries(entities)) {
+    if (entity.isCustom && entity.regionIds.length === 0) {
+      delete entities[entityId];
+    }
+  }
 }

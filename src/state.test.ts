@@ -28,7 +28,6 @@ describe("scenario custom regions", () => {
       color: "#A85F4F",
       regionIds: [customRegion.id],
       isCustom: true,
-      createdFrom: "AAA",
     };
     snapshot.customRegions[customRegion.id] = customRegion;
     snapshot.regionOwners.AAA_ALL = "";
@@ -66,6 +65,73 @@ describe("scenario custom regions", () => {
 
     expect(payload.regionNameOverrides).toEqual({ BBB_1: "Renamed Beta" });
     expect(restored.regionNameOverrides.BBB_1).toBe("Renamed Beta");
+  });
+
+  it("preserves an intentionally empty scenario title", () => {
+    const data = makeMapData();
+    const snapshot = createInitialSnapshot(data);
+    snapshot.title = "";
+
+    const restored = applyScenarioPayload(data, createScenarioPayload(data, snapshot));
+
+    expect(restored.title).toBe("");
+  });
+
+  it("omits custom regions that no longer have a valid owner", () => {
+    const data = makeMapData();
+    const snapshot = createInitialSnapshot(data);
+    const customRegion: RegionRecord = {
+      id: "CUSTOM_001-TERRITORY",
+      name: "Orphan",
+      type: "Custom divided territory",
+      geometry: data.regions[0].geometry,
+    };
+
+    snapshot.customRegions[customRegion.id] = customRegion;
+
+    const payload = createScenarioPayload(data, snapshot);
+    const restored = applyScenarioPayload(data, {
+      ...payload,
+      customRegions: [customRegion],
+    });
+
+    expect(payload.customRegions).toEqual([]);
+    expect(restored.customRegions[customRegion.id]).toBeUndefined();
+    expect(restored.regionOwners[customRegion.id]).toBeUndefined();
+  });
+
+  it("drops custom regions cleared by region owner changes during restoration", () => {
+    const data = makeMapData();
+    const customRegion: RegionRecord = {
+      id: "CUSTOM_001-TERRITORY",
+      name: "Orphan",
+      ownerId: "CUSTOM_001",
+      type: "Custom divided territory",
+      geometry: data.regions[0].geometry,
+    };
+    const payload: ScenarioPayload = {
+      version: 1,
+      title: "Cleared custom region",
+      description: "",
+      customCounter: 2,
+      entityChanges: {
+        CUSTOM_001: {
+          id: "CUSTOM_001",
+          name: "Orphan",
+          color: "#A85F4F",
+          regionIds: [customRegion.id],
+          isCustom: true,
+        },
+      },
+      regionOwnerChanges: [[customRegion.id, ""]],
+      customRegions: [customRegion],
+    };
+
+    const restored = applyScenarioPayload(data, payload);
+
+    expect(restored.customRegions[customRegion.id]).toBeUndefined();
+    expect(restored.regionOwners[customRegion.id]).toBeUndefined();
+    expect(restored.entities.CUSTOM_001).toBeUndefined();
   });
 });
 
@@ -106,10 +172,45 @@ describe("region transfers", () => {
       color: "#A85F4F",
       regionIds: ["BBB_1"],
       isCustom: true,
-      createdFrom: "BBB:BBB_1",
     });
     expect(result?.snapshot.entities.BBB.regionIds).toEqual(["BBB_2"]);
     expect(result?.snapshot.customCounter).toBe(2);
+  });
+
+  it("keeps transferred custom region owner metadata in sync", () => {
+    const data = makeMapData();
+    const snapshot = createInitialSnapshot(data);
+    const customRegion: RegionRecord = {
+      id: "CUSTOM_001-TERRITORY",
+      name: "Newland",
+      ownerId: "CUSTOM_001",
+      type: "Custom divided territory",
+      geometry: data.regions[0].geometry,
+    };
+
+    snapshot.customCounter = 2;
+    snapshot.entities.CUSTOM_001 = {
+      id: "CUSTOM_001",
+      name: "Newland",
+      color: "#A85F4F",
+      regionIds: [customRegion.id],
+      isCustom: true,
+    };
+    snapshot.customRegions[customRegion.id] = customRegion;
+    snapshot.regionOwners[customRegion.id] = "CUSTOM_001";
+
+    const transferred = transferRegions(snapshot, [customRegion.id], "AAA");
+    const payload = createScenarioPayload(data, transferred);
+    const restored = applyScenarioPayload(data, payload);
+
+    expect(transferred.regionOwners[customRegion.id]).toBe("AAA");
+    expect(transferred.customRegions[customRegion.id].ownerId).toBe("AAA");
+    expect(transferred.entities.CUSTOM_001).toBeUndefined();
+    expect(payload.entityChanges.CUSTOM_001).toBeUndefined();
+    expect(restored.regionOwners[customRegion.id]).toBe("AAA");
+    expect(restored.customRegions[customRegion.id].ownerId).toBe("AAA");
+    expect(restored.entities.CUSTOM_001).toBeUndefined();
+    expect(restored.entities.AAA.regionIds).toContain(customRegion.id);
   });
 });
 

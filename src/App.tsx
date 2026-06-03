@@ -120,7 +120,6 @@ type CountryUnderlay = {
   id: string;
   pathData: string;
   strokePathData: string;
-  cacheKey: string;
   bounds: ProjectedBounds;
 };
 
@@ -459,6 +458,7 @@ export default function App() {
   const activeEntityIds = useMemo(() => {
     return [...regionIdsByEntityId.keys()].sort((a, b) => a.localeCompare(b));
   }, [regionIdsByEntityId]);
+  const activeEntityIdSet = useMemo(() => new Set(activeEntityIds), [activeEntityIds]);
 
   const changedRegionIds = useMemo(() => {
     const changed = new Set<string>();
@@ -639,7 +639,6 @@ export default function App() {
             id: entityId,
             pathData: projected.pathData,
             strokePathData: projected.strokePathData,
-            cacheKey,
             bounds: projected.bounds,
           };
           countryUnderlayCacheRef.current.set(cacheKey, underlay);
@@ -663,14 +662,9 @@ export default function App() {
     baseCountryByEntityId,
     baseEntityById,
     baseOwnerByRegionId,
-    customProjectedRegionById,
     data,
-    getBaseProjectedRegion,
     originalRegionGeometryById,
     projection,
-    regionById,
-    renderBaseCountryByEntityId,
-    renderRegionGeometryById,
     regionIdsByEntityId,
     renderGeometriesByEntityId,
   ]);
@@ -781,7 +775,6 @@ export default function App() {
             name: entity.name,
             geometries,
             project: (position) => projection([position[0], position[1]]),
-            zoomScale: maxZoom,
             priority: geometries.length,
           });
           if (label) {
@@ -1099,6 +1092,42 @@ export default function App() {
   const divideLinePath = svgLineToPath(divideLine);
   const visibleDivideError = divideError || (!divideSplit.ok ? divideSplit.reason : "");
   const showSidePanel = mode !== "inspect" || Boolean(selectedEntity || inspectFocusedRegion);
+
+  useEffect(() => {
+    if (!snapshot) return;
+
+    if (selectedEntityId && !activeEntityIdSet.has(selectedEntityId)) {
+      setSelectedEntityId("");
+      setInspectFocusedRegionId("");
+      setTransferFocusedRegionId("");
+      setSelectedRegions(new Set());
+      clearDivideDraft();
+    }
+
+    if (targetEntityId && !activeEntityIdSet.has(targetEntityId)) {
+      setTargetEntityId("");
+    }
+
+    setMergeSelection((current) => {
+      const next = new Set([...current].filter((entityId) => activeEntityIdSet.has(entityId)));
+      if (sameStringSet([...current], [...next])) return current;
+      setMergeName(makeDefaultMergeName(snapshot, next));
+      return next;
+    });
+
+    if (mode === "transfer") {
+      setSelectedRegions((current) => {
+        const next = new Set(
+          [...current].filter((regionId) => {
+            const ownerId = snapshot.regionOwners[regionId];
+            return Boolean(ownerId && (!selectedEntityId || ownerId === selectedEntityId));
+          }),
+        );
+        return sameStringSet([...current], [...next]) ? current : next;
+      });
+    }
+  }, [activeEntityIdSet, mode, selectedEntityId, snapshot, targetEntityId]);
+
   useEffect(() => {
     if (!inspectFocusedRegionId || !snapshot) return;
     if (!selectedEntityId || snapshot.regionOwners[inspectFocusedRegionId] !== selectedEntityId) {
@@ -1450,7 +1479,6 @@ export default function App() {
         color,
         regionIds: [newRegionId],
         isCustom: true,
-        createdFrom: selectedEntity.id,
       };
       draft.customRegions[existingRegionId] = {
         id: existingRegionId,
@@ -1496,7 +1524,6 @@ export default function App() {
         color: getFallbackCountryColor(name),
         regionIds,
         isCustom: true,
-        createdFrom: members.join("+"),
       };
       for (const regionId of regionIds) {
         draft.regionOwners[regionId] = newEntityId;

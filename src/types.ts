@@ -8,7 +8,6 @@ export type CountryEntity = {
   color: string;
   regionIds: string[];
   isCustom?: boolean;
-  createdFrom?: string;
 };
 
 export type RegionRecord = {
@@ -19,7 +18,7 @@ export type RegionRecord = {
   geometry: Geometry;
 };
 
-export type BaseCountryRecord = {
+type BaseCountryRecord = {
   entityId: string;
   geometry: Geometry;
 };

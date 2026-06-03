@@ -19,8 +19,11 @@ export async function decodeSharePayload(encoded: string): Promise<DecodedShare>
       return { ok: false, error: "The shared map data could not be decompressed." };
     }
     const payload = JSON.parse(json) as ScenarioPayload;
-    if (payload.version !== 1) {
+    if (!isRecord(payload) || payload.version !== 1) {
       return { ok: false, error: "This shared map uses an unsupported scenario version." };
+    }
+    if (!isScenarioPayloadShape(payload)) {
+      return { ok: false, error: "The shared map link is invalid." };
     }
     return { ok: true, payload };
   } catch {
@@ -65,4 +68,119 @@ export function describeUrlSize(url: string): { bytes: number; level: "ok" | "wa
     return { bytes, level: "warn" };
   }
   return { bytes, level: "ok" };
+}
+
+function isScenarioPayloadShape(payload: Record<string, unknown>): payload is ScenarioPayload {
+  return (
+    optionalString(payload.title) &&
+    optionalString(payload.description) &&
+    optionalPositiveInteger(payload.customCounter) &&
+    optionalEntityChanges(payload.entityChanges) &&
+    optionalRegionOwnerChanges(payload.regionOwnerChanges) &&
+    optionalStringRecord(payload.regionNameOverrides) &&
+    optionalCustomRegions(payload.customRegions)
+  );
+}
+
+function optionalString(value: unknown): boolean {
+  return value === undefined || typeof value === "string";
+}
+
+function optionalPositiveInteger(value: unknown): boolean {
+  return value === undefined || (typeof value === "number" && Number.isInteger(value) && value >= 1);
+}
+
+function optionalEntityChanges(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (isRecord(value) &&
+      Object.entries(value).every(([entityId, entity]) => {
+        if (!isCountryEntity(entity)) return false;
+        return entity.id === entityId;
+      }))
+  );
+}
+
+function optionalStringRecord(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (isRecord(value) && Object.values(value).every((entry) => typeof entry === "string"))
+  );
+}
+
+function optionalCustomRegions(value: unknown): boolean {
+  return value === undefined || (Array.isArray(value) && value.every(isRegionRecord));
+}
+
+function optionalRegionOwnerChanges(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (Array.isArray(value) &&
+      value.every((entry) =>
+        Array.isArray(entry) &&
+        entry.length === 2 &&
+        typeof entry[0] === "string" &&
+        typeof entry[1] === "string",
+      ))
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isCountryEntity(value: unknown): value is { id: string } {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.color === "string" &&
+    Array.isArray(value.regionIds) &&
+    value.regionIds.every((regionId) => typeof regionId === "string") &&
+    optionalBoolean(value.isCustom)
+  );
+}
+
+function isRegionRecord(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.ownerId === "string" &&
+    typeof value.type === "string" &&
+    isGeometry(value.geometry)
+  );
+}
+
+function isGeometry(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.type !== "string") return false;
+  if (value.type === "Polygon" || value.type === "MultiPolygon") {
+    return value.type === "Polygon"
+      ? isPolygonCoordinates(value.coordinates)
+      : Array.isArray(value.coordinates) && value.coordinates.every(isPolygonCoordinates);
+  }
+  return false;
+}
+
+function isPolygonCoordinates(value: unknown): boolean {
+  return Array.isArray(value) && value.length > 0 && value.every(isLinearRing);
+}
+
+function isLinearRing(value: unknown): boolean {
+  return Array.isArray(value) && value.length >= 4 && value.every(isPosition);
+}
+
+function isPosition(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length >= 2 &&
+    typeof value[0] === "number" &&
+    Number.isFinite(value[0]) &&
+    typeof value[1] === "number" &&
+    Number.isFinite(value[1])
+  );
+}
+
+function optionalBoolean(value: unknown): boolean {
+  return value === undefined || typeof value === "boolean";
 }
