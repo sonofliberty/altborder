@@ -149,6 +149,23 @@ describe("scenario custom regions", () => {
     expect(restored.regionOwners.BBB_1).toBe("BBB");
   });
 
+  it("ignores restored owners that resolve to inherited object properties", () => {
+    const data = makeMapData();
+
+    const restored = applyScenarioPayload(data, {
+      version: 1,
+      title: "Inherited owner",
+      description: "",
+      customCounter: 1,
+      entityChanges: {},
+      regionOwnerChanges: [["BBB_1", "toString"]],
+      customRegions: [],
+    });
+
+    expect(restored.regionOwners.BBB_1).toBe("BBB");
+    expect(restored.entities.BBB.regionIds).toEqual(["BBB_1", "BBB_2"]);
+  });
+
   it("preserves an intentionally empty scenario title", () => {
     const data = makeMapData();
     const snapshot = createInitialSnapshot(data);

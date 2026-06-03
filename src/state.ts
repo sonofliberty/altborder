@@ -50,13 +50,14 @@ export function updateEntityRegions(snapshot: EditorSnapshot): EditorSnapshot {
     entity.regionIds = [];
   }
   for (const [regionId, ownerId] of Object.entries(next.regionOwners)) {
-    if (next.entities[ownerId]) {
-      next.entities[ownerId].regionIds.push(regionId);
+    const owner = getOwnValue(next.entities, ownerId);
+    if (owner) {
+      owner.regionIds.push(regionId);
     }
   }
   for (const [regionId, region] of Object.entries(next.customRegions)) {
     const ownerId = next.regionOwners[regionId];
-    if (!ownerId || !next.entities[ownerId]) {
+    if (!ownerId || !getOwnValue(next.entities, ownerId)) {
       delete next.customRegions[regionId];
       delete next.regionOwners[regionId];
       continue;
@@ -73,7 +74,7 @@ export function transferRegions(
   regionIds: Iterable<string>,
   targetEntityId: string,
 ): EditorSnapshot {
-  const targetEntity = snapshot.entities[targetEntityId];
+  const targetEntity = getOwnValue(snapshot.entities, targetEntityId);
   if (!targetEntity) return snapshot;
 
   const movedBySource = new Map<string, string[]>();
@@ -85,7 +86,7 @@ export function transferRegions(
     seen.add(regionId);
     const sourceEntityId = snapshot.regionOwners[regionId];
     if (!sourceEntityId || sourceEntityId === targetEntityId) continue;
-    const sourceEntity = snapshot.entities[sourceEntityId];
+    const sourceEntity = getOwnValue(snapshot.entities, sourceEntityId);
     if (!sourceEntity) continue;
 
     const sourceMoved = movedBySource.get(sourceEntityId) ?? [];
@@ -103,7 +104,8 @@ export function transferRegions(
 
   const nextEntities = { ...snapshot.entities };
   for (const [sourceEntityId, sourceMoved] of movedBySource) {
-    const sourceEntity = snapshot.entities[sourceEntityId];
+    const sourceEntity = getOwnValue(snapshot.entities, sourceEntityId);
+    if (!sourceEntity) continue;
     const sourceMovedSet = new Set(sourceMoved);
     nextEntities[sourceEntityId] = {
       ...sourceEntity,
@@ -165,7 +167,7 @@ export function separateRegionAsCountry(
   color: string,
 ): { snapshot: EditorSnapshot; entityId: string } | null {
   const sourceEntityId = snapshot.regionOwners[regionId];
-  const sourceEntity = sourceEntityId ? snapshot.entities[sourceEntityId] : undefined;
+  const sourceEntity = sourceEntityId ? getOwnValue(snapshot.entities, sourceEntityId) : undefined;
   const trimmedName = name.trim();
   if (!sourceEntity || !trimmedName) return null;
 
@@ -214,7 +216,7 @@ export function createScenarioPayload(data: MapData, snapshot: EditorSnapshot): 
 
   for (const [id, entity] of Object.entries(normalizedSnapshot.entities)) {
     if (entity.isCustom && entity.regionIds.length === 0) continue;
-    const baseEntity = base.entities[id];
+    const baseEntity = getOwnValue(base.entities, id);
     if (
       !baseEntity ||
       baseEntity.name !== entity.name ||
@@ -240,7 +242,7 @@ export function createScenarioPayload(data: MapData, snapshot: EditorSnapshot): 
     customRegions: Object.values(normalizedSnapshot.customRegions)
       .filter((region) => {
         const ownerId = normalizedSnapshot.regionOwners[region.id];
-        return Boolean(ownerId && normalizedSnapshot.entities[ownerId]);
+        return Boolean(ownerId && getOwnValue(normalizedSnapshot.entities, ownerId));
       })
       .map((region) => withCurrentRegionOwner(region, normalizedSnapshot.regionOwners[region.id])),
   };
@@ -269,15 +271,15 @@ export function applyScenarioPayload(data: MapData, payload: ScenarioPayload): E
   normalizeEntityCustomFlags(base, next.entities);
 
   for (const region of payload.customRegions || []) {
-    if (region.id in base.regionOwners) continue;
-    if (region.ownerId && next.entities[region.ownerId]) {
+    if (hasOwnKey(base.regionOwners, region.id)) continue;
+    if (region.ownerId && getOwnValue(next.entities, region.ownerId)) {
       next.customRegions[region.id] = { ...region };
       next.regionOwners[region.id] = region.ownerId;
     }
   }
 
   for (const [regionId, ownerId] of payload.regionOwnerChanges || []) {
-    if (regionId in next.regionOwners && (!ownerId || next.entities[ownerId])) {
+    if (hasOwnKey(next.regionOwners, regionId) && (!ownerId || getOwnValue(next.entities, ownerId))) {
       next.regionOwners[regionId] = ownerId;
     }
   }
@@ -327,8 +329,8 @@ function createSerializableSnapshot(base: EditorSnapshot, snapshot: EditorSnapsh
   normalizeEntityCustomFlags(base, next.entities);
 
   for (const [regionId, ownerId] of Object.entries(next.regionOwners)) {
-    const isBaseRegion = regionId in base.regionOwners;
-    let isCustomRegion = regionId in next.customRegions;
+    const isBaseRegion = hasOwnKey(base.regionOwners, regionId);
+    let isCustomRegion = hasOwnKey(next.customRegions, regionId);
     if (isBaseRegion && isCustomRegion) {
       delete next.customRegions[regionId];
       isCustomRegion = false;
@@ -337,7 +339,7 @@ function createSerializableSnapshot(base: EditorSnapshot, snapshot: EditorSnapsh
       delete next.regionOwners[regionId];
       continue;
     }
-    if (ownerId && !next.entities[ownerId]) {
+    if (ownerId && !getOwnValue(next.entities, ownerId)) {
       if (isCustomRegion) {
         delete next.customRegions[regionId];
         delete next.regionOwners[regionId];
@@ -355,7 +357,7 @@ function normalizeEntityCustomFlags(
   entities: Record<string, CountryEntity>,
 ): void {
   for (const [entityId, entity] of Object.entries(entities)) {
-    if (!(entityId in base.entities)) {
+    if (!hasOwnKey(base.entities, entityId)) {
       if (!entity.isCustom) {
         entities[entityId] = { ...entity, isCustom: true };
       }
@@ -372,7 +374,15 @@ function pruneInactiveRegionNameOverrides(snapshot: EditorSnapshot): Record<stri
     Object.entries(snapshot.regionNameOverrides).filter(([regionId, name]) => {
       if (!name.trim()) return false;
       const ownerId = snapshot.regionOwners[regionId];
-      return Boolean(ownerId && snapshot.entities[ownerId]);
+      return Boolean(ownerId && getOwnValue(snapshot.entities, ownerId));
     }),
   );
+}
+
+function getOwnValue<T>(record: Record<string, T>, key: string): T | undefined {
+  return hasOwnKey(record, key) ? record[key] : undefined;
+}
+
+function hasOwnKey<T>(record: Record<string, T>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
 }
