@@ -126,7 +126,9 @@ function optionalStringRecord(value: unknown): boolean {
 }
 
 function optionalCustomRegions(value: unknown): boolean {
-  return value === undefined || (Array.isArray(value) && value.every(isRegionRecord));
+  if (value === undefined) return true;
+  if (!Array.isArray(value) || !value.every(isRegionRecord)) return false;
+  return new Set(value.map((region) => region.id)).size === value.length;
 }
 
 function optionalRegionOwnerChanges(value: unknown): boolean {
