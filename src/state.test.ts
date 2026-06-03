@@ -89,6 +89,31 @@ describe("scenario custom regions", () => {
     expect(restored.regionNameOverrides).toEqual({ BBB_1: "Renamed Beta" });
   });
 
+  it("drops blank region name overrides from restored and serialized state", () => {
+    const data = makeMapData();
+    const restored = applyScenarioPayload(data, {
+      version: 1,
+      title: "Blank override",
+      description: "",
+      customCounter: 1,
+      entityChanges: {},
+      regionOwnerChanges: [],
+      regionNameOverrides: {
+        BBB_1: "",
+      },
+      customRegions: [],
+    });
+    const payload = createScenarioPayload(data, {
+      ...createInitialSnapshot(data),
+      regionNameOverrides: {
+        BBB_1: "",
+      },
+    });
+
+    expect(restored.regionNameOverrides).toEqual({});
+    expect(payload.regionNameOverrides).toEqual({});
+  });
+
   it("does not serialize custom entities that only own unknown regions", () => {
     const data = makeMapData();
     const snapshot = createInitialSnapshot(data);

@@ -369,7 +369,8 @@ function normalizeEntityCustomFlags(
 
 function pruneInactiveRegionNameOverrides(snapshot: EditorSnapshot): Record<string, string> {
   return Object.fromEntries(
-    Object.entries(snapshot.regionNameOverrides).filter(([regionId]) => {
+    Object.entries(snapshot.regionNameOverrides).filter(([regionId, name]) => {
+      if (!name.trim()) return false;
       const ownerId = snapshot.regionOwners[regionId];
       return Boolean(ownerId && snapshot.entities[ownerId]);
     }),
