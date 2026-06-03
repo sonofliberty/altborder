@@ -1092,7 +1092,7 @@ export default function App() {
     : "";
   const divideLinePath = svgLineToPath(divideLine);
   const visibleDivideError = divideError || (!divideSplit.ok ? divideSplit.reason : "");
-  const showSidePanel = mode !== "inspect" || Boolean(selectedEntity || inspectFocusedRegion);
+  const showSidePanel = mode !== "inspect" || Boolean(selectedEntity || inspectFocusedRegion || snapshot?.description);
 
   useEffect(() => {
     if (!snapshot) return;
