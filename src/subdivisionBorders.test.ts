@@ -17,4 +17,8 @@ describe("subdivision border visibility", () => {
   it("hides borders when one referenced region is missing", () => {
     expect(isSubdivisionBorderVisible(border, { left: "AAA" })).toBe(false);
   });
+
+  it("hides borders whose region ids resolve only through inherited object properties", () => {
+    expect(isSubdivisionBorderVisible({ regionIds: ["toString", "toString"] }, {})).toBe(false);
+  });
 });
