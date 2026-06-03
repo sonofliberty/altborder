@@ -33,4 +33,11 @@ describe("transient interaction state", () => {
     expect(appSource.match(/setIsBrushDown\(false\);/g)?.length).toBeGreaterThanOrEqual(4);
     expect(appSource).toContain("setBrushEnabled(false)");
   });
+
+  it("clears stale share and divide drafts around history changes", () => {
+    expect(appSource).toContain("function clearHistoryTransientState()");
+    expect(appSource.match(/clearHistoryTransientState\(\);/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(appSource).toContain("setShare(null);");
+    expect(appSource).toContain("clearDivideDraft();");
+  });
 });

@@ -1154,6 +1154,7 @@ export default function App() {
     const draft = cloneSnapshot(history.present);
     const result = mutator(draft) ?? draft;
     const next = updateEntityRegions(result);
+    setShare(null);
     setHistory({
       present: next,
       past: [...history.past, history.present].slice(-80),
@@ -1163,6 +1164,7 @@ export default function App() {
 
   function commitMetadata(mutator: (current: EditorSnapshot) => EditorSnapshot) {
     if (readOnly) return;
+    setShare(null);
     setHistory((currentHistory) => {
       if (!currentHistory) return currentHistory;
       const next = mutator(currentHistory.present);
@@ -1192,6 +1194,7 @@ export default function App() {
   function undo() {
     if (!history || readOnly || history.past.length === 0) return;
     const previous = history.past[history.past.length - 1];
+    clearHistoryTransientState();
     setHistory({
       present: previous,
       past: history.past.slice(0, -1),
@@ -1202,6 +1205,7 @@ export default function App() {
   function redo() {
     if (!history || readOnly || history.future.length === 0) return;
     const next = history.future[0];
+    clearHistoryTransientState();
     setHistory({
       present: next,
       past: [...history.past, history.present],
@@ -1212,17 +1216,16 @@ export default function App() {
   function resetMap() {
     if (!data || !history || readOnly) return;
     const initial = createInitialSnapshot(data);
+    clearHistoryTransientState();
     setHistory({
       present: initial,
       past: [...history.past, history.present],
       future: [],
     });
     setSelectedRegions(new Set());
-    setIsBrushDown(false);
     setTransferFocusedRegionId("");
     setMergeSelection(new Set());
     setTargetEntityId("");
-    clearDivideDraft();
   }
 
   function selectMode(nextMode: EditMode) {
@@ -1244,6 +1247,12 @@ export default function App() {
     setMergeSelection(new Set());
     setIsBrushDown(false);
     setMergeName("");
+    clearDivideDraft();
+  }
+
+  function clearHistoryTransientState() {
+    setShare(null);
+    setIsBrushDown(false);
     clearDivideDraft();
   }
 
@@ -1313,6 +1322,7 @@ export default function App() {
     );
     if (!result) return;
 
+    setShare(null);
     setHistory({
       present: updateEntityRegions(result.snapshot),
       past: [...history.past, history.present].slice(-80),
@@ -1437,6 +1447,7 @@ export default function App() {
     if (!snapshot || !targetEntityId || selectedRegions.size === 0 || readOnly) return;
     const regionIds = [...selectedRegions];
     const nextSelectedEntityId = targetEntityId;
+    setShare(null);
     setHistory((currentHistory) => {
       if (!currentHistory || readOnly) return currentHistory;
       const next = transferRegions(currentHistory.present, regionIds, nextSelectedEntityId);
