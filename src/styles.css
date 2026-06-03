@@ -667,15 +667,25 @@ textarea {
 }
 
 .inline-error {
+  align-items: center;
   background: #fbe5e5;
   border: 1px solid #e6b8b8;
   border-radius: 6px;
   color: #8c2f2f;
+  display: flex;
+  gap: 10px;
   left: 14px;
   padding: 8px 10px;
   position: absolute;
   top: 14px;
   z-index: 3;
+}
+
+.inline-error button {
+  border-color: #e6b8b8;
+  color: #8c2f2f;
+  min-height: 30px;
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {

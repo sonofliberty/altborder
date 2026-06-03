@@ -1584,6 +1584,14 @@ export default function App() {
     void navigator.clipboard.writeText(share.url);
   }
 
+  function startFreshAfterLoadError() {
+    setLoadError("");
+    setReadOnly(false);
+    if (window.location.hash) {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    }
+  }
+
   async function remix() {
     setReadOnly(false);
     const encoded = data && snapshot ? await encodeSharePayload(createScenarioPayload(data, snapshot)) : "";
@@ -2171,7 +2179,12 @@ export default function App() {
         </aside>
 
         <section className="map-stage" aria-label="World map editor">
-          {loadError ? <div className="inline-error">{loadError}</div> : null}
+          {loadError ? (
+            <div className="inline-error">
+              <span>{loadError}</span>
+              <button onClick={startFreshAfterLoadError}>Start fresh</button>
+            </div>
+          ) : null}
           <svg
             ref={mapSvgRef}
             viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}
