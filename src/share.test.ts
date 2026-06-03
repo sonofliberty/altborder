@@ -176,6 +176,31 @@ describe("share helpers", () => {
     });
   });
 
+  it("rejects entity records with padded ids", async () => {
+    const encoded = await encodeSharePayload({
+      version: 1,
+      title: "Broken map",
+      description: "",
+      customCounter: 1,
+      entityChanges: {
+        " CUSTOM_001 ": {
+          id: " CUSTOM_001 ",
+          name: "Broken",
+          color: "#A85F4F",
+          regionIds: [],
+          isCustom: true,
+        },
+      },
+      regionOwnerChanges: [],
+      customRegions: [],
+    } as unknown as ScenarioPayload);
+
+    await expect(decodeSharePayload(encoded)).resolves.toEqual({
+      ok: false,
+      error: "The shared map link is invalid.",
+    });
+  });
+
   it("rejects entity records with invalid colors", async () => {
     const encoded = await encodeSharePayload({
       version: 1,
@@ -246,6 +271,23 @@ describe("share helpers", () => {
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [["   ", "   "]],
+      customRegions: [],
+    } as unknown as ScenarioPayload);
+
+    await expect(decodeSharePayload(encoded)).resolves.toEqual({
+      ok: false,
+      error: "The shared map link is invalid.",
+    });
+  });
+
+  it("rejects region owner changes with padded ids", async () => {
+    const encoded = await encodeSharePayload({
+      version: 1,
+      title: "Broken map",
+      description: "",
+      customCounter: 1,
+      entityChanges: {},
+      regionOwnerChanges: [[" BBB_1 ", " AAA "]],
       customRegions: [],
     } as unknown as ScenarioPayload);
 
@@ -373,6 +415,50 @@ describe("share helpers", () => {
           name: "Broken",
           ownerId: "CUSTOM_001",
           type: "Custom divided territory",
+          geometry: {
+            type: "Polygon",
+            coordinates: [
+              [
+                [0, 0],
+                [1, 0],
+                [1, 1],
+                [0, 1],
+                [0, 0],
+              ],
+            ],
+          },
+        },
+      ],
+    } as unknown as ScenarioPayload);
+
+    await expect(decodeSharePayload(encoded)).resolves.toEqual({
+      ok: false,
+      error: "The shared map link is invalid.",
+    });
+  });
+
+  it("rejects custom regions with padded ids", async () => {
+    const encoded = await encodeSharePayload({
+      version: 1,
+      title: "Broken map",
+      description: "",
+      customCounter: 1,
+      entityChanges: {
+        CUSTOM_001: {
+          id: "CUSTOM_001",
+          name: "Broken",
+          color: "#A85F4F",
+          regionIds: [" CUSTOM_001-TERRITORY "],
+          isCustom: true,
+        },
+      },
+      regionOwnerChanges: [],
+      customRegions: [
+        {
+          id: " CUSTOM_001-TERRITORY ",
+          name: "Broken",
+          ownerId: " CUSTOM_001 ",
+          type: " Custom divided territory ",
           geometry: {
             type: "Polygon",
             coordinates: [
