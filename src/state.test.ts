@@ -334,6 +334,45 @@ describe("scenario custom regions", () => {
     expect(emptiedBase.entities.BBB.regionIds).toEqual([]);
     expect(payload.entityChanges.BBB.isCustom).toBeUndefined();
   });
+
+  it("marks non-base entities as custom before pruning and sharing", () => {
+    const data = makeMapData();
+    const restored = applyScenarioPayload(data, {
+      version: 1,
+      title: "Non-base entity without custom flag",
+      description: "",
+      customCounter: 1,
+      entityChanges: {
+        GHOST: {
+          id: "GHOST",
+          name: "Ghostland",
+          color: "#A85F4F",
+          regionIds: ["BBB_1"],
+        },
+      },
+      regionOwnerChanges: [["BBB_1", "GHOST"]],
+      customRegions: [],
+    });
+
+    const emptiedGhost = transferRegions(restored, ["BBB_1"], "AAA");
+    const ghostWithoutCustomFlag = { ...restored.entities.GHOST };
+    delete ghostWithoutCustomFlag.isCustom;
+    const payload = createScenarioPayload(data, {
+      ...restored,
+      entities: {
+        ...restored.entities,
+        GHOST: { ...ghostWithoutCustomFlag, regionIds: [] },
+      },
+      regionOwners: {
+        ...restored.regionOwners,
+        BBB_1: "AAA",
+      },
+    });
+
+    expect(restored.entities.GHOST.isCustom).toBe(true);
+    expect(emptiedGhost.entities.GHOST).toBeUndefined();
+    expect(payload.entityChanges.GHOST).toBeUndefined();
+  });
 });
 
 describe("region transfers", () => {
