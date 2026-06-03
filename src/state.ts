@@ -260,6 +260,7 @@ export function applyScenarioPayload(data: MapData, payload: ScenarioPayload): E
     regionNameOverrides: { ...(payload.regionNameOverrides || {}) },
     customRegions: {},
   };
+  stripBaseEntityCustomFlags(base, next.entities);
 
   for (const region of payload.customRegions || []) {
     if (region.id in base.regionOwners) continue;
@@ -317,6 +318,7 @@ function pruneEmptyCustomEntities(entities: Record<string, CountryEntity>): void
 
 function createSerializableSnapshot(base: EditorSnapshot, snapshot: EditorSnapshot): EditorSnapshot {
   const next = cloneSnapshot(snapshot);
+  stripBaseEntityCustomFlags(base, next.entities);
 
   for (const [regionId, ownerId] of Object.entries(next.regionOwners)) {
     const isBaseRegion = regionId in base.regionOwners;
@@ -340,6 +342,18 @@ function createSerializableSnapshot(base: EditorSnapshot, snapshot: EditorSnapsh
   }
 
   return updateEntityRegions(next);
+}
+
+function stripBaseEntityCustomFlags(
+  base: EditorSnapshot,
+  entities: Record<string, CountryEntity>,
+): void {
+  for (const entityId of Object.keys(base.entities)) {
+    const entity = entities[entityId];
+    if (!entity?.isCustom) continue;
+    entities[entityId] = { ...entity };
+    delete entities[entityId].isCustom;
+  }
 }
 
 function pruneInactiveRegionNameOverrides(snapshot: EditorSnapshot): Record<string, string> {

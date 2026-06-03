@@ -298,6 +298,42 @@ describe("scenario custom regions", () => {
     expect(payload.customRegions).toEqual([]);
     expect(payload.regionOwnerChanges).toContainEqual(["BBB_1", "AAA"]);
   });
+
+  it("strips custom flags from base entities in restored and serialized state", () => {
+    const data = makeMapData();
+    const restored = applyScenarioPayload(data, {
+      version: 1,
+      title: "Base entity marked custom",
+      description: "",
+      customCounter: 1,
+      entityChanges: {
+        BBB: {
+          id: "BBB",
+          name: "Beta renamed",
+          color: "#6F9A5C",
+          regionIds: ["BBB_1", "BBB_2"],
+          isCustom: true,
+        },
+      },
+      regionOwnerChanges: [],
+      customRegions: [],
+    });
+
+    const emptiedBase = transferRegions(restored, ["BBB_1", "BBB_2"], "AAA");
+    const payload = createScenarioPayload(data, {
+      ...restored,
+      entities: {
+        ...restored.entities,
+        BBB: { ...restored.entities.BBB, isCustom: true },
+      },
+    });
+
+    expect(restored.entities.BBB).toMatchObject({ name: "Beta renamed" });
+    expect(restored.entities.BBB.isCustom).toBeUndefined();
+    expect(emptiedBase.entities.BBB).toBeDefined();
+    expect(emptiedBase.entities.BBB.regionIds).toEqual([]);
+    expect(payload.entityChanges.BBB.isCustom).toBeUndefined();
+  });
 });
 
 describe("region transfers", () => {
