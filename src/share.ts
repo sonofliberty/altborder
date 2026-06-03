@@ -114,6 +114,7 @@ function optionalEntityChanges(value: unknown): boolean {
     value === undefined ||
     (isRecord(value) &&
       Object.entries(value).every(([entityId, entity]) => {
+        if (!isNonEmptyString(entityId)) return false;
         if (!isCountryEntity(entity)) return false;
         return entity.id === entityId;
       }))
@@ -140,7 +141,7 @@ function optionalRegionOwnerChanges(value: unknown): boolean {
     !value.every((entry) =>
       Array.isArray(entry) &&
       entry.length === 2 &&
-      typeof entry[0] === "string" &&
+      isNonEmptyString(entry[0]) &&
       typeof entry[1] === "string",
     )
   ) {
@@ -200,12 +201,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isCountryEntity(value: unknown): value is { id: string } {
   if (!isRecord(value)) return false;
   return (
-    typeof value.id === "string" &&
+    isNonEmptyString(value.id) &&
     typeof value.name === "string" &&
     typeof value.color === "string" &&
     isHexColor(value.color) &&
     Array.isArray(value.regionIds) &&
-    value.regionIds.every((regionId) => typeof regionId === "string") &&
+    value.regionIds.every(isNonEmptyString) &&
     optionalBoolean(value.isCustom)
   );
 }
@@ -213,12 +214,16 @@ function isCountryEntity(value: unknown): value is { id: string } {
 function isRegionRecord(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return (
-    typeof value.id === "string" &&
+    isNonEmptyString(value.id) &&
     typeof value.name === "string" &&
-    typeof value.ownerId === "string" &&
-    typeof value.type === "string" &&
+    isNonEmptyString(value.ownerId) &&
+    isNonEmptyString(value.type) &&
     isGeometry(value.geometry)
   );
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
 }
 
 function isGeometry(value: unknown): boolean {
