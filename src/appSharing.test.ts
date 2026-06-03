@@ -24,6 +24,16 @@ describe("scenario metadata UI", () => {
   });
 });
 
+describe("share dialog accessibility", () => {
+  it("keeps keyboard focus inside the modal share dialog", () => {
+    expect(appSource).toContain("shareDialogRef");
+    expect(appSource).toContain("getFocusableDialogElements");
+    expect(appSource).toContain('event.key !== "Tab"');
+    expect(appSource).toContain('event.key === "Escape"');
+    expect(appSource).toContain("tabIndex={-1}");
+  });
+});
+
 describe("pointer capture handling", () => {
   it("guards pointer-capture release after cancellation", () => {
     expect(appSource).toContain("releasePointerCaptureIfHeld(event.currentTarget, pointerId)");

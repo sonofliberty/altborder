@@ -180,6 +180,7 @@ export default function App() {
     selectOnRelease: boolean;
   } | null>(null);
   const divideDrawRef = useRef<{ pointerId: number; moved: boolean } | null>(null);
+  const shareDialogRef = useRef<HTMLElement | null>(null);
   const countryLabelLayoutCacheRef = useRef(new Map<string, FittedCountryLabel>());
   const countryUnderlayCacheRef = useRef(new Map<string, CountryUnderlay>());
   const countryUnderlaysInitializedRef = useRef(false);
@@ -212,6 +213,46 @@ export default function App() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!share) return;
+
+    const dialog = shareDialogRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const initialFocus = getFocusableDialogElements(dialog)[0] ?? dialog;
+    initialFocus?.focus();
+
+    function handleDialogKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShare(null);
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusableElements = getFocusableDialogElements(dialog);
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        dialog?.focus();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleDialogKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleDialogKeyDown);
+      previousFocus?.focus();
+    };
+  }, [share]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2583,7 +2624,14 @@ export default function App() {
 
       {share ? (
         <div className="dialog-backdrop" role="presentation" onClick={() => setShare(null)}>
-          <section className="share-dialog" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+          <section
+            ref={shareDialogRef}
+            className="share-dialog"
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
+            onClick={(event) => event.stopPropagation()}
+          >
             <div>
               <h2>Share map</h2>
               <p>Shared links open read-only by default. Use Remix/Edit to make a copy.</p>
@@ -2928,4 +2976,15 @@ function pruneMapCache<K, V>(cache: Map<K, V>, activeKeys: Set<K>, maxEntries: n
     cache.delete(key);
     if (cache.size <= maxEntries) return;
   }
+}
+
+function getFocusableDialogElements(dialog: HTMLElement | null): HTMLElement[] {
+  if (!dialog) return [];
+  return Array.from(
+    dialog.querySelectorAll<HTMLElement>(
+      'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((element) => {
+    return !element.hasAttribute("disabled") && element.tabIndex >= 0;
+  });
 }
