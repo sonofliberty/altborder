@@ -188,7 +188,9 @@ function isLinearRing(value: unknown): boolean {
   if (!Array.isArray(value) || value.length < 4 || !value.every(isPosition)) return false;
   const first = value[0];
   const last = value[value.length - 1];
-  return first[0] === last[0] && first[1] === last[1];
+  if (first[0] !== last[0] || first[1] !== last[1]) return false;
+  const distinctPositions = new Set(value.map((position) => `${position[0]},${position[1]}`));
+  return distinctPositions.size >= 3;
 }
 
 function isPosition(value: unknown): boolean {
