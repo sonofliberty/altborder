@@ -1003,6 +1003,7 @@ export default function App() {
   const addRegionByBrush = useCallback((regionId: string) => {
     if (!snapshot || readOnly || !brushEnabled || !isBrushDown || !activeModeUsesRegions) return;
     const ownerId = snapshot.regionOwners[regionId];
+    if (!ownerId) return;
     if (!selectedEntityId) {
       setSelectedEntityId(ownerId);
       setSelectedRegions(new Set([regionId]));
@@ -1178,6 +1179,13 @@ export default function App() {
     commitMetadata((current) => {
       if (current.title === title) return current;
       return { ...current, title };
+    });
+  }
+
+  function updateScenarioDescription(description: string) {
+    commitMetadata((current) => {
+      if (current.description === description) return current;
+      return { ...current, description };
     });
   }
 
@@ -1854,6 +1862,22 @@ export default function App() {
     );
   }
 
+  function renderScenarioContext(currentSnapshot: EditorSnapshot) {
+    return (
+      <section className="context-card">
+        <div className="section-heading">SCENARIO</div>
+        <label className="field">
+          <span>Description</span>
+          <textarea
+            value={currentSnapshot.description}
+            disabled={readOnly}
+            onChange={(event) => updateScenarioDescription(event.target.value)}
+          />
+        </label>
+      </section>
+    );
+  }
+
   function renderRegionSummary({
     title,
     name,
@@ -2263,6 +2287,7 @@ export default function App() {
         {showSidePanel ? (
         <aside className="side-panel">
           <PanelHeader mode={mode} readOnly={readOnly} />
+          {renderScenarioContext(snapshot)}
 
           {mode === "inspect" ? (
             <>

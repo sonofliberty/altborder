@@ -8,3 +8,11 @@ describe("shared-link recovery", () => {
     expect(appSource).toContain("window.history.replaceState");
   });
 });
+
+describe("scenario metadata UI", () => {
+  it("exposes scenario descriptions for editing and shared-map viewing", () => {
+    expect(appSource).toContain("updateScenarioDescription");
+    expect(appSource).toContain("value={currentSnapshot.description}");
+    expect(appSource).toContain("onChange={(event) => updateScenarioDescription(event.target.value)}");
+  });
+});
