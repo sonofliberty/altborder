@@ -44,4 +44,11 @@ describe("transient interaction state", () => {
     expect(appSource).toContain("setShare(null);");
     expect(appSource).toContain("clearDivideDraft();");
   });
+
+  it("clears geometry-sensitive render caches around snapshot geometry changes", () => {
+    expect(appSource).toContain("function clearGeometryRenderCaches()");
+    expect(appSource).toContain("countryUnderlayCacheRef.current.clear();");
+    expect(appSource).toContain("countryLabelLayoutCacheRef.current.clear();");
+    expect(appSource.match(/clearGeometryRenderCaches\(\);/g)?.length).toBeGreaterThanOrEqual(4);
+  });
 });

@@ -1172,6 +1172,7 @@ export default function App() {
     const draft = cloneSnapshot(history.present);
     const result = mutator(draft) ?? draft;
     const next = updateEntityRegions(result);
+    clearGeometryRenderCaches();
     setShare(null);
     setHistory({
       present: next,
@@ -1271,7 +1272,13 @@ export default function App() {
   function clearHistoryTransientState() {
     setShare(null);
     setIsBrushDown(false);
+    clearGeometryRenderCaches();
     clearDivideDraft();
+  }
+
+  function clearGeometryRenderCaches() {
+    countryUnderlayCacheRef.current.clear();
+    countryLabelLayoutCacheRef.current.clear();
   }
 
   function clearDivideDraft() {
@@ -1341,6 +1348,7 @@ export default function App() {
     if (!result) return;
 
     setShare(null);
+    clearGeometryRenderCaches();
     setHistory({
       present: updateEntityRegions(result.snapshot),
       past: [...history.past, history.present].slice(-80),
@@ -1466,6 +1474,7 @@ export default function App() {
     const regionIds = [...selectedRegions];
     const nextSelectedEntityId = targetEntityId;
     setShare(null);
+    clearGeometryRenderCaches();
     setHistory((currentHistory) => {
       if (!currentHistory || readOnly) return currentHistory;
       const next = transferRegions(currentHistory.present, regionIds, nextSelectedEntityId);
