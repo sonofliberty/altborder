@@ -20,32 +20,6 @@ const defaultAdjacencyTolerance = 0.0008;
 const minimumSharedBorderLength = 1e-6;
 const indexedRegionCache = new WeakMap<RegionRecord[], IndexedRegion[]>();
 
-export function buildRegionAdjacency(
-  regions: RegionRecord[],
-  tolerance = defaultAdjacencyTolerance,
-): Map<string, Set<string>> {
-  const adjacency = new Map<string, Set<string>>();
-  const indexedRegions = getIndexedRegions(regions);
-
-  for (const region of indexedRegions) {
-    adjacency.set(region.id, new Set());
-  }
-
-  for (let i = 0; i < indexedRegions.length; i += 1) {
-    for (let j = i + 1; j < indexedRegions.length; j += 1) {
-      const first = indexedRegions[i];
-      const second = indexedRegions[j];
-      if (!boundsOverlap(first.bounds, second.bounds, tolerance)) continue;
-      if (!regionsShareBorder(first, second, tolerance)) continue;
-
-      adjacency.get(first.id)?.add(second.id);
-      adjacency.get(second.id)?.add(first.id);
-    }
-  }
-
-  return adjacency;
-}
-
 export function buildSelectedRegionAdjacency(
   regions: RegionRecord[],
   selectedRegionIds: Iterable<string>,

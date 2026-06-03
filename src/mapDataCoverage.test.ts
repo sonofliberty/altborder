@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import mapDataFixture from "../public/data/map-data.json";
 import colorScheme from "./color-scheme.json";
-import { buildRegionAdjacency } from "./regionAdjacency";
+import { buildSelectedRegionAdjacency } from "./regionAdjacency";
 import type { Geometry, MultiPolygon, Polygon, Position } from "geojson";
-import type { MapData } from "./types";
+import type { MapData, RegionRecord } from "./types";
 
 const requestedAdm1Countries = [
   "GBR",
@@ -263,6 +263,13 @@ function countryUsesFallbackColor(id: string, name: string): boolean {
 
 function normalizeCountryColorName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function buildRegionAdjacency(regions: RegionRecord[]): Map<string, Set<string>> {
+  return buildSelectedRegionAdjacency(
+    regions,
+    regions.map((region) => region.id),
+  );
 }
 
 function countryBoundaryRecords(data: MapData) {

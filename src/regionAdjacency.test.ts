@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CountryEntity, RegionRecord } from "./types";
-import { buildRegionAdjacency } from "./regionAdjacency";
+import { buildSelectedRegionAdjacency } from "./regionAdjacency";
 import { getNeighborTargetEntityIds, orderTransferTargetEntities } from "./transferContext";
 
 describe("buildRegionAdjacency", () => {
@@ -150,6 +150,17 @@ function region(id: string, geometry: RegionRecord["geometry"]): RegionRecord {
     type: "Test region",
     geometry,
   };
+}
+
+function buildRegionAdjacency(
+  regions: RegionRecord[],
+  tolerance?: number,
+): Map<string, Set<string>> {
+  return buildSelectedRegionAdjacency(
+    regions,
+    regions.map((region) => region.id),
+    tolerance,
+  );
 }
 
 function square(minX: number, minY: number, maxX: number, maxY: number): RegionRecord["geometry"] {
