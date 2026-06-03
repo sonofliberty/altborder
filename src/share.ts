@@ -226,7 +226,9 @@ function isGeometry(value: unknown): boolean {
   if (value.type === "Polygon" || value.type === "MultiPolygon") {
     return value.type === "Polygon"
       ? isPolygonCoordinates(value.coordinates)
-      : Array.isArray(value.coordinates) && value.coordinates.every(isPolygonCoordinates);
+      : Array.isArray(value.coordinates) &&
+          value.coordinates.length > 0 &&
+          value.coordinates.every(isPolygonCoordinates);
   }
   return false;
 }

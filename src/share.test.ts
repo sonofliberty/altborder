@@ -517,6 +517,42 @@ describe("share helpers", () => {
     });
   });
 
+  it("rejects custom regions with empty multipolygon geometries", async () => {
+    const encoded = await encodeSharePayload({
+      version: 1,
+      title: "Broken map",
+      description: "",
+      customCounter: 1,
+      entityChanges: {
+        CUSTOM_001: {
+          id: "CUSTOM_001",
+          name: "Broken",
+          color: "#A85F4F",
+          regionIds: ["CUSTOM_001-TERRITORY"],
+          isCustom: true,
+        },
+      },
+      regionOwnerChanges: [],
+      customRegions: [
+        {
+          id: "CUSTOM_001-TERRITORY",
+          name: "Broken",
+          ownerId: "CUSTOM_001",
+          type: "Custom divided territory",
+          geometry: {
+            type: "MultiPolygon",
+            coordinates: [],
+          },
+        },
+      ],
+    } as unknown as ScenarioPayload);
+
+    await expect(decodeSharePayload(encoded)).resolves.toEqual({
+      ok: false,
+      error: "The shared map link is invalid.",
+    });
+  });
+
   it("rejects non-polygonal custom region geometries", async () => {
     const encoded = await encodeSharePayload({
       version: 1,
