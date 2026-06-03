@@ -190,7 +190,17 @@ function isLinearRing(value: unknown): boolean {
   const last = value[value.length - 1];
   if (first[0] !== last[0] || first[1] !== last[1]) return false;
   const distinctPositions = new Set(value.map((position) => `${position[0]},${position[1]}`));
-  return distinctPositions.size >= 3;
+  return distinctPositions.size >= 3 && Math.abs(linearRingArea(value)) > 0;
+}
+
+function linearRingArea(ring: number[][]): number {
+  let area = 0;
+  for (let index = 0; index < ring.length - 1; index += 1) {
+    const current = ring[index];
+    const next = ring[index + 1];
+    area += current[0] * next[1] - next[0] * current[1];
+  }
+  return area / 2;
 }
 
 function isPosition(value: unknown): boolean {
