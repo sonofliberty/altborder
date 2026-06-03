@@ -1408,6 +1408,9 @@ export default function App() {
 
     if (readOnly) {
       setSelectedEntityId(ownerId);
+      if (mode === "inspect") {
+        setInspectFocusedRegionId(regionId);
+      }
       return;
     }
 
