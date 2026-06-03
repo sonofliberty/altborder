@@ -115,6 +115,18 @@ textarea:disabled {
   width: 100%;
 }
 
+.scenario-title-text {
+  color: #1f2523;
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 input,
 select,
 textarea {

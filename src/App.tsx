@@ -2150,11 +2150,14 @@ export default function App() {
         </div>
         <label className="title-field">
           <span>Scenario</span>
-          <input
-            value={snapshot.title}
-            disabled={readOnly}
-            onChange={(event) => updateScenarioTitle(event.target.value)}
-          />
+          {readOnly ? (
+            <strong className="scenario-title-text">{snapshot.title || "Untitled Border Experiment"}</strong>
+          ) : (
+            <input
+              value={snapshot.title}
+              onChange={(event) => updateScenarioTitle(event.target.value)}
+            />
+          )}
         </label>
         <div className="topbar-actions">
           {readOnly ? (

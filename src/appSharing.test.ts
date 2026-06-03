@@ -14,6 +14,7 @@ describe("scenario metadata UI", () => {
     expect(appSource).toContain("updateScenarioDescription");
     expect(appSource).toContain("value={currentSnapshot.description}");
     expect(appSource).toContain("onChange={(event) => updateScenarioDescription(event.target.value)}");
+    expect(appSource).toContain('className="scenario-title-text"');
     expect(appSource).toContain('className="scenario-description"');
     expect(appSource).toContain("selectedEntity || inspectFocusedRegion || snapshot?.description");
   });
