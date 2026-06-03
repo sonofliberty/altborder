@@ -206,6 +206,41 @@ describe("scenario custom regions", () => {
     expect(restored.regionNameOverrides[customRegion.id]).toBeUndefined();
     expect(restored.entities.CUSTOM_001).toBeUndefined();
   });
+
+  it("advances stale custom counters from shared payloads", () => {
+    const data = makeMapData();
+    const customRegion: RegionRecord = {
+      id: "CUSTOM_001-TERRITORY",
+      name: "Newland",
+      ownerId: "CUSTOM_001",
+      type: "Custom divided territory",
+      geometry: data.regions[0].geometry,
+    };
+    const restored = applyScenarioPayload(data, {
+      version: 1,
+      title: "Stale counter",
+      description: "",
+      customCounter: 1,
+      entityChanges: {
+        CUSTOM_001: {
+          id: "CUSTOM_001",
+          name: "Newland",
+          color: "#A85F4F",
+          regionIds: [customRegion.id],
+          isCustom: true,
+        },
+      },
+      regionOwnerChanges: [],
+      customRegions: [customRegion],
+    });
+
+    const separated = separateRegionAsCountry(restored, "BBB_1", "Beta Coast", "#A85F4F");
+
+    expect(restored.customCounter).toBe(2);
+    expect(separated?.entityId).toBe("CUSTOM_002");
+    expect(separated?.snapshot.entities.CUSTOM_001.name).toBe("Newland");
+    expect(separated?.snapshot.entities.CUSTOM_002.name).toBe("Beta Coast");
+  });
 });
 
 describe("region transfers", () => {

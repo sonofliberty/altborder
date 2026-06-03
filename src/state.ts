@@ -274,7 +274,7 @@ export function applyScenarioPayload(data: MapData, payload: ScenarioPayload): E
     }
   }
 
-  return updateEntityRegions(next);
+  return normalizeCustomCounter(updateEntityRegions(next));
 }
 
 function withCurrentRegionOwner(region: RegionRecord, ownerId: string | undefined): RegionRecord {
@@ -287,6 +287,17 @@ function withCurrentRegionOwner(region: RegionRecord, ownerId: string | undefine
     return regionWithoutOwner;
   }
   return { ...region, ownerId };
+}
+
+function normalizeCustomCounter(snapshot: EditorSnapshot): EditorSnapshot {
+  const nextCounter = Object.keys(snapshot.entities).reduce((counter, entityId) => {
+    const match = /^CUSTOM_(\d+)$/.exec(entityId);
+    if (!match) return counter;
+    return Math.max(counter, Number(match[1]) + 1);
+  }, snapshot.customCounter);
+
+  if (nextCounter === snapshot.customCounter) return snapshot;
+  return { ...snapshot, customCounter: nextCounter };
 }
 
 function pruneEmptyCustomEntities(entities: Record<string, CountryEntity>): void {
