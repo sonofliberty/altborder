@@ -54,6 +54,11 @@ describe("share helpers", () => {
     expect(hashRequestsEdit("#s=abc")).toBe(false);
   });
 
+  it("preserves plus signs in compressed share hashes", () => {
+    expect(readShareFromHash("#s=A+B-$&edit=1")).toBe("A+B-$");
+    expect(readShareFromHash("#edit=1&s=A%2BB%3D")).toBe("A+B=");
+  });
+
   it("rejects malformed versioned payloads before app state restoration", async () => {
     const encoded = await encodeSharePayload({
       version: 1,

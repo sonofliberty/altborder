@@ -38,8 +38,7 @@ function loadLzStringModule(): Promise<typeof import("lz-string")> {
 
 export function readShareFromHash(hash: string): string | null {
   const value = hash.startsWith("#") ? hash.slice(1) : hash;
-  const params = new URLSearchParams(value);
-  return params.get("s");
+  return readHashParam(value, "s");
 }
 
 export function makeShareUrl(encoded: string): string {
@@ -57,6 +56,23 @@ export function makeEditableUrl(encoded: string): string {
 export function hashRequestsEdit(hash: string): boolean {
   const value = hash.startsWith("#") ? hash.slice(1) : hash;
   return new URLSearchParams(value).get("edit") === "1";
+}
+
+function readHashParam(hashValue: string, key: string): string | null {
+  for (const entry of hashValue.split("&")) {
+    const [rawKey, ...rawValueParts] = entry.split("=");
+    if (decodeHashComponent(rawKey) !== key) continue;
+    return decodeHashComponent(rawValueParts.join("="));
+  }
+  return null;
+}
+
+function decodeHashComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 export function describeUrlSize(url: string): { bytes: number; level: "ok" | "warn" | "large" } {
