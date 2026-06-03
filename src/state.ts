@@ -182,6 +182,11 @@ export function separateRegionAsCountry(
     regionIds: [regionId],
     isCustom: true,
   };
+  const nextCustomRegions = { ...snapshot.customRegions };
+  const customRegion = nextCustomRegions[regionId];
+  if (customRegion) {
+    nextCustomRegions[regionId] = withCurrentRegionOwner(customRegion, newEntityId);
+  }
 
   return {
     entityId: newEntityId,
@@ -189,6 +194,7 @@ export function separateRegionAsCountry(
       ...snapshot,
       customCounter: snapshot.customCounter + 1,
       entities: nextEntities,
+      customRegions: nextCustomRegions,
       regionOwners: {
         ...snapshot.regionOwners,
         [regionId]: newEntityId,

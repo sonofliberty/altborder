@@ -378,6 +378,29 @@ describe("region transfers", () => {
     expect(result?.snapshot.customCounter).toBe(2);
   });
 
+  it("keeps separated custom region owner metadata in sync", () => {
+    const data = makeMapData();
+    const snapshot = createInitialSnapshot(data);
+    const customRegion: RegionRecord = {
+      id: "CUSTOM_001-TERRITORY",
+      name: "Transferred Newland",
+      ownerId: "AAA",
+      type: "Custom divided territory",
+      geometry: data.regions[0].geometry,
+    };
+
+    snapshot.customCounter = 2;
+    snapshot.customRegions[customRegion.id] = customRegion;
+    snapshot.regionOwners[customRegion.id] = "AAA";
+    snapshot.entities.AAA.regionIds.push(customRegion.id);
+
+    const result = separateRegionAsCountry(snapshot, customRegion.id, "Newland", "#A85F4F");
+
+    expect(result?.entityId).toBe("CUSTOM_002");
+    expect(result?.snapshot.regionOwners[customRegion.id]).toBe("CUSTOM_002");
+    expect(result?.snapshot.customRegions[customRegion.id].ownerId).toBe("CUSTOM_002");
+  });
+
   it("keeps transferred custom region owner metadata in sync", () => {
     const data = makeMapData();
     const snapshot = createInitialSnapshot(data);
