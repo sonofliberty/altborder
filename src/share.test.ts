@@ -206,6 +206,42 @@ describe("share helpers", () => {
     });
   });
 
+  it("rejects custom regions owned by missing custom entities", async () => {
+    const encoded = await encodeSharePayload({
+      version: 1,
+      title: "Broken map",
+      description: "",
+      customCounter: 1,
+      entityChanges: {},
+      regionOwnerChanges: [],
+      customRegions: [
+        {
+          id: "CUSTOM_001-TERRITORY",
+          name: "Nowhere",
+          ownerId: "CUSTOM_001",
+          type: "Custom divided territory",
+          geometry: {
+            type: "Polygon",
+            coordinates: [
+              [
+                [0, 0],
+                [1, 0],
+                [1, 1],
+                [0, 1],
+                [0, 0],
+              ],
+            ],
+          },
+        },
+      ],
+    } as unknown as ScenarioPayload);
+
+    await expect(decodeSharePayload(encoded)).resolves.toEqual({
+      ok: false,
+      error: "The shared map link is invalid.",
+    });
+  });
+
   it("rejects duplicate custom region ids in shared payloads", async () => {
     const customRegion = {
       id: "CUSTOM_001-TERRITORY",

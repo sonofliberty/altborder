@@ -95,7 +95,8 @@ function isScenarioPayloadShape(payload: Record<string, unknown>): payload is Sc
     optionalEntityChanges(payload.entityChanges) &&
     optionalRegionOwnerChanges(payload.regionOwnerChanges) &&
     optionalStringRecord(payload.regionNameOverrides) &&
-    optionalCustomRegions(payload.customRegions)
+    optionalCustomRegions(payload.customRegions) &&
+    customRegionOwnersHaveEntityChanges(payload)
   );
 }
 
@@ -145,6 +146,19 @@ function optionalRegionOwnerChanges(value: unknown): boolean {
     return false;
   }
   return new Set(value.map(([regionId]) => regionId)).size === value.length;
+}
+
+function customRegionOwnersHaveEntityChanges(payload: Record<string, unknown>): boolean {
+  if (!Array.isArray(payload.customRegions)) return true;
+  const customEntityIds = isRecord(payload.entityChanges) ? new Set(Object.keys(payload.entityChanges)) : new Set();
+  return payload.customRegions.every((region) => {
+    if (!isRecord(region) || typeof region.ownerId !== "string") return false;
+    return !isCustomId(region.ownerId) || customEntityIds.has(region.ownerId);
+  });
+}
+
+function isCustomId(value: string): boolean {
+  return /^CUSTOM_\d+/.test(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
