@@ -114,7 +114,7 @@ function optionalEntityChanges(value: unknown): boolean {
     value === undefined ||
     (isRecord(value) &&
       Object.entries(value).every(([entityId, entity]) => {
-        if (!isNonEmptyString(entityId)) return false;
+        if (!isNonBlankString(entityId)) return false;
         if (!isCountryEntity(entity)) return false;
         return entity.id === entityId;
       }))
@@ -141,8 +141,8 @@ function optionalRegionOwnerChanges(value: unknown): boolean {
     !value.every((entry) =>
       Array.isArray(entry) &&
       entry.length === 2 &&
-      isNonEmptyString(entry[0]) &&
-      typeof entry[1] === "string",
+      isNonBlankString(entry[0]) &&
+      (entry[1] === "" || isNonBlankString(entry[1])),
     )
   ) {
     return false;
@@ -201,12 +201,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isCountryEntity(value: unknown): value is { id: string } {
   if (!isRecord(value)) return false;
   return (
-    isNonEmptyString(value.id) &&
+    isNonBlankString(value.id) &&
     typeof value.name === "string" &&
     typeof value.color === "string" &&
     isHexColor(value.color) &&
     Array.isArray(value.regionIds) &&
-    value.regionIds.every(isNonEmptyString) &&
+    value.regionIds.every(isNonBlankString) &&
     optionalBoolean(value.isCustom)
   );
 }
@@ -214,16 +214,16 @@ function isCountryEntity(value: unknown): value is { id: string } {
 function isRegionRecord(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return (
-    isNonEmptyString(value.id) &&
+    isNonBlankString(value.id) &&
     typeof value.name === "string" &&
-    isNonEmptyString(value.ownerId) &&
-    isNonEmptyString(value.type) &&
+    isNonBlankString(value.ownerId) &&
+    isNonBlankString(value.type) &&
     isGeometry(value.geometry)
   );
 }
 
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0;
+function isNonBlankString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function isGeometry(value: unknown): boolean {
