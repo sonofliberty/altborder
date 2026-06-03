@@ -1,0 +1,44 @@
+{
+  "name": "altborder",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "prepare:data": "node scripts/build-map-data.mjs"
+  },
+  "dependencies": {
+    "d3-geo": "^3.1.1",
+    "jsts": "^2.12.1",
+    "lucide-react": "^0.468.0",
+    "lz-string": "^1.5.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.16.0",
+    "@turf/rewind": "^7.3.5",
+    "@turf/simplify": "^7.3.5",
+    "@types/d3-geo": "^3.1.0",
+    "@types/jsts": "^0.17.24",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/topojson-client": "^3.1.4",
+    "@vitejs/plugin-react": "^5.0.0",
+    "eslint": "^9.16.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "globals": "^17.6.0",
+    "playwright": "^1.60.0",
+    "topojson-client": "^3.1.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.60.1",
+    "vite": "^6.0.0",
+    "vitest": "^4.1.8",
+    "world-atlas": "^2.0.2"
+  }
+}

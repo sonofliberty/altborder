@@ -1,0 +1,37 @@
+import type { Geometry } from "geojson";
+import type { RegionRecord } from "./types";
+
+export type CountryLabelGeometryInput = {
+  entityId: string;
+  regionIds: string[];
+  baseEntityById: Map<string, { regionIds: string[] }>;
+  baseCountryByEntityId: Map<string, { geometry: Geometry }>;
+  baseOwnerByRegionId: Map<string, string>;
+  regionById: Map<string, RegionRecord>;
+  fallbackGeometries: Geometry[];
+  subtractGeoJsonGeometries: (geometry: Geometry, subtractGeometries: Geometry[]) => Geometry | null;
+};
+
+export function getCountryLabelGeometries(input: CountryLabelGeometryInput): Geometry[] {
+  const baseEntity = input.baseEntityById.get(input.entityId);
+  const baseCountry = input.baseCountryByEntityId.get(input.entityId);
+  const ownsNativeRegion = baseEntity?.regionIds.some((regionId) => input.regionIds.includes(regionId));
+  if (!baseEntity || !baseCountry || !ownsNativeRegion) return input.fallbackGeometries;
+
+  const ownedRegionIds = new Set(input.regionIds);
+  const missingBaseGeometries = baseEntity.regionIds
+    .filter((regionId) => !ownedRegionIds.has(regionId))
+    .map((regionId) => input.regionById.get(regionId)?.geometry)
+    .filter((geometry): geometry is Geometry => Boolean(geometry));
+  const transferredGeometries = input.regionIds
+    .filter((regionId) => input.baseOwnerByRegionId.get(regionId) !== input.entityId)
+    .map((regionId) => input.regionById.get(regionId)?.geometry)
+    .filter((geometry): geometry is Geometry => Boolean(geometry));
+
+  const nativeGeometry =
+    missingBaseGeometries.length > 0
+      ? input.subtractGeoJsonGeometries(baseCountry.geometry, missingBaseGeometries)
+      : baseCountry.geometry;
+
+  return nativeGeometry ? [nativeGeometry, ...transferredGeometries] : transferredGeometries;
+}
