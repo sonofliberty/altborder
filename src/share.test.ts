@@ -151,6 +151,26 @@ describe("share helpers", () => {
     });
   });
 
+  it("rejects duplicate region owner changes in shared payloads", async () => {
+    const encoded = await encodeSharePayload({
+      version: 1,
+      title: "Broken map",
+      description: "",
+      customCounter: 1,
+      entityChanges: {},
+      regionOwnerChanges: [
+        ["BBB_1", "AAA"],
+        ["BBB_1", "CCC"],
+      ],
+      customRegions: [],
+    } as unknown as ScenarioPayload);
+
+    await expect(decodeSharePayload(encoded)).resolves.toEqual({
+      ok: false,
+      error: "The shared map link is invalid.",
+    });
+  });
+
   it("rejects ownerless custom regions in shared payloads", async () => {
     const encoded = await encodeSharePayload({
       version: 1,

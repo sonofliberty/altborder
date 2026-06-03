@@ -132,16 +132,19 @@ function optionalCustomRegions(value: unknown): boolean {
 }
 
 function optionalRegionOwnerChanges(value: unknown): boolean {
-  return (
-    value === undefined ||
-    (Array.isArray(value) &&
-      value.every((entry) =>
-        Array.isArray(entry) &&
-        entry.length === 2 &&
-        typeof entry[0] === "string" &&
-        typeof entry[1] === "string",
-      ))
-  );
+  if (value === undefined) return true;
+  if (
+    !Array.isArray(value) ||
+    !value.every((entry) =>
+      Array.isArray(entry) &&
+      entry.length === 2 &&
+      typeof entry[0] === "string" &&
+      typeof entry[1] === "string",
+    )
+  ) {
+    return false;
+  }
+  return new Set(value.map(([regionId]) => regionId)).size === value.length;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
