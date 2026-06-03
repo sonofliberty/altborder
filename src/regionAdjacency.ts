@@ -19,6 +19,7 @@ type IndexedRegion = {
 const defaultAdjacencyTolerance = 0.0008;
 const minimumSharedBorderLength = 1e-6;
 const indexedRegionCache = new WeakMap<RegionRecord[], IndexedRegion[]>();
+const sortedSegmentCache = new WeakMap<Segment[], Segment[]>();
 
 export function buildSelectedRegionAdjacency(
   regions: RegionRecord[],
@@ -88,16 +89,37 @@ function getRegionSegments(region: IndexedRegion): Segment[] {
 
 function approximateSharedBorderLength(first: Segment[], second: Segment[], tolerance: number): number {
   let sharedLength = 0;
+  const firstSorted = getSegmentsSortedByMinX(first);
+  const secondSorted = getSegmentsSortedByMinX(second);
+  let secondStartIndex = 0;
 
-  for (const firstSegment of first) {
-    for (const secondSegment of second) {
-      if (!boundsOverlap(firstSegment.bounds, secondSegment.bounds, tolerance)) continue;
+  for (const firstSegment of firstSorted) {
+    while (
+      secondStartIndex < secondSorted.length &&
+      secondSorted[secondStartIndex].bounds[2] + tolerance < firstSegment.bounds[0]
+    ) {
+      secondStartIndex += 1;
+    }
+
+    for (let index = secondStartIndex; index < secondSorted.length; index += 1) {
+      const secondSegment = secondSorted[index];
+      if (secondSegment.bounds[0] - tolerance > firstSegment.bounds[2]) break;
+      if (!yBoundsOverlap(firstSegment.bounds, secondSegment.bounds, tolerance)) continue;
       sharedLength += nearlyCollinearOverlapLength(firstSegment, secondSegment, tolerance);
       if (sharedLength > minimumSharedBorderLength) return sharedLength;
     }
   }
 
   return sharedLength;
+}
+
+function getSegmentsSortedByMinX(segments: Segment[]): Segment[] {
+  const cached = sortedSegmentCache.get(segments);
+  if (cached) return cached;
+
+  const sorted = [...segments].sort((a, b) => a.bounds[0] - b.bounds[0]);
+  sortedSegmentCache.set(segments, sorted);
+  return sorted;
 }
 
 function nearlyCollinearOverlapLength(first: Segment, second: Segment, tolerance: number): number {
@@ -197,6 +219,10 @@ function boundsOverlap(a: Bounds, b: Bounds, tolerance: number): boolean {
     a[1] - tolerance <= b[3] &&
     a[3] + tolerance >= b[1]
   );
+}
+
+function yBoundsOverlap(a: Bounds, b: Bounds, tolerance: number): boolean {
+  return a[1] - tolerance <= b[3] && a[3] + tolerance >= b[1];
 }
 
 function vector(start: Position, end: Position): Position {
