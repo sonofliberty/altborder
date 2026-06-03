@@ -429,7 +429,8 @@ function sharedSubdivisionBorderGeometry(firstBoundary, secondBoundary) {
 
     const simplified = simplifyLinealGeometry(linealGeometry, subdivisionBorderSimplifyTolerance);
     const pruned = pruneShortLinealParts(simplified, minimumSubdivisionBorderLength);
-    return pruned ? roundGeometry(pruned) : null;
+    const rounded = pruned ? roundGeometry(pruned) : null;
+    return rounded ? pruneShortLinealParts(rounded, minimumSubdivisionBorderLength) : null;
   } catch {
     return null;
   }

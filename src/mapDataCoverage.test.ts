@@ -145,6 +145,7 @@ describe("generated ADM1 coverage", () => {
       expect(baseOwnerByRegionId.get(firstRegionId), border.id).toBe(border.ownerId);
       expect(baseOwnerByRegionId.get(secondRegionId), border.id).toBe(border.ownerId);
       expect(["LineString", "MultiLineString"], border.id).toContain(border.geometry.type);
+      expect(linealPartsHaveLength(border.geometry), border.id).toBe(true);
     }
   });
 
@@ -342,6 +343,18 @@ function hasLongHorizontalExteriorSegment(geometry: Polygon | MultiPolygon): boo
       return Math.abs(position[0] - previous[0]) > 40 && Math.abs(position[1] - previous[1]) < 0.05;
     });
   });
+}
+
+function linealPartsHaveLength(geometry: MapData["subdivisionBorders"][number]["geometry"]): boolean {
+  const lines = geometry.type === "LineString" ? [geometry.coordinates] : geometry.coordinates;
+  return lines.every((line) => line.length >= 2 && lineLength(line) > 1e-6);
+}
+
+function lineLength(line: Position[]): number {
+  return line.slice(1).reduce((total, point, index) => {
+    const previous = line[index];
+    return total + Math.hypot(point[0] - previous[0], point[1] - previous[1]);
+  }, 0);
 }
 
 function ringSignedArea(ring: Position[]): number {
