@@ -14,6 +14,7 @@ import {
   Split,
   Undo2,
   Redo2,
+  X,
 } from "lucide-react";
 import { geoNaturalEarth1 } from "d3-geo";
 import type { FeatureCollection, Geometry, Position } from "geojson";
@@ -2035,19 +2036,20 @@ export default function App() {
     return (
       <div className="region-list country-list" role="list">
         {entities.map((entity) => (
-          <button key={entity.id} className="region-row" onClick={() => onSelect(entity.id)} role="listitem">
-            <span>{entity.name}</span>
+          <div key={entity.id} className="country-row" role="listitem">
+            <button className="region-row country-row-main" onClick={() => onSelect(entity.id)}>
+              <span>{entity.name}</span>
+            </button>
             {onRemove ? (
-              <small
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRemove(entity.id);
-                }}
+              <button
+                className="country-row-remove"
+                onClick={() => onRemove(entity.id)}
+                aria-label={`Remove ${entity.name}`}
               >
-                Remove
-              </small>
+                <X size={15} />
+              </button>
             ) : null}
-          </button>
+          </div>
         ))}
       </div>
     );

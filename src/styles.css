@@ -536,8 +536,21 @@ textarea {
   max-height: min(220px, 26vh);
 }
 
-.country-list .region-row small {
+.country-row {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) 38px;
+}
+
+.country-row-main {
+  min-width: 0;
+}
+
+.country-row-remove {
   color: #8c3d3d;
+  min-height: 42px;
+  min-width: 38px;
+  padding: 0;
 }
 
 .region-row {
