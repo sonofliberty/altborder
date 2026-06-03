@@ -402,6 +402,14 @@ textarea {
   padding: 3px;
 }
 
+.scenario-description {
+  color: #1f2523;
+  line-height: 1.4;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .tool-card {
   background: #ffffff;
   border: 1px solid #dce4de;

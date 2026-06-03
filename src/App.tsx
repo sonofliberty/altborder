@@ -1866,14 +1866,20 @@ export default function App() {
     return (
       <section className="context-card">
         <div className="section-heading">SCENARIO</div>
-        <label className="field">
-          <span>Description</span>
-          <textarea
-            value={currentSnapshot.description}
-            disabled={readOnly}
-            onChange={(event) => updateScenarioDescription(event.target.value)}
-          />
-        </label>
+        {readOnly ? (
+          <div className="field">
+            <span>Description</span>
+            <p className="scenario-description">{currentSnapshot.description || "No description"}</p>
+          </div>
+        ) : (
+          <label className="field">
+            <span>Description</span>
+            <textarea
+              value={currentSnapshot.description}
+              onChange={(event) => updateScenarioDescription(event.target.value)}
+            />
+          </label>
+        )}
       </section>
     );
   }
