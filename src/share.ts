@@ -96,7 +96,7 @@ function isScenarioPayloadShape(payload: Record<string, unknown>): payload is Sc
     optionalRegionOwnerChanges(payload.regionOwnerChanges) &&
     optionalStringRecord(payload.regionNameOverrides) &&
     optionalCustomRegions(payload.customRegions) &&
-    customRegionOwnersHaveEntityChanges(payload)
+    customOwnersHaveEntityChanges(payload)
   );
 }
 
@@ -148,13 +148,27 @@ function optionalRegionOwnerChanges(value: unknown): boolean {
   return new Set(value.map(([regionId]) => regionId)).size === value.length;
 }
 
-function customRegionOwnersHaveEntityChanges(payload: Record<string, unknown>): boolean {
-  if (!Array.isArray(payload.customRegions)) return true;
+function customOwnersHaveEntityChanges(payload: Record<string, unknown>): boolean {
   const customEntityIds = isRecord(payload.entityChanges) ? new Set(Object.keys(payload.entityChanges)) : new Set();
-  return payload.customRegions.every((region) => {
-    if (!isRecord(region) || typeof region.ownerId !== "string") return false;
-    return !isCustomId(region.ownerId) || customEntityIds.has(region.ownerId);
-  });
+  if (
+    Array.isArray(payload.customRegions) &&
+    !payload.customRegions.every((region) => {
+      if (!isRecord(region) || typeof region.ownerId !== "string") return false;
+      return !isCustomId(region.ownerId) || customEntityIds.has(region.ownerId);
+    })
+  ) {
+    return false;
+  }
+  if (
+    Array.isArray(payload.regionOwnerChanges) &&
+    !payload.regionOwnerChanges.every((entry) => {
+      const ownerId = entry[1];
+      return typeof ownerId === "string" && (!isCustomId(ownerId) || customEntityIds.has(ownerId));
+    })
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function isCustomId(value: string): boolean {
