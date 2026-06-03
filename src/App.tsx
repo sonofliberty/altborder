@@ -2269,14 +2269,14 @@ export default function App() {
           >
             <rect width={viewportWidth} height={viewportHeight} className="ocean" />
             <g ref={mapContentRef} transform={formatZoomTransform(zoom)}>
-              <g className="country-underlays" aria-hidden="true">
+              <g aria-hidden="true">
                 {countryUnderlayElements}
               </g>
               {regionPathElements}
-              <g className="subdivision-borders" aria-hidden="true">
+              <g aria-hidden="true">
                 {subdivisionBorderElements}
               </g>
-              <g className="country-outlines" aria-hidden="true">
+              <g aria-hidden="true">
                 {countryOutlineElements}
               </g>
               {divideTerritories ? (
