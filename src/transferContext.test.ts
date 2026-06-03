@@ -38,6 +38,18 @@ describe("transfer context helpers", () => {
     expect(regions[0]?.ownerName).toBe("Alpha");
   });
 
+  it("does not summarize selected regions with inherited owner ids", () => {
+    const regions = getSelectedTransferRegions({
+      selectedRegionIds: ["toString"],
+      regionById: new Map([["toString", region("toString", "Inherited")]]),
+      regionOwners: {},
+      entities: {},
+      getRegionDisplayName: (regionId) => regionId,
+    });
+
+    expect(regions).toEqual([]);
+  });
+
   it("sorts multiple selected transfer regions by display name", () => {
     const regions = getSelectedTransferRegions({
       selectedRegionIds: ["AAA_2", "AAA_1", "AAA_3"],
@@ -65,6 +77,10 @@ describe("transfer context helpers", () => {
     expect(isValidTransferTarget({ targetEntityId: "", selectedEntityId: "AAA", entities })).toBe(false);
     expect(isValidTransferTarget({ targetEntityId: "CCC", selectedEntityId: "AAA", entities })).toBe(false);
     expect(isValidTransferTarget({ targetEntityId: "AAA", selectedEntityId: "AAA", entities })).toBe(false);
+  });
+
+  it("rejects transfer targets that resolve only through inherited object properties", () => {
+    expect(isValidTransferTarget({ targetEntityId: "toString", selectedEntityId: "AAA", entities: {} })).toBe(false);
   });
 });
 

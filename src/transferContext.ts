@@ -24,14 +24,15 @@ export function getSelectedTransferRegions({
   return [...selectedRegionIds]
     .map((regionId) => {
       const region = regionById.get(regionId);
-      const ownerId = regionOwners[regionId];
+      const ownerId = getOwnValue(regionOwners, regionId);
       if (!region || !ownerId) return null;
+      const owner = getOwnValue(entities, ownerId);
       return {
         id: region.id,
         displayName: getRegionDisplayName(region.id),
         type: region.type,
         ownerId,
-        ownerName: entities[ownerId]?.name ?? ownerId,
+        ownerName: owner?.name ?? ownerId,
       };
     })
     .filter((region): region is TransferRegionSummary => Boolean(region))
@@ -54,12 +55,12 @@ export function getValidTransferFocus({
   if (
     currentFocusId &&
     selectedRegionList.includes(currentFocusId) &&
-    regionOwners[currentFocusId] === selectedEntityId
+    getOwnValue(regionOwners, currentFocusId) === selectedEntityId
   ) {
     return currentFocusId;
   }
 
-  return selectedRegionList.find((regionId) => regionOwners[regionId] === selectedEntityId) ?? "";
+  return selectedRegionList.find((regionId) => getOwnValue(regionOwners, regionId) === selectedEntityId) ?? "";
 }
 
 export function getNeighborTargetEntityIds({
@@ -82,7 +83,7 @@ export function getNeighborTargetEntityIds({
 
     for (const adjacentRegionId of adjacentRegionIds) {
       if (selectedRegionSet.has(adjacentRegionId)) continue;
-      const ownerId = regionOwners[adjacentRegionId];
+      const ownerId = getOwnValue(regionOwners, adjacentRegionId);
       if (!ownerId || ownerId === selectedEntityId) continue;
       neighborEntityIds.add(ownerId);
     }
@@ -120,5 +121,9 @@ export function isValidTransferTarget({
   selectedEntityId: string;
   entities: Record<string, CountryEntity>;
 }): boolean {
-  return Boolean(targetEntityId && targetEntityId !== selectedEntityId && entities[targetEntityId]);
+  return Boolean(targetEntityId && targetEntityId !== selectedEntityId && getOwnValue(entities, targetEntityId));
+}
+
+function getOwnValue<T>(record: Record<string, T>, key: string): T | undefined {
+  return Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined;
 }
