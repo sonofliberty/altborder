@@ -96,7 +96,8 @@ function isScenarioPayloadShape(payload: Record<string, unknown>): payload is Sc
     optionalRegionOwnerChanges(payload.regionOwnerChanges) &&
     optionalStringRecord(payload.regionNameOverrides) &&
     optionalCustomRegions(payload.customRegions) &&
-    customOwnersHaveEntityChanges(payload)
+    customOwnersHaveEntityChanges(payload) &&
+    customRegionOwnerChangesAreConsistent(payload)
   );
 }
 
@@ -169,6 +170,23 @@ function customOwnersHaveEntityChanges(payload: Record<string, unknown>): boolea
     return false;
   }
   return true;
+}
+
+function customRegionOwnerChangesAreConsistent(payload: Record<string, unknown>): boolean {
+  if (!Array.isArray(payload.customRegions) || !Array.isArray(payload.regionOwnerChanges)) {
+    return true;
+  }
+  const customRegionOwnerById = new Map<string, string>();
+  for (const region of payload.customRegions) {
+    if (!isRecord(region) || typeof region.id !== "string" || typeof region.ownerId !== "string") {
+      return false;
+    }
+    customRegionOwnerById.set(region.id, region.ownerId);
+  }
+  return payload.regionOwnerChanges.every((entry) => {
+    const expectedOwnerId = customRegionOwnerById.get(entry[0]);
+    return expectedOwnerId === undefined || expectedOwnerId === entry[1];
+  });
 }
 
 function isCustomId(value: string): boolean {

@@ -259,6 +259,57 @@ describe("share helpers", () => {
     });
   });
 
+  it("rejects custom region owner changes that conflict with custom region owners", async () => {
+    const encoded = await encodeSharePayload({
+      version: 1,
+      title: "Broken map",
+      description: "",
+      customCounter: 2,
+      entityChanges: {
+        CUSTOM_001: {
+          id: "CUSTOM_001",
+          name: "Broken",
+          color: "#A85F4F",
+          regionIds: ["CUSTOM_001-TERRITORY"],
+          isCustom: true,
+        },
+        CUSTOM_002: {
+          id: "CUSTOM_002",
+          name: "Other",
+          color: "#5F7FA2",
+          regionIds: [],
+          isCustom: true,
+        },
+      },
+      regionOwnerChanges: [["CUSTOM_001-TERRITORY", "CUSTOM_002"]],
+      customRegions: [
+        {
+          id: "CUSTOM_001-TERRITORY",
+          name: "Broken",
+          ownerId: "CUSTOM_001",
+          type: "Custom divided territory",
+          geometry: {
+            type: "Polygon",
+            coordinates: [
+              [
+                [0, 0],
+                [1, 0],
+                [1, 1],
+                [0, 1],
+                [0, 0],
+              ],
+            ],
+          },
+        },
+      ],
+    } as unknown as ScenarioPayload);
+
+    await expect(decodeSharePayload(encoded)).resolves.toEqual({
+      ok: false,
+      error: "The shared map link is invalid.",
+    });
+  });
+
   it("rejects duplicate custom region ids in shared payloads", async () => {
     const customRegion = {
       id: "CUSTOM_001-TERRITORY",
