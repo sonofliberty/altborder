@@ -409,11 +409,10 @@ function buildSubdivisionBorders(countries, regions) {
         const geometry = sharedSubdivisionBorderGeometry(first.boundary, second.boundary);
         if (!geometry) continue;
 
-        const regionIds = [first.id, second.id].sort();
         borders.push({
-          id: `${country.id}:${regionIds[0]}:${regionIds[1]}`,
+          id: `${country.id}:${first.id}:${second.id}`,
           ownerId: country.id,
-          regionIds,
+          regionIds: [first.id, second.id],
           geometry,
         });
       }
@@ -434,8 +433,7 @@ function sharedSubdivisionBorderGeometry(firstBoundary, secondBoundary) {
 
     const simplified = simplifyLinealGeometry(linealGeometry, subdivisionBorderSimplifyTolerance);
     const pruned = pruneShortLinealParts(simplified, minimumSubdivisionBorderLength);
-    const rounded = pruned ? roundGeometry(pruned) : null;
-    return rounded ? pruneShortLinealParts(rounded, minimumSubdivisionBorderLength) : null;
+    return pruned ? roundGeometry(pruned) : null;
   } catch {
     return null;
   }

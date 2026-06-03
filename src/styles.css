@@ -266,7 +266,6 @@ textarea {
 .region-layer:has(.region:hover) .region-border,
 .region-layer:has(.region-editable:hover) .region-border {
   stroke: rgba(6, 9, 8, 0.34);
-  stroke-opacity: 1;
   stroke-width: 0.45;
 }
 
