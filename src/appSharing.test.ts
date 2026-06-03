@@ -7,6 +7,10 @@ describe("shared-link recovery", () => {
     expect(appSource).toContain("Start fresh");
     expect(appSource).toContain("window.history.replaceState");
   });
+
+  it("validates empty shared-data hashes instead of silently starting fresh", () => {
+    expect(appSource).toContain("if (encoded !== null)");
+  });
 });
 
 describe("scenario metadata UI", () => {

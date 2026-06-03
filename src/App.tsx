@@ -227,7 +227,7 @@ export default function App() {
         let initial = createInitialSnapshot(mapData);
         let shouldReadOnly = false;
 
-        if (encoded) {
+        if (encoded !== null) {
           const decoded = await decodeSharePayload(encoded);
           if (cancelled) return;
           if (decoded.ok) {
