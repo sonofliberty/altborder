@@ -267,12 +267,8 @@ function isPosition(value: unknown): boolean {
     value.length >= 2 &&
     typeof value[0] === "number" &&
     Number.isFinite(value[0]) &&
-    value[0] >= -180 &&
-    value[0] <= 180 &&
     typeof value[1] === "number" &&
-    Number.isFinite(value[1]) &&
-    value[1] >= -90 &&
-    value[1] <= 90
+    Number.isFinite(value[1])
   );
 }
 

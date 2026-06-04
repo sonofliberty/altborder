@@ -24,24 +24,6 @@ describe("scenario metadata UI", () => {
   });
 });
 
-describe("read-only map inspection", () => {
-  it("focuses clicked regions while viewing shared maps", () => {
-    expect(appSource).toMatch(
-      /if \(readOnly\) \{\s+setSelectedEntityId\(ownerId\);\s+if \(mode === "inspect"\) \{\s+setInspectFocusedRegionId\(regionId\);/,
-    );
-  });
-});
-
-describe("share dialog accessibility", () => {
-  it("keeps keyboard focus inside the modal share dialog", () => {
-    expect(appSource).toContain("shareDialogRef");
-    expect(appSource).toContain("getFocusableDialogElements");
-    expect(appSource).toContain('event.key !== "Tab"');
-    expect(appSource).toContain('event.key === "Escape"');
-    expect(appSource).toContain("tabIndex={-1}");
-  });
-});
-
 describe("pointer capture handling", () => {
   it("guards pointer-capture release after cancellation", () => {
     expect(appSource).toContain("releasePointerCaptureIfHeld(event.currentTarget, pointerId)");

@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { feature } from "topojson-client";
 import simplify from "@turf/simplify";
 import rewind from "@turf/rewind";
@@ -19,17 +19,13 @@ const cacheDir = path.join(root, ".cache/geoboundaries");
 const adm1SimplifyTolerance = 0.03;
 const fallbackSimplifyTolerance = 0.015;
 const fallbackSimplifyToleranceByCountryId = new Map([["CAN", 0.008]]);
-const singleRegionAdm0SimplifyToleranceByCountryId = new Map([
-  ["CAN", 0.01],
-  ["VAT", 0.00001],
-]);
+const singleRegionAdm0SimplifyToleranceByCountryId = new Map([["CAN", 0.01]]);
 const subdivisionBorderSimplifyTolerance = 0.03;
 const subdivisionBorderMatchTolerance = 0.02;
 const minimumSubdivisionBorderLength = 1e-6;
 const minimumPolygonArea = 0.005;
 const minimumClippedAreaRetentionRatio = 0.2;
 const coordinatePrecision = 2;
-const fallbackPolygonCoordinatePrecision = 5;
 const fetchTimeoutMs = 180_000;
 const reader = new GeoJSONReader(new GeometryFactory());
 const writer = new GeoJSONWriter();
@@ -141,7 +137,7 @@ const singleRegionCountries = [
   { iso3: "MLT", name: "Malta", aliases: ["Malta"] },
 ];
 
-const singleRegionAdm0CountryIds = new Set(["CAN", "VAT"]);
+const singleRegionAdm0CountryIds = new Set(["CAN"]);
 
 const nonSovereignFallbackOwners = {
   akrotiri: "GBR",
@@ -287,7 +283,7 @@ async function main() {
       geometry: worldGeometry,
     });
 
-    if (shouldSkipWorldFallback(normalizedWorldName, countryNameToId)) {
+    if (selectedNames.has(normalizeName(worldName))) {
       continue;
     }
 
@@ -409,10 +405,11 @@ function buildSubdivisionBorders(countries, regions) {
         const geometry = sharedSubdivisionBorderGeometry(first.boundary, second.boundary);
         if (!geometry) continue;
 
+        const regionIds = [first.id, second.id].sort();
         borders.push({
-          id: `${country.id}:${first.id}:${second.id}`,
+          id: `${country.id}:${regionIds[0]}:${regionIds[1]}`,
           ownerId: country.id,
-          regionIds: [first.id, second.id],
+          regionIds,
           geometry,
         });
       }
@@ -433,7 +430,8 @@ function sharedSubdivisionBorderGeometry(firstBoundary, secondBoundary) {
 
     const simplified = simplifyLinealGeometry(linealGeometry, subdivisionBorderSimplifyTolerance);
     const pruned = pruneShortLinealParts(simplified, minimumSubdivisionBorderLength);
-    return pruned ? roundGeometry(pruned) : null;
+    const rounded = pruned ? roundGeometry(pruned) : null;
+    return rounded ? pruneShortLinealParts(rounded, minimumSubdivisionBorderLength) : null;
   } catch {
     return null;
   }
@@ -1034,10 +1032,6 @@ function normalizeName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
-export function shouldSkipWorldFallback(normalizedWorldName, countryNameToId) {
-  return selectedNames.has(normalizedWorldName) && countryNameToId.has(normalizedWorldName);
-}
-
 function simplifyGeometry(geometry, tolerance) {
   if (!geometry) {
     return geometry;
@@ -1219,21 +1213,19 @@ function rewindForD3(geometry) {
 
 function roundGeometry(geometry) {
   if (geometry.type === "Polygon") {
-    const rounded = roundPolygonalGeometry(geometry, coordinatePrecision);
-    return (
-      pruneDegeneratePolygonRings(rounded) ??
-      pruneDegeneratePolygonRings(roundPolygonalGeometry(geometry, fallbackPolygonCoordinatePrecision)) ??
-      rounded
-    );
+    return {
+      type: "Polygon",
+      coordinates: geometry.coordinates.map((ring) => ring.map(roundPoint)),
+    };
   }
 
   if (geometry.type === "MultiPolygon") {
-    const rounded = roundPolygonalGeometry(geometry, coordinatePrecision);
-    return (
-      pruneDegeneratePolygonRings(rounded) ??
-      pruneDegeneratePolygonRings(roundPolygonalGeometry(geometry, fallbackPolygonCoordinatePrecision)) ??
-      rounded
-    );
+    return {
+      type: "MultiPolygon",
+      coordinates: geometry.coordinates.map((polygon) =>
+        polygon.map((ring) => ring.map(roundPoint)),
+      ),
+    };
   }
 
   if (geometry.type === "LineString") {
@@ -1253,61 +1245,14 @@ function roundGeometry(geometry) {
   return geometry;
 }
 
-function roundPolygonalGeometry(geometry, precision) {
-  if (geometry.type === "Polygon") {
-    return {
-      type: "Polygon",
-      coordinates: geometry.coordinates.map((ring) =>
-        ring.map((point) => roundPoint(point, precision)),
-      ),
-    };
-  }
-
-  return {
-    type: "MultiPolygon",
-    coordinates: geometry.coordinates.map((polygon) =>
-      polygon.map((ring) => ring.map((point) => roundPoint(point, precision))),
-    ),
-  };
-}
-
-function pruneDegeneratePolygonRings(geometry) {
-  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
-  const keptPolygons = polygons
-    .map((polygon) => {
-      const [shell, ...holes] = polygon;
-      if (!ringHasArea(shell)) return null;
-      return [shell, ...holes.filter(ringHasArea)];
-    })
-    .filter(Boolean);
-
-  if (keptPolygons.length === 0) return null;
-  if (keptPolygons.length === 1) {
-    return {
-      type: "Polygon",
-      coordinates: keptPolygons[0],
-    };
-  }
-  return {
-    type: "MultiPolygon",
-    coordinates: keptPolygons,
-  };
-}
-
-function ringHasArea(ring) {
-  return Array.isArray(ring) && ring.length >= 4 && ringArea(ring) > 1e-12;
-}
-
-function roundPoint(point, precision = coordinatePrecision) {
+function roundPoint(point) {
   return [
-    Number(point[0].toFixed(precision)),
-    Number(point[1].toFixed(precision)),
+    Number(point[0].toFixed(coordinatePrecision)),
+    Number(point[1].toFixed(coordinatePrecision)),
   ];
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
-}
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

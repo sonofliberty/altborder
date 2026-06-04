@@ -115,24 +115,6 @@ describe("generated ADM1 coverage", () => {
     expect(hasLongHorizontalExteriorSegment(sakha.geometry)).toBe(false);
   });
 
-  it("emits polygonal map geometry without degenerate rings", () => {
-    const data = mapDataFixture as MapData;
-    const degenerateRings = [];
-
-    for (const region of data.regions) {
-      if (isPolygonalGeometry(region.geometry)) {
-        degenerateRings.push(...degeneratePolygonRingIds(region.id, region.geometry));
-      }
-    }
-    for (const country of data.baseCountries) {
-      if (isPolygonalGeometry(country.geometry)) {
-        degenerateRings.push(...degeneratePolygonRingIds(country.entityId, country.geometry));
-      }
-    }
-
-    expect(degenerateRings).toEqual([]);
-  });
-
   it("generates shared subdivision border linework for multi-region countries", () => {
     const data = mapDataFixture as MapData;
     const regionIds = new Set(data.regions.map((region) => region.id));
@@ -163,6 +145,9 @@ describe("generated ADM1 coverage", () => {
       expect(baseOwnerByRegionId.get(firstRegionId), border.id).toBe(border.ownerId);
       expect(baseOwnerByRegionId.get(secondRegionId), border.id).toBe(border.ownerId);
       expect(["LineString", "MultiLineString"], border.id).toContain(border.geometry.type);
+      expect(linealPartsHaveLength(border.geometry), border.id).toBe(true);
+      expect(border.regionIds, border.id).toEqual([...border.regionIds].sort());
+      expect(border.id, border.id).toBe(`${border.ownerId}:${firstRegionId}:${secondRegionId}`);
     }
   });
 
@@ -362,21 +347,16 @@ function hasLongHorizontalExteriorSegment(geometry: Polygon | MultiPolygon): boo
   });
 }
 
-function degeneratePolygonRingIds(id: string, geometry: Polygon | MultiPolygon): string[] {
-  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
-  const degenerateRings = [];
+function linealPartsHaveLength(geometry: MapData["subdivisionBorders"][number]["geometry"]): boolean {
+  const lines = geometry.type === "LineString" ? [geometry.coordinates] : geometry.coordinates;
+  return lines.every((line) => line.length >= 2 && lineLength(line) > 1e-6);
+}
 
-  for (let polygonIndex = 0; polygonIndex < polygons.length; polygonIndex += 1) {
-    const polygon = polygons[polygonIndex];
-    for (let ringIndex = 0; ringIndex < polygon.length; ringIndex += 1) {
-      const ring = polygon[ringIndex];
-      if (ring.length < 4 || Math.abs(ringSignedArea(ring)) <= 1e-12) {
-        degenerateRings.push(`${id}:${polygonIndex}:${ringIndex}`);
-      }
-    }
-  }
-
-  return degenerateRings;
+function lineLength(line: Position[]): number {
+  return line.slice(1).reduce((total, point, index) => {
+    const previous = line[index];
+    return total + Math.hypot(point[0] - previous[0], point[1] - previous[1]);
+  }, 0);
 }
 
 function ringSignedArea(ring: Position[]): number {

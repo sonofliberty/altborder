@@ -189,7 +189,6 @@ export function separateRegionAsCountry(
   if (customRegion) {
     nextCustomRegions[regionId] = withCurrentRegionOwner(customRegion, newEntityId);
   }
-  pruneEmptyCustomEntities(nextEntities);
 
   return {
     entityId: newEntityId,

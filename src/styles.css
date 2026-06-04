@@ -266,6 +266,7 @@ textarea {
 .region-layer:has(.region:hover) .region-border,
 .region-layer:has(.region-editable:hover) .region-border {
   stroke: rgba(6, 9, 8, 0.34);
+  stroke-opacity: 1;
   stroke-width: 0.45;
 }
 
@@ -535,21 +536,8 @@ textarea {
   max-height: min(220px, 26vh);
 }
 
-.country-row {
-  display: grid;
-  gap: 6px;
-  grid-template-columns: minmax(0, 1fr) 38px;
-}
-
-.country-row-main {
-  min-width: 0;
-}
-
-.country-row-remove {
+.country-list .region-row small {
   color: #8c3d3d;
-  min-height: 42px;
-  min-width: 38px;
-  padding: 0;
 }
 
 .region-row {
