@@ -90,7 +90,6 @@ export function describeUrlSize(url: string): { bytes: number; level: "ok" | "wa
 function isScenarioPayloadShape(payload: Record<string, unknown>): payload is ScenarioPayload {
   return (
     optionalString(payload.title) &&
-    optionalString(payload.description) &&
     optionalPositiveInteger(payload.customCounter) &&
     optionalEntityChanges(payload.entityChanges) &&
     optionalRegionOwnerChanges(payload.regionOwnerChanges) &&

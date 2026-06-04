@@ -47,7 +47,6 @@ describe("scenario custom regions", () => {
     const payload: ScenarioPayload = {
       version: 1,
       title: "Old map",
-      description: "",
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [],
@@ -94,7 +93,6 @@ describe("scenario custom regions", () => {
     const restored = applyScenarioPayload(data, {
       version: 1,
       title: "Blank override",
-      description: "",
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [],
@@ -155,7 +153,6 @@ describe("scenario custom regions", () => {
     const restored = applyScenarioPayload(data, {
       version: 1,
       title: "Inherited owner",
-      description: "",
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [["BBB_1", "toString"]],
@@ -174,18 +171,6 @@ describe("scenario custom regions", () => {
     const restored = applyScenarioPayload(data, createScenarioPayload(data, snapshot));
 
     expect(restored.title).toBe("");
-  });
-
-  it("serializes and restores scenario descriptions", () => {
-    const data = makeMapData();
-    const snapshot = createInitialSnapshot(data);
-    snapshot.description = "A saved alternate history note.";
-
-    const payload = createScenarioPayload(data, snapshot);
-    const restored = applyScenarioPayload(data, payload);
-
-    expect(payload.description).toBe("A saved alternate history note.");
-    expect(restored.description).toBe("A saved alternate history note.");
   });
 
   it("omits custom regions that no longer have a valid owner", () => {
@@ -223,7 +208,6 @@ describe("scenario custom regions", () => {
     const payload: ScenarioPayload = {
       version: 1,
       title: "Cleared custom region",
-      description: "",
       customCounter: 2,
       entityChanges: {
         CUSTOM_001: {
@@ -261,7 +245,6 @@ describe("scenario custom regions", () => {
     const restored = applyScenarioPayload(data, {
       version: 1,
       title: "Stale counter",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {
@@ -297,7 +280,6 @@ describe("scenario custom regions", () => {
     const restored = applyScenarioPayload(data, {
       version: 1,
       title: "Transferred custom region",
-      description: "",
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [[customRegion.id, "AAA"]],
@@ -320,7 +302,6 @@ describe("scenario custom regions", () => {
     const restored = applyScenarioPayload(data, {
       version: 1,
       title: "Colliding custom region",
-      description: "",
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [["BBB_1", "AAA"]],
@@ -346,7 +327,6 @@ describe("scenario custom regions", () => {
     const restored = applyScenarioPayload(data, {
       version: 1,
       title: "Base entity marked custom",
-      description: "",
       customCounter: 1,
       entityChanges: {
         BBB: {
@@ -382,7 +362,6 @@ describe("scenario custom regions", () => {
     const restored = applyScenarioPayload(data, {
       version: 1,
       title: "Non-base entity without custom flag",
-      description: "",
       customCounter: 1,
       entityChanges: {
         GHOST: {

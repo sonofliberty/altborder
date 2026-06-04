@@ -1106,7 +1106,7 @@ export default function App() {
     : "";
   const divideLinePath = svgLineToPath(divideLine);
   const visibleDivideError = divideError || (!divideSplit.ok ? divideSplit.reason : "");
-  const showSidePanel = mode !== "inspect" || Boolean(selectedEntity || inspectFocusedRegion || snapshot?.description);
+  const showSidePanel = mode !== "inspect" || Boolean(selectedEntity || inspectFocusedRegion);
 
   useEffect(() => {
     if (!snapshot) return;
@@ -1200,13 +1200,6 @@ export default function App() {
     commitMetadata((current) => {
       if (current.title === title) return current;
       return { ...current, title };
-    });
-  }
-
-  function updateScenarioDescription(description: string) {
-    commitMetadata((current) => {
-      if (current.description === description) return current;
-      return { ...current, description };
     });
   }
 
@@ -1903,28 +1896,6 @@ export default function App() {
     );
   }
 
-  function renderScenarioContext(currentSnapshot: EditorSnapshot) {
-    return (
-      <section className="context-card">
-        <div className="section-heading">SCENARIO</div>
-        {readOnly ? (
-          <div className="field">
-            <span>Description</span>
-            <p className="scenario-description">{currentSnapshot.description || "No description"}</p>
-          </div>
-        ) : (
-          <label className="field">
-            <span>Description</span>
-            <textarea
-              value={currentSnapshot.description}
-              onChange={(event) => updateScenarioDescription(event.target.value)}
-            />
-          </label>
-        )}
-      </section>
-    );
-  }
-
   function renderRegionSummary({
     title,
     name,
@@ -2337,7 +2308,6 @@ export default function App() {
         {showSidePanel ? (
         <aside className="side-panel">
           <PanelHeader mode={mode} readOnly={readOnly} />
-          {renderScenarioContext(snapshot)}
 
           {mode === "inspect" ? (
             <>

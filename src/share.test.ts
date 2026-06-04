@@ -7,7 +7,6 @@ describe("share helpers", () => {
     const payload: ScenarioPayload = {
       version: 1,
       title: "Shared map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {
@@ -63,7 +62,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [],
@@ -80,7 +78,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         BROKEN: {
@@ -105,7 +102,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {
@@ -130,7 +126,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         "": {
@@ -155,7 +150,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         "   ": {
@@ -180,7 +174,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         " CUSTOM_001 ": {
@@ -205,7 +198,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {
@@ -230,7 +222,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [
@@ -250,7 +241,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [["", "AAA"]],
@@ -267,7 +257,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [["   ", "   "]],
@@ -284,7 +273,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [[" BBB_1 ", " AAA "]],
@@ -301,7 +289,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [["BBB_1", "CUSTOM_001"]],
@@ -318,7 +305,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [],
@@ -353,7 +339,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {
@@ -397,7 +382,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {
@@ -441,7 +425,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {
@@ -485,7 +468,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {},
       regionOwnerChanges: [],
@@ -521,7 +503,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 2,
       entityChanges: {
         CUSTOM_001: {
@@ -589,7 +570,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {
@@ -614,7 +594,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {
@@ -650,7 +629,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {
@@ -693,7 +671,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {
@@ -736,7 +713,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {
@@ -779,7 +755,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {
@@ -815,7 +790,6 @@ describe("share helpers", () => {
     const encoded = await encodeSharePayload({
       version: 1,
       title: "Broken map",
-      description: "",
       customCounter: 1,
       entityChanges: {
         CUSTOM_001: {

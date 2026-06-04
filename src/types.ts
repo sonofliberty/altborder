@@ -41,7 +41,6 @@ export type MapData = {
 
 export type EditorSnapshot = {
   title: string;
-  description: string;
   entities: Record<string, CountryEntity>;
   regionOwners: Record<string, string>;
   regionNameOverrides: Record<string, string>;
@@ -58,7 +57,6 @@ export type HistoryState = {
 export type ScenarioPayload = {
   version: 1;
   title: string;
-  description: string;
   customCounter: number;
   entityChanges: Record<string, CountryEntity>;
   regionOwnerChanges: Array<[regionId: string, ownerId: string]>;

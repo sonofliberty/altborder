@@ -10,7 +10,6 @@ export function createInitialSnapshot(data: MapData): EditorSnapshot {
 
   return {
     title: "Untitled Border Experiment",
-    description: "",
     entities: Object.fromEntries(data.countries.map((country) => [country.id, { ...country }])),
     regionOwners,
     regionNameOverrides: {},
@@ -22,7 +21,6 @@ export function createInitialSnapshot(data: MapData): EditorSnapshot {
 export function cloneSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
   return {
     title: snapshot.title,
-    description: snapshot.description,
     customCounter: snapshot.customCounter,
     entities: Object.fromEntries(
       Object.entries(snapshot.entities).map(([id, entity]) => [
@@ -234,7 +232,6 @@ export function createScenarioPayload(data: MapData, snapshot: EditorSnapshot): 
   return {
     version: 1,
     title: normalizedSnapshot.title,
-    description: normalizedSnapshot.description,
     customCounter: normalizedSnapshot.customCounter,
     entityChanges,
     regionOwnerChanges,
@@ -253,7 +250,6 @@ export function applyScenarioPayload(data: MapData, payload: ScenarioPayload): E
   const next: EditorSnapshot = {
     ...base,
     title: payload.title ?? base.title,
-    description: payload.description ?? "",
     customCounter: payload.customCounter ?? base.customCounter,
     entities: {
       ...base.entities,

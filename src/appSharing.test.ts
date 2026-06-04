@@ -14,13 +14,12 @@ describe("shared-link recovery", () => {
 });
 
 describe("scenario metadata UI", () => {
-  it("exposes scenario descriptions for editing and shared-map viewing", () => {
-    expect(appSource).toContain("updateScenarioDescription");
-    expect(appSource).toContain("value={currentSnapshot.description}");
-    expect(appSource).toContain("onChange={(event) => updateScenarioDescription(event.target.value)}");
+  it("keeps scenario titles without exposing description metadata", () => {
     expect(appSource).toContain('className="scenario-title-text"');
-    expect(appSource).toContain('className="scenario-description"');
-    expect(appSource).toContain("selectedEntity || inspectFocusedRegion || snapshot?.description");
+    expect(appSource).not.toContain("updateScenarioDescription");
+    expect(appSource).not.toContain("currentSnapshot.description");
+    expect(appSource).not.toContain('className="scenario-description"');
+    expect(appSource).toContain("selectedEntity || inspectFocusedRegion");
   });
 });
 
