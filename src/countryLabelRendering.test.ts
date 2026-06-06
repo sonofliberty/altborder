@@ -32,3 +32,11 @@ describe("country underlay rendering", () => {
     expect(appSource).not.toContain("baseFillGeometry");
   });
 });
+
+describe("region border rendering", () => {
+  it("uses original region geometry for detailed visible border strokes", () => {
+    expect(appSource).toContain("getBaseDetailedRegionStrokePath");
+    expect(appSource).toContain("originalRegionGeometryById.get(regionId)");
+    expect(appSource).toContain("getRegionStrokePath(regionId, useDetailedRegionBorderStrokes)");
+  });
+});

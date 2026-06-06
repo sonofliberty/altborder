@@ -54,6 +54,7 @@ import {
   getCountryLabelMinScreenFontSize,
 } from "./mapLabelDisplay";
 import { zoomToBounds, type ProjectedBounds } from "./mapZoom";
+import { getSubdivisionBorderZoomClass } from "./mapVisualStyle";
 import { boundsIntersect, projectedViewportBounds, shouldCullPaths } from "./mapCulling";
 import { findRegionAtProjectedPoint } from "./geometryHitTest";
 import { customCountryAccentColor, getFallbackCountryColor } from "./colorRuntime";
@@ -64,7 +65,7 @@ import {
   isValidTransferTarget,
   orderTransferTargetEntities,
 } from "./transferContext";
-import { isSubdivisionBorderVisible } from "./subdivisionBorders";
+import { getSubdivisionBorderSamplePoint, isSubdivisionBorderVisible } from "./subdivisionBorders";
 import {
   geometryToSvgPath,
   projectGeometryToPathData,
@@ -83,8 +84,8 @@ const acquiredRegionRenderGapTolerance = 0.08;
 const mapRenderSimplifyTolerance = 0.07;
 const countryUnderlayUpdateDelayMs = 0;
 const projectedSeamBreakDistance = viewportWidth * 0.22;
-const projectedPathCacheVersion = "shared-subdivision-linework-v29";
-const baseGeometryUnionSensitiveEntityIds = new Set(["RUS", "USA"]);
+const projectedPathCacheVersion = "shared-subdivision-linework-v30";
+const baseGeometryUnionSensitiveEntityIds = new Set(["BRA", "RUS", "USA"]);
 const pathCullingMinZoom = 2.1;
 const pathCullingOverscanRatio = 0.42;
 const svgPathCoordinatePrecision = 2;
@@ -128,6 +129,7 @@ type ProjectedSubdivisionBorder = {
   id: string;
   ownerId: string;
   regionIds: [string, string];
+  samplePoint: Position | null;
   pathData: string;
   bounds: ProjectedBounds;
 };
@@ -184,9 +186,11 @@ export default function App() {
   const countryUnderlayCacheRef = useRef(new Map<string, CountryUnderlay>());
   const countryUnderlaysInitializedRef = useRef(false);
   const baseProjectedRegionCacheRef = useRef(new Map<string, ProjectedPathData>());
+  const baseProjectedRegionDetailStrokeCacheRef = useRef(new Map<string, string>());
 
   useEffect(() => {
     baseProjectedRegionCacheRef.current.clear();
+    baseProjectedRegionDetailStrokeCacheRef.current.clear();
     countryUnderlayCacheRef.current.clear();
   }, []);
 
@@ -218,7 +222,7 @@ export default function App() {
 
     async function load() {
       try {
-        const response = await fetch("/data/map-data.json");
+        const response = await fetch(`${import.meta.env.BASE_URL}data/map-data.json`);
         if (!response.ok) {
           throw new Error(`${response.status} ${response.statusText}`);
         }
@@ -268,6 +272,17 @@ export default function App() {
   const customRegionRecords = useMemo(() => {
     return Object.values(snapshot?.customRegions ?? {});
   }, [snapshot?.customRegions]);
+
+  const divideRemainderGeometriesByOwnerId = useMemo(() => {
+    const geometriesByOwnerId = new Map<string, Geometry[]>();
+    for (const region of customRegionRecords) {
+      if (region.type !== "Custom divide remainder" || !region.ownerId) continue;
+      const geometries = geometriesByOwnerId.get(region.ownerId) ?? [];
+      geometries.push(region.geometry);
+      geometriesByOwnerId.set(region.ownerId, geometries);
+    }
+    return geometriesByOwnerId;
+  }, [customRegionRecords]);
 
   const effectiveRegions = useMemo(() => {
     if (!data) return [];
@@ -357,6 +372,7 @@ export default function App() {
 
   useEffect(() => {
     baseProjectedRegionCacheRef.current.clear();
+    baseProjectedRegionDetailStrokeCacheRef.current.clear();
   }, [data, projection]);
 
   const customProjectedRegionById = useMemo(() => {
@@ -385,14 +401,33 @@ export default function App() {
     return projected;
   }, [projection, regionById, renderRegionGeometryById]);
 
+  const getBaseDetailedRegionStrokePath = useCallback((regionId: string) => {
+    const cacheKey = `${projectedPathCacheVersion}|detail-stroke|${regionId}`;
+    const cached = baseProjectedRegionDetailStrokeCacheRef.current.get(cacheKey);
+    if (cached !== undefined) return cached;
+
+    const geometry = originalRegionGeometryById.get(regionId);
+    if (!geometry) return "";
+    const projected = projectGeometryToPathData(geometry, projection, getProjectedPathOptions());
+    const strokePath = projected?.strokePathData ?? projected?.pathData ?? "";
+    baseProjectedRegionDetailStrokeCacheRef.current.set(cacheKey, strokePath);
+    return strokePath;
+  }, [originalRegionGeometryById, projection]);
+
   const getRegionPath = useCallback((regionId: string) => {
     return customProjectedRegionById.get(regionId)?.pathData ?? getBaseProjectedRegion(regionId)?.pathData ?? "";
   }, [customProjectedRegionById, getBaseProjectedRegion]);
 
-  const getRegionStrokePath = useCallback((regionId: string) => {
+  const getRegionStrokePath = useCallback((regionId: string, preferDetailedStroke = false) => {
     const projected = customProjectedRegionById.get(regionId) ?? getBaseProjectedRegion(regionId);
+    if (preferDetailedStroke) {
+      const detailedStrokePath = customProjectedRegionById.has(regionId)
+        ? projected?.strokePathData
+        : getBaseDetailedRegionStrokePath(regionId);
+      if (detailedStrokePath) return detailedStrokePath;
+    }
     return projected?.strokePathData ?? projected?.pathData ?? "";
-  }, [customProjectedRegionById, getBaseProjectedRegion]);
+  }, [customProjectedRegionById, getBaseDetailedRegionStrokePath, getBaseProjectedRegion]);
 
   const getRegionBounds = useCallback((regionId: string) => {
     return customProjectedRegionById.get(regionId)?.bounds ?? getBaseProjectedRegion(regionId)?.bounds ?? null;
@@ -407,6 +442,7 @@ export default function App() {
         id: border.id,
         ownerId: border.ownerId,
         regionIds: border.regionIds,
+        samplePoint: getSubdivisionBorderSamplePoint(border.geometry),
         pathData: projected.strokePathData,
         bounds: projected.bounds,
       });
@@ -1857,9 +1893,32 @@ export default function App() {
   }
 
   function renderCountryContext() {
+    const selectedRegionCount = selectedEntity?.regionIds.length ?? 0;
+    const selectedEntityStatus = selectedEntity
+      ? selectedEntity.isCustom
+        ? "Custom country"
+        : "Base country"
+      : "No country selected";
+
     return (
-      <section className="context-card">
+      <section className="context-section country-context">
         <div className="section-heading">COUNTRY</div>
+
+        <div className="country-summary">
+          <span
+            className="country-swatch"
+            style={{ backgroundColor: selectedEntity?.color ?? customCountryAccentColor }}
+            aria-hidden="true"
+          />
+          <div className="country-summary-text">
+            <strong>{selectedEntity?.name || "No country selected"}</strong>
+            <span>
+              {selectedEntityStatus}
+              {selectedEntity ? ` · ${selectedRegionCount.toLocaleString()} region${selectedRegionCount === 1 ? "" : "s"}` : ""}
+            </span>
+          </div>
+        </div>
+
         <label className="field">
           <span>Selected country</span>
           <select value={selectedEntityId} onChange={(event) => changeSelectedEntity(event.target.value)}>
@@ -1872,26 +1931,27 @@ export default function App() {
           </select>
         </label>
 
-        <label className="field">
-          <span>Name</span>
-          <input
-            value={selectedEntity?.name ?? ""}
-            disabled={!selectedEntity || readOnly}
-            onChange={(event) => updateSelectedName(event.target.value)}
-          />
-        </label>
+        <div className="country-edit-fields">
+          <label className="field">
+            <span>Name</span>
+            <input
+              value={selectedEntity?.name ?? ""}
+              disabled={!selectedEntity || readOnly}
+              onChange={(event) => updateSelectedName(event.target.value)}
+            />
+          </label>
 
-        <label className="field color-field">
-          <span>Color</span>
-          <input
-            type="color"
-            value={selectedEntity?.color ?? customCountryAccentColor}
-            disabled={!selectedEntity || readOnly}
-            onInput={(event) => updateSelectedColor(event.currentTarget.value)}
-            onChange={(event) => updateSelectedColor(event.target.value)}
-          />
-        </label>
-
+          <label className="field color-field">
+            <span>Color</span>
+            <input
+              type="color"
+              value={selectedEntity?.color ?? customCountryAccentColor}
+              disabled={!selectedEntity || readOnly}
+              onInput={(event) => updateSelectedColor(event.currentTarget.value)}
+              onChange={(event) => updateSelectedColor(event.target.value)}
+            />
+          </label>
+        </div>
       </section>
     );
   }
@@ -2014,6 +2074,9 @@ export default function App() {
     useSimplifiedCountryLayer,
   ]);
 
+  const subdivisionBorderZoomClass = getSubdivisionBorderZoomClass(zoom.k);
+  const useDetailedRegionBorderStrokes = subdivisionBorderZoomClass !== "map-admin-borders-default";
+
   const regionPathElements = useMemo(() => {
     if (!entities || !regionOwners) return [];
     const regionsToRender = useSimplifiedCountryLayer
@@ -2060,7 +2123,7 @@ export default function App() {
             </title>
           </path>
           <path
-            d={getRegionStrokePath(regionId)}
+            d={getRegionStrokePath(regionId, useDetailedRegionBorderStrokes)}
             className={borderClasses}
             fill="none"
             aria-hidden="true"
@@ -2083,6 +2146,7 @@ export default function App() {
     selectedEntityId,
     selectedRegions,
     transferFocusedRegionId,
+    useDetailedRegionBorderStrokes,
     useLowZoomTransferCountryLayer,
     useSimplifiedCountryLayer,
     visibleRegions,
@@ -2095,7 +2159,11 @@ export default function App() {
       : projectedSubdivisionBorders;
 
     return visibleSubdivisionBorders
-      .filter((border) => isSubdivisionBorderVisible(border, regionOwners))
+      .filter((border) =>
+        isSubdivisionBorderVisible(border, regionOwners, {
+          ownerRemainderGeometries: divideRemainderGeometriesByOwnerId,
+        }),
+      )
       .map((border) => (
         <path
           key={border.id}
@@ -2108,11 +2176,40 @@ export default function App() {
         />
       ));
   }, [
+    divideRemainderGeometriesByOwnerId,
     projectedSubdivisionBorders,
     regionOwners,
     settledViewportBounds,
     shouldCullMapPaths,
   ]);
+
+  const selectedRegionOverlayElements = useMemo(() => {
+    if (selectedRegions.size === 0) return [];
+    return visibleRegions
+      .filter((region) => selectedRegions.has(region.id))
+      .map((region) => (
+        <g key={region.id} className="selected-region-overlay">
+          <path
+            className="selected-region-tint"
+            d={getRegionPath(region.id)}
+            fillRule="evenodd"
+            aria-hidden="true"
+          />
+          <path
+            className="selected-region-outline selected-region-outline-halo"
+            d={getRegionStrokePath(region.id, useDetailedRegionBorderStrokes)}
+            fill="none"
+            aria-hidden="true"
+          />
+          <path
+            className="selected-region-outline selected-region-outline-inner"
+            d={getRegionStrokePath(region.id, useDetailedRegionBorderStrokes)}
+            fill="none"
+            aria-hidden="true"
+          />
+        </g>
+      ));
+  }, [getRegionPath, getRegionStrokePath, selectedRegions, useDetailedRegionBorderStrokes, visibleRegions]);
 
   const countryOutlineElements = useMemo(() => {
     const visibleUnderlays = shouldCullMapPaths
@@ -2156,38 +2253,40 @@ export default function App() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand">
-          <Globe2 aria-hidden="true" />
-          <strong>AltBorder</strong>
+        <div className="topbar-main">
+          <div className="brand">
+            <Globe2 aria-hidden="true" />
+            <strong>AltBorder</strong>
+          </div>
+          <label className="title-field">
+            <span>Scenario</span>
+            {readOnly ? (
+              <strong className="scenario-title-text">{snapshot.title || "Untitled Border Experiment"}</strong>
+            ) : (
+              <input
+                value={snapshot.title}
+                onChange={(event) => updateScenarioTitle(event.target.value)}
+              />
+            )}
+          </label>
         </div>
-        <label className="title-field">
-          <span>Scenario</span>
-          {readOnly ? (
-            <strong className="scenario-title-text">{snapshot.title || "Untitled Border Experiment"}</strong>
-          ) : (
-            <input
-              value={snapshot.title}
-              onChange={(event) => updateScenarioTitle(event.target.value)}
-            />
-          )}
-        </label>
         <div className="topbar-actions">
           {readOnly ? (
             <button className="primary" onClick={remix}>
               <PaintBucket size={16} /> Remix/Edit
             </button>
           ) : (
-            <>
-              <button onClick={undo} disabled={history!.past.length === 0} title="Undo">
+            <div className="history-actions">
+              <button className="icon-button" onClick={undo} disabled={history!.past.length === 0} title="Undo">
                 <Undo2 size={16} />
               </button>
-              <button onClick={redo} disabled={history!.future.length === 0} title="Redo">
+              <button className="icon-button" onClick={redo} disabled={history!.future.length === 0} title="Redo">
                 <Redo2 size={16} />
               </button>
-              <button onClick={resetMap} title="Reset map">
+              <button className="icon-button" onClick={resetMap} title="Reset map">
                 <RotateCcw size={16} />
               </button>
-            </>
+            </div>
           )}
           <button className="primary" onClick={makeShare}>
             <Share2 size={16} /> Share
@@ -2235,6 +2334,7 @@ export default function App() {
             viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}
             className={[
               "map",
+              subdivisionBorderZoomClass,
               brushEnabled && activeModeUsesRegions ? "brush-map" : "",
               mode === "divide" && !readOnly ? "divide-map" : "",
             ].join(" ")}
@@ -2258,6 +2358,9 @@ export default function App() {
               </g>
               <g aria-hidden="true">
                 {countryOutlineElements}
+              </g>
+              <g className="selected-region-overlays" aria-hidden="true">
+                {selectedRegionOverlayElements}
               </g>
               {divideTerritories ? (
                 <g className="divide-preview" aria-hidden="true">
@@ -2313,8 +2416,8 @@ export default function App() {
             <>
               {renderCountryContext()}
 
-              <section className="context-card">
-                <div className="section-heading">REGION</div>
+                <section className="context-section">
+                  <div className="section-heading">REGION</div>
 
                 {inspectFocusedRegion ? (
                   renderRegionSummary({
@@ -2357,7 +2460,7 @@ export default function App() {
               {renderCountryContext()}
 
               {activeModeUsesRegions ? (
-                <section className="context-card compact-context-card">
+                <section className="context-section compact-context-card">
                   <div className="section-heading">SELECTION</div>
                   <div className="switch-row">
                     <button
