@@ -16,14 +16,14 @@ export type FittedCountryLabel = {
   priority: number;
 };
 
+export type CountryLabelFit = "standard" | "expanded";
+
 export type CountryLabelInput = {
   id: string;
   name: string;
   geometries: Geometry[];
   project: ProjectPoint;
-  areaFontRatio?: number;
-  heightFontRatio?: number;
-  minFootprintContainment?: number;
+  fit?: CountryLabelFit;
   priority?: number;
 };
 
@@ -51,11 +51,28 @@ type PolygonCluster = {
 const labelAngles = [0, -8, 8, -15, 15];
 const minMapFontSize = 0.5;
 const maxMapFontSize = 24;
-const defaultAreaFontRatio = 0.4;
-const defaultHeightFontRatio = 0.72;
-const defaultMinFootprintContainment = 1;
 const labelHorizontalSafetyRatio = 0.95;
 const labelVerticalSafetyRatio = 1.55;
+
+const countryLabelFitProfiles: Record<
+  CountryLabelFit,
+  {
+    areaFontRatio: number;
+    heightFontRatio: number;
+    minFootprintContainment: number;
+  }
+> = {
+  standard: {
+    areaFontRatio: 0.4,
+    heightFontRatio: 0.72,
+    minFootprintContainment: 1,
+  },
+  expanded: {
+    areaFontRatio: 0.6,
+    heightFontRatio: 1.1,
+    minFootprintContainment: 0.58,
+  },
+};
 
 export function layoutCountryLabel(input: CountryLabelInput): FittedCountryLabel | null {
   const displayName = input.name.trim().toUpperCase();
@@ -68,13 +85,14 @@ export function layoutCountryLabel(input: CountryLabelInput): FittedCountryLabel
   const candidates = candidatePoints(cluster);
   if (candidates.length === 0) return null;
 
+  const fitProfile = countryLabelFitProfiles[input.fit ?? "standard"];
   const label = fitLabel(
     displayName,
     cluster,
     candidates,
-    input.areaFontRatio ?? defaultAreaFontRatio,
-    input.heightFontRatio ?? defaultHeightFontRatio,
-    input.minFootprintContainment ?? defaultMinFootprintContainment,
+    fitProfile.areaFontRatio,
+    fitProfile.heightFontRatio,
+    fitProfile.minFootprintContainment,
   );
   if (!label) return null;
 

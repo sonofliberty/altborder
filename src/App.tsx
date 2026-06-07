@@ -71,7 +71,7 @@ import {
   projectGeometryToPathData,
   type ProjectedPathData,
 } from "./projectedPath";
-import { getCountryLabelGeometries } from "./countryLabelGeometry";
+import { getCountryLabelGeometry } from "./countryLabelGeometry";
 import { simplifyPolygonalGeometry } from "./geometrySimplify";
 
 const viewportWidth = 1000;
@@ -83,9 +83,6 @@ const countryRenderGapTolerance = 0.02;
 const acquiredRegionRenderGapTolerance = 0.08;
 const mapRenderSimplifyTolerance = 0.07;
 const countryUnderlayUpdateDelayMs = 0;
-const expandedCountryLabelAreaFontRatio = 0.6;
-const expandedCountryLabelHeightFontRatio = 1.1;
-const expandedCountryLabelMinFootprintContainment = 0.58;
 const projectedSeamBreakDistance = viewportWidth * 0.22;
 const projectedPathCacheVersion = "shared-subdivision-linework-v30";
 const baseGeometryUnionSensitiveEntityIds = new Set(["BRA", "RUS", "USA"]);
@@ -798,31 +795,26 @@ export default function App() {
           if (!entity) continue;
           const regionIds = regionIdsByEntityId.get(entity.id) ?? [];
           const fallbackGeometries = renderGeometriesByEntityId.get(entity.id) ?? [];
-          let geometries = fallbackGeometries;
+          subtractGeoJsonGeometries ??= (await import("./geometrySplit")).subtractGeoJsonGeometries;
+          unionGeoJsonGeometriesClosingGaps ??= (await import("./geometrySplit")).unionGeoJsonGeometriesClosingGaps;
+          const labelGeometry = getCountryLabelGeometry({
+            baseCountryByEntityId,
+            baseEntityById,
+            baseOwnerByRegionId,
+            entityId: entity.id,
+            entityName: entity.name,
+            fallbackGeometries,
+            regionById,
+            regionIds,
+            subtractGeoJsonGeometries,
+            unionGeoJsonGeometriesClosingGaps,
+            unionGapTolerance: acquiredRegionRenderGapTolerance,
+          });
 
-          if (baseEntityById.has(entity.id) && baseCountryByEntityId.has(entity.id)) {
-            subtractGeoJsonGeometries ??= (await import("./geometrySplit")).subtractGeoJsonGeometries;
-            unionGeoJsonGeometriesClosingGaps ??= (await import("./geometrySplit")).unionGeoJsonGeometriesClosingGaps;
-            geometries = getCountryLabelGeometries({
-              baseCountryByEntityId,
-              baseEntityById,
-              baseOwnerByRegionId,
-              entityId: entity.id,
-              fallbackGeometries,
-              regionById,
-              regionIds,
-              subtractGeoJsonGeometries,
-              unionGeoJsonGeometriesClosingGaps,
-              unionGapTolerance: acquiredRegionRenderGapTolerance,
-            });
-          }
+          if (labelGeometry.geometries.length === 0) continue;
 
-          if (geometries.length === 0) continue;
-
-          const usesExpandedLabelFit = ownsTransferredRegions(entity.id, regionIds, baseOwnerByRegionId);
-          const cacheKey = `${entity.id}|${entity.name}|${usesExpandedLabelFit ? "expanded" : "default"}|${regionIds.join(",")}`;
-          activeCacheKeys.add(cacheKey);
-          const cached = countryLabelLayoutCacheRef.current.get(cacheKey);
+          activeCacheKeys.add(labelGeometry.cacheKey);
+          const cached = countryLabelLayoutCacheRef.current.get(labelGeometry.cacheKey);
           if (cached) {
             labels.push(cached);
             continue;
@@ -831,15 +823,13 @@ export default function App() {
           const label = layoutCountryLabelFn({
             id: entity.id,
             name: entity.name,
-            geometries,
+            geometries: labelGeometry.geometries,
             project: (position) => projection([position[0], position[1]]),
-            areaFontRatio: usesExpandedLabelFit ? expandedCountryLabelAreaFontRatio : undefined,
-            heightFontRatio: usesExpandedLabelFit ? expandedCountryLabelHeightFontRatio : undefined,
-            minFootprintContainment: usesExpandedLabelFit ? expandedCountryLabelMinFootprintContainment : undefined,
-            priority: geometries.length,
+            fit: labelGeometry.fit,
+            priority: labelGeometry.geometries.length,
           });
           if (label) {
-            countryLabelLayoutCacheRef.current.set(cacheKey, label);
+            countryLabelLayoutCacheRef.current.set(labelGeometry.cacheKey, label);
             labels.push(label);
           }
         }

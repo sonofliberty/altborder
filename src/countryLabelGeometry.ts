@@ -1,5 +1,6 @@
 import type { Geometry } from "geojson";
 import type { RegionRecord } from "./types";
+import type { CountryLabelFit } from "./labelLayout";
 
 export type CountryLabelGeometryInput = {
   entityId: string;
@@ -13,6 +14,23 @@ export type CountryLabelGeometryInput = {
   unionGeoJsonGeometriesClosingGaps?: (geometries: Geometry[], gapTolerance: number) => Geometry | null;
   unionGapTolerance?: number;
 };
+
+export type CountryLabelGeometryResult = {
+  cacheKey: string;
+  fit: CountryLabelFit;
+  geometries: Geometry[];
+};
+
+export function getCountryLabelGeometry(input: CountryLabelGeometryInput & { entityName: string }): CountryLabelGeometryResult {
+  const hasBaseCountryGeometry = input.baseEntityById.has(input.entityId) && input.baseCountryByEntityId.has(input.entityId);
+  const fit = ownsTransferredRegions(input.entityId, input.regionIds, input.baseOwnerByRegionId) ? "expanded" : "standard";
+
+  return {
+    cacheKey: [input.entityId, input.entityName, fit, input.regionIds.join(",")].join("|"),
+    fit,
+    geometries: hasBaseCountryGeometry ? getCountryLabelGeometries(input) : input.fallbackGeometries,
+  };
+}
 
 export function getCountryLabelGeometries(input: CountryLabelGeometryInput): Geometry[] {
   const baseEntity = input.baseEntityById.get(input.entityId);
@@ -40,4 +58,15 @@ export function getCountryLabelGeometries(input: CountryLabelGeometryInput): Geo
 
   const unioned = input.unionGeoJsonGeometriesClosingGaps(geometries, input.unionGapTolerance ?? 0);
   return unioned ? [unioned] : geometries;
+}
+
+function ownsTransferredRegions(
+  entityId: string,
+  regionIds: string[],
+  baseOwnerByRegionId: Map<string, string>,
+): boolean {
+  return regionIds.some((regionId) => {
+    const baseOwnerId = baseOwnerByRegionId.get(regionId);
+    return Boolean(baseOwnerId && baseOwnerId !== entityId);
+  });
 }

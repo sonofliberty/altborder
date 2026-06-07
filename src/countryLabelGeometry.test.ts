@@ -3,7 +3,7 @@ import { geoNaturalEarth1 } from "d3-geo";
 import type { Geometry, Position } from "geojson";
 import mapDataFixture from "../public/data/map-data.json";
 import { subtractGeoJsonGeometries, unionGeoJsonGeometriesClosingGaps } from "./geometrySplit";
-import { getCountryLabelGeometries } from "./countryLabelGeometry";
+import { getCountryLabelGeometries, getCountryLabelGeometry } from "./countryLabelGeometry";
 import type { MapData } from "./types";
 import { layoutCountryLabel } from "./labelLayout";
 
@@ -135,11 +135,12 @@ describe("getCountryLabelGeometries", () => {
       project: (position) => projection([position[0], position[1]]),
     });
     const expandedRegionIds = [...vietnam.regionIds, ...transferredRegionIds];
-    const expandedGeometries = getCountryLabelGeometries({
+    const expandedGeometry = getCountryLabelGeometry({
       baseCountryByEntityId,
       baseEntityById,
       baseOwnerByRegionId,
       entityId: vietnam.id,
+      entityName: vietnam.name,
       fallbackGeometries: expandedRegionIds
         .map((regionId) => regionById.get(regionId)?.geometry)
         .filter((geometry): geometry is NonNullable<typeof geometry> => Boolean(geometry)),
@@ -152,14 +153,14 @@ describe("getCountryLabelGeometries", () => {
     const expandedLabel = layoutCountryLabel({
       id: vietnam.id,
       name: vietnam.name,
-      geometries: expandedGeometries,
+      geometries: expandedGeometry.geometries,
       project: (position) => projection([position[0], position[1]]),
-      areaFontRatio: 0.6,
-      heightFontRatio: 1.1,
-      minFootprintContainment: 0.58,
+      fit: expandedGeometry.fit,
     });
 
     expect(originalLabel).not.toBeNull();
+    expect(expandedGeometry.fit).toBe("expanded");
+    expect(expandedGeometry.cacheKey).toContain("VNM|Vietnam|expanded|");
     expect(expandedLabel).not.toBeNull();
     expect(expandedLabel!.fontSize).toBeGreaterThan(7);
   });
