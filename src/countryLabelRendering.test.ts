@@ -9,6 +9,18 @@ describe("country label rendering", () => {
     expect(appSource).not.toContain("country-label-clip");
     expect(appSource).not.toContain("<clipPath");
   });
+
+  it("keeps country label visibility independent from selected country state", () => {
+    expect(appSource).not.toContain("label.id === selectedEntityId");
+    expect(appSource).not.toContain("priority: label.priority +");
+    expect(appSource).toContain("}, [countryLabelLayouts, isMapMoving, zoom]);");
+  });
+
+  it("swaps rebuilt country labels only after the full layout pass completes", () => {
+    expect(appSource).not.toContain("publishLabels");
+    expect(appSource).not.toContain("publishedLabelCount");
+    expect(appSource).toContain("flushLabels();");
+  });
 });
 
 describe("country underlay rendering", () => {

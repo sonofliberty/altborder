@@ -92,7 +92,7 @@ describe("getCountryLabelGeometries", () => {
     expect(projectedPolygonsContainPoint(germanyPolygons, [label!.x, label!.y])).toBe(true);
   });
 
-  it("scales Vietnam's label after expanding into adjacent Chinese regions", () => {
+  it("fits Vietnam's expanded label only when it stays inside expanded geometry", () => {
     const data = mapDataFixture as MapData;
     const vietnam = data.countries.find((country) => country.id === "VNM");
     const vietnamBase = data.baseCountries.find((country) => country.entityId === "VNM");
@@ -155,14 +155,24 @@ describe("getCountryLabelGeometries", () => {
       name: vietnam.name,
       geometries: expandedGeometry.geometries,
       project: (position) => projection([position[0], position[1]]),
-      fit: expandedGeometry.fit,
     });
+    const expandedPolygons = expandedGeometry.geometries.flatMap((geometry) =>
+      projectGeometryRings(geometry, (position) => projection([position[0], position[1]])),
+    );
 
     expect(originalLabel).not.toBeNull();
-    expect(expandedGeometry.fit).toBe("expanded");
-    expect(expandedGeometry.cacheKey).toContain("VNM|Vietnam|expanded|");
-    expect(expandedLabel).not.toBeNull();
-    expect(expandedLabel!.fontSize).toBeGreaterThan(7);
+    expect(expandedGeometry.cacheKey).toContain("VNM|Vietnam|");
+    if (expandedLabel) {
+      for (const point of rectangleSamplePoints(
+        expandedLabel.x,
+        expandedLabel.y,
+        expandedLabel.width,
+        expandedLabel.height,
+        expandedLabel.angle,
+      )) {
+        expect(projectedPolygonsContainPoint(expandedPolygons, point)).toBe(true);
+      }
+    }
   });
 
   it("unions expanded country geometry before fitting the label", () => {
@@ -229,6 +239,29 @@ function rectangleGeometry(minX: number, minY: number, maxX: number, maxY: numbe
 
 function identityProject(position: Position): [number, number] {
   return [position[0], position[1]];
+}
+
+function rectangleSamplePoints(
+  centerX: number,
+  centerY: number,
+  width: number,
+  height: number,
+  angleDegrees: number,
+): Position[] {
+  const angle = (angleDegrees * Math.PI) / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const points: Position[] = [];
+
+  for (const yRatio of [0, 0.25, 0.5, 0.75, 1]) {
+    for (const xRatio of [0, 0.25, 0.5, 0.75, 1]) {
+      const localX = (xRatio - 0.5) * width;
+      const localY = (yRatio - 0.5) * height;
+      points.push([centerX + localX * cos - localY * sin, centerY + localX * sin + localY * cos]);
+    }
+  }
+
+  return points;
 }
 
 function projectGeometryRings(

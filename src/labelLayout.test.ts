@@ -25,6 +25,7 @@ describe("layoutCountryLabel", () => {
     expect(small).not.toBeNull();
     expect(large).not.toBeNull();
     expect(large!.fontSize).toBeGreaterThan(small!.fontSize);
+    expect(large!.priority).toBeGreaterThan(small!.priority);
   });
 
   it("keeps a simple polygon label anchor inside the polygon", () => {
@@ -120,16 +121,21 @@ describe("layoutCountryLabel", () => {
   });
 
   it("falls back to a small label for skinny countries", () => {
+    const geometry = skinnyPolygon();
     const label = layoutCountryLabel({
       id: "skinny",
       name: "Skinnyland",
-      geometries: [skinnyPolygon()],
+      geometries: [geometry],
       project: identityProject,
     });
 
     expect(label).not.toBeNull();
     expect(label!.x).toBeGreaterThan(0);
     expect(label!.y).toBeGreaterThan(0);
+    if (geometry.type !== "Polygon") throw new Error("Expected skinny polygon");
+    for (const point of rectangleSamplePoints(label!.x, label!.y, label!.width, label!.height, label!.angle)) {
+      expect(ringContainsPoint(geometry.coordinates[0], point)).toBe(true);
+    }
   });
 
   it("fits labels for large generated-map countries", () => {

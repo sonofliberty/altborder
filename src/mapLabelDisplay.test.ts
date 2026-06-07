@@ -65,4 +65,22 @@ describe("filterLabels", () => {
 
     expect(filtered.map((label) => label.id)).toEqual(["visible"]);
   });
+
+  it("returns deterministic label ids for identical inputs", () => {
+    const labels = [
+      { id: "alpha", x: 10, y: 10, priority: 3 },
+      { id: "bravo", x: 12, y: 10, priority: 2 },
+      { id: "charlie", x: 40, y: 10, priority: 1 },
+    ];
+    const options = {
+      maxLabels: 10,
+      minGap: 2,
+      getBoxSize: () => ({ width: 18, height: 10 }),
+    };
+
+    const first = filterLabels(labels, { x: 0, y: 0, k: 1 }, options);
+    const second = filterLabels(labels, { x: 0, y: 0, k: 1 }, options);
+
+    expect(second.map((label) => label.id)).toEqual(first.map((label) => label.id));
+  });
 });

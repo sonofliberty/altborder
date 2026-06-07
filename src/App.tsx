@@ -751,7 +751,6 @@ export default function App() {
       return (entityMap[b]?.name ?? b).localeCompare(entityMap[a]?.name ?? a);
     });
     let index = 0;
-    let publishedLabelCount = 0;
     let layoutCountryLabelFn: (typeof import("./labelLayout"))["layoutCountryLabel"] | null = null;
     let subtractGeoJsonGeometries: GeometrySplitModule["subtractGeoJsonGeometries"] | null = null;
     let unionGeoJsonGeometriesClosingGaps: GeometrySplitModule["unionGeoJsonGeometriesClosingGaps"] | null = null;
@@ -761,17 +760,6 @@ export default function App() {
         if (a.priority !== b.priority) return a.priority - b.priority;
         return a.id.localeCompare(b.id);
       });
-    }
-
-    function publishLabels(final = false) {
-      if (!final && labels.length === publishedLabelCount) return;
-      if (final) {
-        pruneMapCache(countryLabelLayoutCacheRef.current, activeCacheKeys, 680);
-      }
-      publishedLabelCount = labels.length;
-      if (!cancelled) {
-        setCountryLabelLayouts(sortedLabels());
-      }
     }
 
     function flushLabels() {
@@ -825,8 +813,6 @@ export default function App() {
             name: entity.name,
             geometries: labelGeometry.geometries,
             project: (position) => projection([position[0], position[1]]),
-            fit: labelGeometry.fit,
-            priority: labelGeometry.geometries.length,
           });
           if (label) {
             countryLabelLayoutCacheRef.current.set(labelGeometry.cacheKey, label);
@@ -836,7 +822,6 @@ export default function App() {
 
         if (cancelled) return;
         if (index < entityIds.length) {
-          publishLabels();
           timeoutId = window.setTimeout(work, 0);
         } else {
           flushLabels();
@@ -870,12 +855,7 @@ export default function App() {
 
     const displayScale = zoom.k;
     const minScreenFontSize = getCountryLabelMinScreenFontSize(countryLabelMinScreenFontSize, zoom.k);
-    const rawLabels = countryLabelLayouts
-      .filter((label) => label.fontSize * displayScale >= minScreenFontSize)
-      .map((label) => ({
-        ...label,
-        priority: label.priority + (label.id === selectedEntityId ? 100 : 0),
-      }));
+    const rawLabels = countryLabelLayouts.filter((label) => label.fontSize * displayScale >= minScreenFontSize);
 
     return filterLabels(rawLabels, zoom, {
       maxLabels: zoom.k < 1.8 ? 44 : zoom.k < 4 ? 120 : 240,
@@ -895,7 +875,7 @@ export default function App() {
         };
       },
     });
-  }, [countryLabelLayouts, isMapMoving, selectedEntityId, zoom]);
+  }, [countryLabelLayouts, isMapMoving, zoom]);
 
   const regionLabels = useMemo<SimpleMapLabel[]>(() => {
     if (!regionOwners) return [];

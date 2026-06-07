@@ -16,15 +16,11 @@ export type FittedCountryLabel = {
   priority: number;
 };
 
-export type CountryLabelFit = "standard" | "expanded";
-
 export type CountryLabelInput = {
   id: string;
   name: string;
   geometries: Geometry[];
   project: ProjectPoint;
-  fit?: CountryLabelFit;
-  priority?: number;
 };
 
 type Point = [number, number];
@@ -51,28 +47,10 @@ type PolygonCluster = {
 const labelAngles = [0, -8, 8, -15, 15];
 const minMapFontSize = 0.5;
 const maxMapFontSize = 24;
+const areaFontRatio = 0.4;
+const heightFontRatio = 0.72;
 const labelHorizontalSafetyRatio = 0.95;
 const labelVerticalSafetyRatio = 1.55;
-
-const countryLabelFitProfiles: Record<
-  CountryLabelFit,
-  {
-    areaFontRatio: number;
-    heightFontRatio: number;
-    minFootprintContainment: number;
-  }
-> = {
-  standard: {
-    areaFontRatio: 0.4,
-    heightFontRatio: 0.72,
-    minFootprintContainment: 1,
-  },
-  expanded: {
-    areaFontRatio: 0.6,
-    heightFontRatio: 1.1,
-    minFootprintContainment: 0.58,
-  },
-};
 
 export function layoutCountryLabel(input: CountryLabelInput): FittedCountryLabel | null {
   const displayName = input.name.trim().toUpperCase();
@@ -85,15 +63,7 @@ export function layoutCountryLabel(input: CountryLabelInput): FittedCountryLabel
   const candidates = candidatePoints(cluster);
   if (candidates.length === 0) return null;
 
-  const fitProfile = countryLabelFitProfiles[input.fit ?? "standard"];
-  const label = fitLabel(
-    displayName,
-    cluster,
-    candidates,
-    fitProfile.areaFontRatio,
-    fitProfile.heightFontRatio,
-    fitProfile.minFootprintContainment,
-  );
+  const label = fitLabel(displayName, cluster, candidates);
   if (!label) return null;
 
   return {
@@ -106,7 +76,7 @@ export function layoutCountryLabel(input: CountryLabelInput): FittedCountryLabel
     width: label.width,
     height: label.height,
     angle: label.angle,
-    priority: input.priority ?? 0,
+    priority: cluster.area,
   };
 }
 
@@ -114,9 +84,6 @@ function fitLabel(
   displayName: string,
   cluster: PolygonCluster,
   candidates: Point[],
-  areaFontRatio: number,
-  heightFontRatio: number,
-  minFootprintContainment: number,
 ): Pick<FittedCountryLabel, "x" | "y" | "fontSize" | "textLength" | "width" | "height" | "angle"> | null {
   const boundsWidth = cluster.bounds.maxX - cluster.bounds.minX;
   const boundsHeight = cluster.bounds.maxY - cluster.bounds.minY;
@@ -132,7 +99,7 @@ function fitLabel(
       const width = textLength + fontSize * labelHorizontalSafetyRatio;
       const height = fontSize * labelVerticalSafetyRatio;
       for (const point of candidates) {
-        if (labelRectangleFitsCluster(cluster, point, width, height, angle, minFootprintContainment)) {
+        if (labelRectangleFitsCluster(cluster, point, width, height, angle)) {
           return {
             x: point[0],
             y: point[1],
@@ -259,10 +226,9 @@ function labelRectangleFitsCluster(
   width: number,
   height: number,
   angleDegrees: number,
-  minFootprintContainment: number,
 ): boolean {
   const rectangle = makeRotatedRectangle(center, width, height, angleDegrees);
-  return clusterContainsRectangle(cluster, rectangle, minFootprintContainment);
+  return clusterContainsRectangle(cluster, rectangle);
 }
 
 function makeRotatedRectangle(center: Point, width: number, height: number, angleDegrees: number): Point[] {
@@ -281,28 +247,19 @@ function makeRotatedRectangle(center: Point, width: number, height: number, angl
   return localCorners.map(([x, y]) => [center[0] + x * cos - y * sin, center[1] + x * sin + y * cos]);
 }
 
-function clusterContainsRectangle(
-  cluster: PolygonCluster,
-  rectangle: Point[],
-  minFootprintContainment: number,
-): boolean {
+function clusterContainsRectangle(cluster: PolygonCluster, rectangle: Point[]): boolean {
   const sampleSteps = 6;
-  let containedSamples = 0;
-  let totalSamples = 0;
   for (let yIndex = 0; yIndex <= sampleSteps; yIndex += 1) {
     const yRatio = yIndex / sampleSteps;
     for (let xIndex = 0; xIndex <= sampleSteps; xIndex += 1) {
       const xRatio = xIndex / sampleSteps;
-      totalSamples += 1;
-      if (clusterContainsPoint(cluster, interpolateRectanglePoint(rectangle, xRatio, yRatio))) {
-        containedSamples += 1;
-      } else if (minFootprintContainment >= 1) {
+      if (!clusterContainsPoint(cluster, interpolateRectanglePoint(rectangle, xRatio, yRatio))) {
         return false;
       }
     }
   }
 
-  return containedSamples / totalSamples >= minFootprintContainment;
+  return true;
 }
 
 function interpolateRectanglePoint(rectangle: Point[], xRatio: number, yRatio: number): Point {
