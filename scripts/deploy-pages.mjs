@@ -55,7 +55,7 @@ async function main() {
   const tmpRoot = mkdtempSync(join(tmpdir(), "altborder-pages-"));
 
   try {
-    run("npm", ["run", "build", "--", `--base=${pagesBase}`]);
+    run("pnpm", ["build", `--base=${pagesBase}`]);
 
     if (!existsSync(join(distDir, "index.html"))) {
       throw new Error("Build completed, but dist/index.html was not found.");

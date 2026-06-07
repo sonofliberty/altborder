@@ -1,0 +1,7 @@
+minimumReleaseAge: 10080
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
+blockExoticSubdeps: true
+trustLockfile: false
+allowBuilds:
+  esbuild: true
