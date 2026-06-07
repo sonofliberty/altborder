@@ -2222,6 +2222,35 @@ export default function App() {
       ));
   }, [getRegionPath, getRegionStrokePath, selectedRegions, useDetailedRegionBorderStrokes, visibleRegions]);
 
+  const selectedCountryOverlayElement = useMemo(() => {
+    if (!selectedEntityId) return null;
+    const underlay = countryUnderlays.find((candidate) => candidate.id === selectedEntityId);
+    if (!underlay) return null;
+
+    return (
+      <g className="selected-country-overlay" data-entity-id={selectedEntityId} aria-hidden="true">
+        <path
+          className="selected-country-tint"
+          d={underlay.pathData}
+          fillRule="evenodd"
+          aria-hidden="true"
+        />
+        <path
+          className="selected-country-outline selected-country-outline-halo"
+          d={underlay.strokePathData}
+          fill="none"
+          aria-hidden="true"
+        />
+        <path
+          className="selected-country-outline selected-country-outline-inner"
+          d={underlay.strokePathData}
+          fill="none"
+          aria-hidden="true"
+        />
+      </g>
+    );
+  }, [countryUnderlays, selectedEntityId]);
+
   const countryOutlineElements = useMemo(() => {
     const visibleUnderlays = shouldCullMapPaths
       ? countryUnderlays.filter((underlay) => boundsIntersect(underlay.bounds, settledViewportBounds))
@@ -2370,6 +2399,7 @@ export default function App() {
               <g aria-hidden="true">
                 {countryOutlineElements}
               </g>
+              {selectedCountryOverlayElement}
               <g className="selected-region-overlays" aria-hidden="true">
                 {selectedRegionOverlayElements}
               </g>

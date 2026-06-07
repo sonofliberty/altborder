@@ -16,6 +16,14 @@ describe("country underlay rendering", () => {
     expect(appSource).toContain('fillRule="evenodd"');
   });
 
+  it("renders a selected country overlay from the projected country underlay", () => {
+    expect(appSource).toContain("selectedCountryOverlayElement");
+    expect(appSource).toContain('className="selected-country-overlay" data-entity-id={selectedEntityId} aria-hidden="true"');
+    expect(appSource).toContain('className="selected-country-tint"');
+    expect(appSource).toContain('className="selected-country-outline selected-country-outline-halo"');
+    expect(appSource).toContain('className="selected-country-outline selected-country-outline-inner"');
+  });
+
   it("clears derived geometry caches when custom region geometry changes", () => {
     expect(appSource).toMatch(
       /useEffect\(\(\) => \{\s+countryUnderlayCacheRef\.current\.clear\(\);\s+countryLabelLayoutCacheRef\.current\.clear\(\);\s+\}, \[customRegionRecords\]\);/,

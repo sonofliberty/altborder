@@ -409,18 +409,36 @@ textarea {
 .selected-region-overlays,
 .selected-region-overlay,
 .selected-region-tint,
-.selected-region-outline {
+.selected-region-outline,
+.selected-country-overlay,
+.selected-country-tint,
+.selected-country-outline {
   pointer-events: none;
+}
+
+.selected-country-tint {
+  fill: rgba(255, 231, 128, 0.12);
 }
 
 .selected-region-tint {
   fill: rgba(255, 231, 128, 0.24);
 }
 
+.selected-country-outline,
 .selected-region-outline {
   stroke-linejoin: round;
   stroke-opacity: 1;
   vector-effect: non-scaling-stroke;
+}
+
+.selected-country-outline-halo {
+  stroke: rgba(3, 7, 6, 0.76);
+  stroke-width: 4.8;
+}
+
+.selected-country-outline-inner {
+  stroke: #ffe98f;
+  stroke-width: 1.7;
 }
 
 .selected-region-outline-halo {

@@ -31,4 +31,11 @@ describe("map style rules", () => {
     expect(styles).toMatch(/\.selected-region-outline-halo \{[^}]*stroke-width: 3\.9;/);
     expect(styles).toMatch(/\.selected-region-outline-inner \{[^}]*stroke-width: 1\.55;/);
   });
+
+  it("renders selected countries with a non-interactive tint and contrast outline", () => {
+    expect(styles).toMatch(/\.selected-country-overlay,[^}]*pointer-events: none;/);
+    expect(styles).toMatch(/\.selected-country-tint \{[^}]*fill: rgba\(255, 231, 128, 0\.12\);/);
+    expect(styles).toMatch(/\.selected-country-outline-halo \{[^}]*stroke-width: 4\.8;/);
+    expect(styles).toMatch(/\.selected-country-outline-inner \{[^}]*stroke-width: 1\.7;/);
+  });
 });
