@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { geoNaturalEarth1 } from "d3-geo";
 import type { Geometry, Position } from "geojson";
 import mapDataFixture from "../public/data/map-data.json";
-import { subtractGeoJsonGeometries } from "./geometrySplit";
+import { subtractGeoJsonGeometries, unionGeoJsonGeometriesClosingGaps } from "./geometrySplit";
 import { getCountryLabelGeometries } from "./countryLabelGeometry";
 import type { MapData } from "./types";
 import { layoutCountryLabel } from "./labelLayout";
@@ -33,10 +33,10 @@ describe("getCountryLabelGeometries", () => {
       regionById,
       regionIds,
       subtractGeoJsonGeometries,
+      unionGeoJsonGeometriesClosingGaps,
     });
 
-    expect(geometries[0]).toBe(germanyBase.geometry);
-    expect(geometries).toHaveLength(2);
+    expect(geometries).toHaveLength(1);
   });
 
   it("fits Germany's label against Germany after it owns a transferred region", () => {
@@ -78,6 +78,7 @@ describe("getCountryLabelGeometries", () => {
       regionById,
       regionIds,
       subtractGeoJsonGeometries,
+      unionGeoJsonGeometriesClosingGaps,
     });
     const label = layoutCountryLabel({
       id: germany.id,
@@ -90,7 +91,144 @@ describe("getCountryLabelGeometries", () => {
     expect(label).not.toBeNull();
     expect(projectedPolygonsContainPoint(germanyPolygons, [label!.x, label!.y])).toBe(true);
   });
+
+  it("scales Vietnam's label after expanding into adjacent Chinese regions", () => {
+    const data = mapDataFixture as MapData;
+    const vietnam = data.countries.find((country) => country.id === "VNM");
+    const vietnamBase = data.baseCountries.find((country) => country.entityId === "VNM");
+    const transferredRegionIds = [
+      "CHN-43563684B59914390554750",
+      "CHN-43563684B84540832148656",
+      "CHN-43563684B78583622565599",
+      "CHN-43563684B64987462919315",
+      "CHN-43563684B38891657012300",
+      "CHN-43563684B30737817496648",
+    ];
+    if (!vietnam || !vietnamBase) {
+      throw new Error("Missing Vietnam fixture records");
+    }
+
+    const projection = geoNaturalEarth1().fitExtent(
+      [
+        [16, 18],
+        [984, 538],
+      ],
+      {
+        type: "FeatureCollection",
+        features: data.regions.map((region) => ({
+          type: "Feature",
+          properties: { id: region.id },
+          geometry: region.geometry,
+        })),
+      },
+    );
+    const regionById = new Map(data.regions.map((region) => [region.id, region]));
+    const baseCountryByEntityId = new Map(data.baseCountries.map((country) => [country.entityId, country]));
+    const baseEntityById = new Map(data.countries.map((country) => [country.id, country]));
+    const baseOwnerByRegionId = new Map(
+      data.countries.flatMap((country) => country.regionIds.map((regionId) => [regionId, country.id])),
+    );
+    const originalLabel = layoutCountryLabel({
+      id: vietnam.id,
+      name: vietnam.name,
+      geometries: [vietnamBase.geometry],
+      project: (position) => projection([position[0], position[1]]),
+    });
+    const expandedRegionIds = [...vietnam.regionIds, ...transferredRegionIds];
+    const expandedGeometries = getCountryLabelGeometries({
+      baseCountryByEntityId,
+      baseEntityById,
+      baseOwnerByRegionId,
+      entityId: vietnam.id,
+      fallbackGeometries: expandedRegionIds
+        .map((regionId) => regionById.get(regionId)?.geometry)
+        .filter((geometry): geometry is NonNullable<typeof geometry> => Boolean(geometry)),
+      regionById,
+      regionIds: expandedRegionIds,
+      subtractGeoJsonGeometries,
+      unionGeoJsonGeometriesClosingGaps,
+      unionGapTolerance: 0.08,
+    });
+    const expandedLabel = layoutCountryLabel({
+      id: vietnam.id,
+      name: vietnam.name,
+      geometries: expandedGeometries,
+      project: (position) => projection([position[0], position[1]]),
+      areaFontRatio: 0.6,
+      heightFontRatio: 1.1,
+      minFootprintContainment: 0.58,
+    });
+
+    expect(originalLabel).not.toBeNull();
+    expect(expandedLabel).not.toBeNull();
+    expect(expandedLabel!.fontSize).toBeGreaterThan(7);
+  });
+
+  it("unions expanded country geometry before fitting the label", () => {
+    const baseGeometry = rectangleGeometry(0, 0, 10, 4);
+    const transferredGeometry = rectangleGeometry(10, 0, 34, 4);
+    const unionedGeometry = rectangleGeometry(0, 0, 34, 4);
+    const regionById = new Map([
+      ["BASE-1", { id: "BASE-1", name: "Base", ownerId: "AAA", type: "Base", geometry: baseGeometry }],
+      ["BBB-1", { id: "BBB-1", name: "Transfer", ownerId: "BBB", type: "Base", geometry: transferredGeometry }],
+    ]);
+    const unionCalls: Geometry[][] = [];
+    const geometries = getCountryLabelGeometries({
+      baseCountryByEntityId: new Map([["AAA", { geometry: baseGeometry }]]),
+      baseEntityById: new Map([["AAA", { regionIds: ["BASE-1"] }]]),
+      baseOwnerByRegionId: new Map([
+        ["BASE-1", "AAA"],
+        ["BBB-1", "BBB"],
+      ]),
+      entityId: "AAA",
+      fallbackGeometries: [baseGeometry, transferredGeometry],
+      regionById,
+      regionIds: ["BASE-1", "BBB-1"],
+      subtractGeoJsonGeometries,
+      unionGeoJsonGeometriesClosingGaps: (inputGeometries) => {
+        unionCalls.push(inputGeometries);
+        return unionedGeometry;
+      },
+    });
+    const originalLabel = layoutCountryLabel({
+      id: "AAA",
+      name: "Expanded",
+      geometries: [baseGeometry],
+      project: identityProject,
+    });
+    const expandedLabel = layoutCountryLabel({
+      id: "AAA",
+      name: "Expanded",
+      geometries,
+      project: identityProject,
+    });
+
+    expect(unionCalls).toEqual([[baseGeometry, transferredGeometry]]);
+    expect(geometries).toEqual([unionedGeometry]);
+    expect(originalLabel).not.toBeNull();
+    expect(expandedLabel).not.toBeNull();
+    expect(expandedLabel!.fontSize).toBeGreaterThan(originalLabel!.fontSize);
+  });
 });
+
+function rectangleGeometry(minX: number, minY: number, maxX: number, maxY: number): Geometry {
+  return {
+    type: "Polygon",
+    coordinates: [
+      [
+        [minX, minY],
+        [maxX, minY],
+        [maxX, maxY],
+        [minX, maxY],
+        [minX, minY],
+      ],
+    ],
+  };
+}
+
+function identityProject(position: Position): [number, number] {
+  return [position[0], position[1]];
+}
 
 function projectGeometryRings(
   geometry: Geometry,

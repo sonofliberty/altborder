@@ -10,6 +10,8 @@ export type CountryLabelGeometryInput = {
   regionById: Map<string, RegionRecord>;
   fallbackGeometries: Geometry[];
   subtractGeoJsonGeometries: (geometry: Geometry, subtractGeometries: Geometry[]) => Geometry | null;
+  unionGeoJsonGeometriesClosingGaps?: (geometries: Geometry[], gapTolerance: number) => Geometry | null;
+  unionGapTolerance?: number;
 };
 
 export function getCountryLabelGeometries(input: CountryLabelGeometryInput): Geometry[] {
@@ -33,5 +35,9 @@ export function getCountryLabelGeometries(input: CountryLabelGeometryInput): Geo
       ? input.subtractGeoJsonGeometries(baseCountry.geometry, missingBaseGeometries)
       : baseCountry.geometry;
 
-  return nativeGeometry ? [nativeGeometry, ...transferredGeometries] : transferredGeometries;
+  const geometries = nativeGeometry ? [nativeGeometry, ...transferredGeometries] : transferredGeometries;
+  if (geometries.length <= 1 || !input.unionGeoJsonGeometriesClosingGaps) return geometries;
+
+  const unioned = input.unionGeoJsonGeometriesClosingGaps(geometries, input.unionGapTolerance ?? 0);
+  return unioned ? [unioned] : geometries;
 }

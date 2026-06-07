@@ -21,6 +21,9 @@ export type CountryLabelInput = {
   name: string;
   geometries: Geometry[];
   project: ProjectPoint;
+  areaFontRatio?: number;
+  heightFontRatio?: number;
+  minFootprintContainment?: number;
   priority?: number;
 };
 
@@ -48,6 +51,9 @@ type PolygonCluster = {
 const labelAngles = [0, -8, 8, -15, 15];
 const minMapFontSize = 0.5;
 const maxMapFontSize = 24;
+const defaultAreaFontRatio = 0.4;
+const defaultHeightFontRatio = 0.72;
+const defaultMinFootprintContainment = 1;
 const labelHorizontalSafetyRatio = 0.95;
 const labelVerticalSafetyRatio = 1.55;
 
@@ -62,7 +68,14 @@ export function layoutCountryLabel(input: CountryLabelInput): FittedCountryLabel
   const candidates = candidatePoints(cluster);
   if (candidates.length === 0) return null;
 
-  const label = fitLabel(displayName, cluster, candidates);
+  const label = fitLabel(
+    displayName,
+    cluster,
+    candidates,
+    input.areaFontRatio ?? defaultAreaFontRatio,
+    input.heightFontRatio ?? defaultHeightFontRatio,
+    input.minFootprintContainment ?? defaultMinFootprintContainment,
+  );
   if (!label) return null;
 
   return {
@@ -83,12 +96,15 @@ function fitLabel(
   displayName: string,
   cluster: PolygonCluster,
   candidates: Point[],
+  areaFontRatio: number,
+  heightFontRatio: number,
+  minFootprintContainment: number,
 ): Pick<FittedCountryLabel, "x" | "y" | "fontSize" | "textLength" | "width" | "height" | "angle"> | null {
   const boundsWidth = cluster.bounds.maxX - cluster.bounds.minX;
   const boundsHeight = cluster.bounds.maxY - cluster.bounds.minY;
   const widthLimitedFont = (boundsWidth * 0.92) / Math.max(displayName.length * countryLabelCharWidthRatio, 1);
-  const heightLimitedFont = boundsHeight * 0.72;
-  const areaLimitedFont = Math.sqrt(cluster.area) * 0.4;
+  const heightLimitedFont = boundsHeight * heightFontRatio;
+  const areaLimitedFont = Math.sqrt(cluster.area) * areaFontRatio;
   const maxFontSize = Math.min(maxMapFontSize, widthLimitedFont, heightLimitedFont, areaLimitedFont);
 
   for (const angle of labelAngles) {
@@ -98,8 +114,7 @@ function fitLabel(
       const width = textLength + fontSize * labelHorizontalSafetyRatio;
       const height = fontSize * labelVerticalSafetyRatio;
       for (const point of candidates) {
-        const containingPolygon = labelRectangleContainingPolygon(cluster, point, width, height, angle);
-        if (containingPolygon) {
+        if (labelRectangleFitsCluster(cluster, point, width, height, angle, minFootprintContainment)) {
           return {
             x: point[0],
             y: point[1],
@@ -220,15 +235,16 @@ function candidatePoints(cluster: PolygonCluster): Point[] {
   return candidates.sort((a, b) => a.score - b.score).map((candidate) => candidate.point);
 }
 
-function labelRectangleContainingPolygon(
+function labelRectangleFitsCluster(
   cluster: PolygonCluster,
   center: Point,
   width: number,
   height: number,
   angleDegrees: number,
-): ProjectedPolygon | null {
+  minFootprintContainment: number,
+): boolean {
   const rectangle = makeRotatedRectangle(center, width, height, angleDegrees);
-  return cluster.polygons.find((polygon) => polygonContainsRectangle(polygon, rectangle)) ?? null;
+  return clusterContainsRectangle(cluster, rectangle, minFootprintContainment);
 }
 
 function makeRotatedRectangle(center: Point, width: number, height: number, angleDegrees: number): Point[] {
@@ -247,29 +263,28 @@ function makeRotatedRectangle(center: Point, width: number, height: number, angl
   return localCorners.map(([x, y]) => [center[0] + x * cos - y * sin, center[1] + x * sin + y * cos]);
 }
 
-function polygonContainsRectangle(polygon: ProjectedPolygon, rectangle: Point[]): boolean {
+function clusterContainsRectangle(
+  cluster: PolygonCluster,
+  rectangle: Point[],
+  minFootprintContainment: number,
+): boolean {
   const sampleSteps = 6;
+  let containedSamples = 0;
+  let totalSamples = 0;
   for (let yIndex = 0; yIndex <= sampleSteps; yIndex += 1) {
     const yRatio = yIndex / sampleSteps;
     for (let xIndex = 0; xIndex <= sampleSteps; xIndex += 1) {
       const xRatio = xIndex / sampleSteps;
-      if (!polygonContainsPoint(polygon, interpolateRectanglePoint(rectangle, xRatio, yRatio))) {
+      totalSamples += 1;
+      if (clusterContainsPoint(cluster, interpolateRectanglePoint(rectangle, xRatio, yRatio))) {
+        containedSamples += 1;
+      } else if (minFootprintContainment >= 1) {
         return false;
       }
     }
   }
 
-  const rectangleEdges = edgesForRing([...rectangle, rectangle[0]]);
-  const polygonEdges = polygon.rings.flatMap(edgesForRing);
-  if (
-    rectangleEdges.some(([rectStart, rectEnd]) =>
-      polygonEdges.some(([ringStart, ringEnd]) => segmentsIntersect(rectStart, rectEnd, ringStart, ringEnd)),
-    )
-  ) {
-    return false;
-  }
-
-  return polygon.rings.slice(1).every((hole) => !hole.some((point) => pointInConvexPolygon(point, rectangle)));
+  return containedSamples / totalSamples >= minFootprintContainment;
 }
 
 function interpolateRectanglePoint(rectangle: Point[], xRatio: number, yRatio: number): Point {
@@ -280,56 +295,6 @@ function interpolateRectanglePoint(rectangle: Point[], xRatio: number, yRatio: n
 
 function interpolatePoint(a: Point, b: Point, ratio: number): Point {
   return [a[0] + (b[0] - a[0]) * ratio, a[1] + (b[1] - a[1]) * ratio];
-}
-
-function edgesForRing(ring: Point[]): Array<[Point, Point]> {
-  const edges: Array<[Point, Point]> = [];
-  for (let index = 0; index < ring.length - 1; index += 1) {
-    edges.push([ring[index], ring[index + 1]]);
-  }
-  return edges;
-}
-
-function segmentsIntersect(a: Point, b: Point, c: Point, d: Point): boolean {
-  const abC = orientation(a, b, c);
-  const abD = orientation(a, b, d);
-  const cdA = orientation(c, d, a);
-  const cdB = orientation(c, d, b);
-
-  if (Math.abs(abC) < 1e-9 && pointOnSegment(c, a, b)) return true;
-  if (Math.abs(abD) < 1e-9 && pointOnSegment(d, a, b)) return true;
-  if (Math.abs(cdA) < 1e-9 && pointOnSegment(a, c, d)) return true;
-  if (Math.abs(cdB) < 1e-9 && pointOnSegment(b, c, d)) return true;
-
-  return (abC > 0) !== (abD > 0) && (cdA > 0) !== (cdB > 0);
-}
-
-function orientation(a: Point, b: Point, c: Point): number {
-  return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-}
-
-function pointOnSegment(point: Point, start: Point, end: Point): boolean {
-  return (
-    point[0] >= Math.min(start[0], end[0]) - 1e-9 &&
-    point[0] <= Math.max(start[0], end[0]) + 1e-9 &&
-    point[1] >= Math.min(start[1], end[1]) - 1e-9 &&
-    point[1] <= Math.max(start[1], end[1]) + 1e-9
-  );
-}
-
-function pointInConvexPolygon(point: Point, polygon: Point[]): boolean {
-  let sign = 0;
-  return polygon.every((current, index) => {
-    const next = polygon[(index + 1) % polygon.length];
-    const cross = orientation(current, next, point);
-    if (Math.abs(cross) < 1e-9) return true;
-    const currentSign = Math.sign(cross);
-    if (sign === 0) {
-      sign = currentSign;
-      return true;
-    }
-    return currentSign === sign;
-  });
 }
 
 function clusterContainsPoint(cluster: PolygonCluster, point: Point): boolean {

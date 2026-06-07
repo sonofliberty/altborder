@@ -81,6 +81,25 @@ describe("layoutCountryLabel", () => {
     expect(label!.y).toBeGreaterThan(50);
   });
 
+  it("fits expanded labels across adjacent owned polygon components", () => {
+    const original = layoutCountryLabel({
+      id: "expanded",
+      name: "Expanded",
+      geometries: [square(0, 0, 18, 8)],
+      project: identityProject,
+    });
+    const expanded = layoutCountryLabel({
+      id: "expanded",
+      name: "Expanded",
+      geometries: [multiSquare([squareCoordinates(0, 0, 18, 8), squareCoordinates(18, 0, 52, 8)])],
+      project: identityProject,
+    });
+
+    expect(original).not.toBeNull();
+    expect(expanded).not.toBeNull();
+    expect(expanded!.fontSize).toBeGreaterThan(original!.fontSize);
+  });
+
   it("shrinks long names to fit available geometry", () => {
     const short = layoutCountryLabel({
       id: "short",
