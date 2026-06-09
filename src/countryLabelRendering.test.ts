@@ -42,10 +42,10 @@ describe("country underlay rendering", () => {
     );
   });
 
-  it("builds changed-country underlay fills from unioned original geometry", () => {
+  it("builds changed-country underlay fills from unioned render topology geometry", () => {
     expect(appSource).toContain("hasTransferredOwnershipChanges(");
     expect(appSource).toContain("baseCountryByEntityId.get(baseEntityId)?.geometry");
-    expect(appSource).toContain("regionById.get(regionId)?.geometry");
+    expect(appSource).toContain("renderRegionTopologyGeometryById.get(regionId)");
     expect(appSource).toContain("simplifyPolygonalGeometry(geometry, mapRenderSimplifyTolerance)");
     expect(appSource).not.toContain("renderGapSensitiveEntityIds");
     expect(appSource).not.toContain("combineProjectedPathData");
@@ -54,9 +54,10 @@ describe("country underlay rendering", () => {
 });
 
 describe("region border rendering", () => {
-  it("uses original region geometry for detailed visible border strokes", () => {
+  it("uses holeless topology geometry for detailed visible border strokes", () => {
     expect(appSource).toContain("getBaseDetailedRegionStrokePath");
-    expect(appSource).toContain("originalRegionGeometryById.get(regionId)");
+    expect(appSource).toContain("renderRegionTopologyGeometryById.get(regionId)");
+    expect(appSource).toContain("removePolygonalGeometryHoles(region.geometry)");
     expect(appSource).toContain("getRegionStrokePath(regionId, useDetailedRegionBorderStrokes)");
   });
 });

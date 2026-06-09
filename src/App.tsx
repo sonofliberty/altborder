@@ -72,7 +72,11 @@ import {
   type ProjectedPathData,
 } from "./projectedPath";
 import { getCountryLabelGeometry } from "./countryLabelGeometry";
-import { simplifyPolygonalGeometry } from "./geometrySimplify";
+import {
+  removePolygonalGeometryHoles,
+  removeSmallPolygonalGeometryComponents,
+  simplifyPolygonalGeometry,
+} from "./geometrySimplify";
 
 const viewportWidth = 1000;
 const viewportHeight = 560;
@@ -85,7 +89,9 @@ const mapRenderSimplifyTolerance = 0.07;
 const countryUnderlayUpdateDelayMs = 0;
 const projectedSeamBreakDistance = viewportWidth * 0.22;
 const projectedPathCacheVersion = "shared-subdivision-linework-v30";
-const baseGeometryUnionSensitiveEntityIds = new Set(["BRA", "RUS", "USA"]);
+const baseGeometryUnionSensitiveEntityIds = new Set(["BOL", "BRA", "RUS", "USA"]);
+const sliverProneBaseGeometryEntityIds = new Set(["BOL"]);
+const sliverComponentMinAreaRatio = 0.0005;
 const pathCullingMinZoom = 2.1;
 const pathCullingOverscanRatio = 0.42;
 const svgPathCoordinatePrecision = 2;
@@ -293,8 +299,13 @@ export default function App() {
     return new Map(effectiveRegions.map((region) => [region.id, region]));
   }, [effectiveRegions]);
 
-  const originalRegionGeometryById = useMemo(() => {
-    return new Map(effectiveRegions.map((region) => [region.id, region.geometry]));
+  const renderRegionTopologyGeometryById = useMemo(() => {
+    return new Map(
+      effectiveRegions.map((region) => [
+        region.id,
+        removePolygonalGeometryHoles(region.geometry),
+      ]),
+    );
   }, [effectiveRegions]);
 
   const getRegionDisplayName = useCallback((regionId: string): string => {
@@ -327,13 +338,14 @@ export default function App() {
     if (!data) return geometries;
 
     for (const region of data.regions) {
-      geometries.set(region.id, simplifyPolygonalGeometry(region.geometry, mapRenderSimplifyTolerance));
+      const geometry = renderRegionTopologyGeometryById.get(region.id) ?? region.geometry;
+      geometries.set(region.id, simplifyPolygonalGeometry(geometry, mapRenderSimplifyTolerance));
     }
     for (const region of customRegionRecords) {
-      geometries.set(region.id, region.geometry);
+      geometries.set(region.id, renderRegionTopologyGeometryById.get(region.id) ?? region.geometry);
     }
     return geometries;
-  }, [customRegionRecords, data]);
+  }, [customRegionRecords, data, renderRegionTopologyGeometryById]);
 
   useEffect(() => {
     countryUnderlayCacheRef.current.clear();
@@ -378,13 +390,14 @@ export default function App() {
   const customProjectedRegionById = useMemo(() => {
     const projectedRegions = new Map<string, ProjectedPathData>();
     for (const region of customRegionRecords) {
-      const projected = projectGeometryToPathData(region.geometry, projection, getProjectedPathOptions());
+      const geometry = renderRegionTopologyGeometryById.get(region.id) ?? region.geometry;
+      const projected = projectGeometryToPathData(geometry, projection, getProjectedPathOptions());
       if (projected) {
         projectedRegions.set(region.id, projected);
       }
     }
     return projectedRegions;
-  }, [customRegionRecords, projection]);
+  }, [customRegionRecords, projection, renderRegionTopologyGeometryById]);
 
   const getBaseProjectedRegion = useCallback((regionId: string, preferManualFill = false) => {
     const cacheKey = `${projectedPathCacheVersion}|${preferManualFill ? "manual-fill" : "d3-fill"}|${regionId}`;
@@ -406,13 +419,13 @@ export default function App() {
     const cached = baseProjectedRegionDetailStrokeCacheRef.current.get(cacheKey);
     if (cached !== undefined) return cached;
 
-    const geometry = originalRegionGeometryById.get(regionId);
+    const geometry = renderRegionTopologyGeometryById.get(regionId);
     if (!geometry) return "";
     const projected = projectGeometryToPathData(geometry, projection, getProjectedPathOptions());
     const strokePath = projected?.strokePathData ?? projected?.pathData ?? "";
     baseProjectedRegionDetailStrokeCacheRef.current.set(cacheKey, strokePath);
     return strokePath;
-  }, [originalRegionGeometryById, projection]);
+  }, [projection, renderRegionTopologyGeometryById]);
 
   const getRegionPath = useCallback((regionId: string) => {
     return customProjectedRegionById.get(regionId)?.pathData ?? getBaseProjectedRegion(regionId)?.pathData ?? "";
@@ -583,7 +596,7 @@ export default function App() {
       for (const regionId of regionIds) {
         if (consumedRegionIds.has(regionId)) continue;
         const geometry = hasOwnershipChanges
-          ? regionById.get(regionId)?.geometry ?? renderRegionGeometryById.get(regionId)
+          ? renderRegionTopologyGeometryById.get(regionId) ?? regionById.get(regionId)?.geometry
           : renderRegionGeometryById.get(regionId) ?? regionById.get(regionId)?.geometry;
         if (geometry) {
           geometries.push(geometry);
@@ -603,6 +616,7 @@ export default function App() {
     regionById,
     renderBaseCountryByEntityId,
     renderRegionGeometryById,
+    renderRegionTopologyGeometryById,
     regionIdsByEntityId,
   ]);
 
@@ -642,15 +656,18 @@ export default function App() {
             ) {
               subtractGeoJsonGeometries ??= (await import("./geometrySplit")).subtractGeoJsonGeometries;
               unionGeoJsonGeometries ??= (await import("./geometrySplit")).unionGeoJsonGeometries;
+              unionGeoJsonGeometriesClosingGaps ??= (await import("./geometrySplit")).unionGeoJsonGeometriesClosingGaps;
               return buildStableBaseRenderGeometry({
                 baseCountryByEntityId,
                 baseEntityById,
                 baseOwnerByRegionId,
                 entityId,
-                regionGeometryById: originalRegionGeometryById,
+                regionGeometryById: renderRegionTopologyGeometryById,
                 regionIds,
                 subtractGeoJsonGeometries,
                 unionGeoJsonGeometries,
+                unionGeoJsonGeometriesClosingGaps,
+                unionGapTolerance: acquiredRegionRenderGapTolerance,
               });
             }
 
@@ -679,9 +696,12 @@ export default function App() {
             baseEntityById,
             baseOwnerByRegionId,
           );
-          const renderGeometry = hasOwnershipChanges
-            ? simplifyPolygonalGeometry(geometry, mapRenderSimplifyTolerance)
+          const displayGeometry = sliverProneBaseGeometryEntityIds.has(entityId)
+            ? removeSmallPolygonalGeometryComponents(geometry, sliverComponentMinAreaRatio)
             : geometry;
+          const renderGeometry = hasOwnershipChanges
+            ? simplifyPolygonalGeometry(displayGeometry, mapRenderSimplifyTolerance)
+            : displayGeometry;
           const projected = projectGeometryToPathData(renderGeometry, projection, getProjectedPathOptions());
           if (!projected) continue;
 
@@ -713,8 +733,8 @@ export default function App() {
     baseEntityById,
     baseOwnerByRegionId,
     data,
-    originalRegionGeometryById,
     projection,
+    renderRegionTopologyGeometryById,
     regionIdsByEntityId,
     renderGeometriesByEntityId,
   ]);
@@ -2945,6 +2965,8 @@ function buildStableBaseRenderGeometry({
   regionIds,
   subtractGeoJsonGeometries,
   unionGeoJsonGeometries,
+  unionGeoJsonGeometriesClosingGaps,
+  unionGapTolerance,
 }: {
   baseCountryByEntityId: Map<string, { geometry: Geometry }>;
   baseEntityById: Map<string, { regionIds: string[] }>;
@@ -2954,6 +2976,8 @@ function buildStableBaseRenderGeometry({
   regionIds: string[];
   subtractGeoJsonGeometries: GeometrySplitModule["subtractGeoJsonGeometries"];
   unionGeoJsonGeometries: GeometrySplitModule["unionGeoJsonGeometries"];
+  unionGeoJsonGeometriesClosingGaps?: GeometrySplitModule["unionGeoJsonGeometriesClosingGaps"];
+  unionGapTolerance?: number;
 }): Geometry | null {
   const baseEntity = baseEntityById.get(entityId);
   const baseCountry = baseCountryByEntityId.get(entityId);
@@ -2976,7 +3000,10 @@ function buildStableBaseRenderGeometry({
 
   if (!stableBaseGeometry) return foreignGeometries.length > 0 ? unionGeoJsonGeometries(foreignGeometries) : null;
   if (foreignGeometries.length === 0) return stableBaseGeometry;
-  return unionGeoJsonGeometries([stableBaseGeometry, ...foreignGeometries]);
+  const expandedGeometries = [stableBaseGeometry, ...foreignGeometries];
+  return unionGeoJsonGeometriesClosingGaps
+    ? unionGeoJsonGeometriesClosingGaps(expandedGeometries, unionGapTolerance ?? 0)
+    : unionGeoJsonGeometries(expandedGeometries);
 }
 
 function shouldSkipRenderGapClosing(

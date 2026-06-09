@@ -18,6 +18,67 @@ export function simplifyPolygonalGeometry(geometry: Geometry, tolerance: number)
   return geometry;
 }
 
+export function removePolygonalGeometryHoles(geometry: Geometry): Geometry {
+  if (geometry.type === "Polygon") {
+    return {
+      ...geometry,
+      coordinates: removePolygonHoles(geometry.coordinates),
+    };
+  }
+  if (geometry.type === "MultiPolygon") {
+    return {
+      ...geometry,
+      coordinates: geometry.coordinates.map(removePolygonHoles),
+    };
+  }
+  return geometry;
+}
+
+export function removeSmallPolygonalGeometryComponents(
+  geometry: Geometry,
+  minAreaRatio: number,
+): Geometry {
+  if (geometry.type !== "MultiPolygon" || minAreaRatio <= 0 || geometry.coordinates.length <= 1) {
+    return geometry;
+  }
+
+  const componentAreas = geometry.coordinates.map((polygon) => polygonOuterArea(polygon));
+  const maxArea = Math.max(...componentAreas);
+  if (maxArea <= 0) return geometry;
+
+  const keptPolygons = geometry.coordinates
+    .filter((_, index) => componentAreas[index] >= maxArea * minAreaRatio)
+    .map(copyPolygonCoordinates);
+  if (keptPolygons.length === 0 || keptPolygons.length === geometry.coordinates.length) {
+    return geometry;
+  }
+  if (keptPolygons.length === 1) {
+    return {
+      ...geometry,
+      type: "Polygon",
+      coordinates: keptPolygons[0],
+    };
+  }
+  return {
+    ...geometry,
+    coordinates: keptPolygons,
+  };
+}
+
+function removePolygonHoles(polygon: Position[][]): Position[][] {
+  const outerRing = polygon[0];
+  return outerRing ? [outerRing.map(copyPosition)] : [];
+}
+
+function copyPolygonCoordinates(polygon: Position[][]): Position[][] {
+  return polygon.map((ring) => ring.map(copyPosition));
+}
+
+function polygonOuterArea(polygon: Position[][]): number {
+  const outerRing = polygon[0];
+  return outerRing ? Math.abs(ringSignedArea(outerRing)) : 0;
+}
+
 function simplifyPolygonCoordinates(polygon: Position[][], tolerance: number): Position[][] {
   return polygon.map((ring) => simplifyRing(ring, tolerance));
 }
