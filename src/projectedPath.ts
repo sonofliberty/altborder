@@ -32,57 +32,102 @@ export function projectGeometryToPathData(
   projection: GeoProjection,
   options: ProjectedPathOptions = {},
 ): ProjectedPathData | null {
+  const projectedStroke = projectGeometryToStrokePathData(geometry, projection, options);
+  if (!projectedStroke.bounds) return null;
+
+  if (geometry.type === "LineString" || geometry.type === "MultiLineString") {
+    return projectedStroke.pathData
+      ? {
+          pathData: projectedStroke.pathData,
+          strokePathData: projectedStroke.pathData,
+          bounds: projectedStroke.bounds,
+        }
+      : null;
+  }
+
   let pathGenerator = geoPath(projection) as GeoPathWithDigits;
   if (pathGenerator.digits && options.coordinatePrecision !== undefined) {
     pathGenerator = pathGenerator.digits(options.coordinatePrecision) as GeoPathWithDigits;
   }
 
-  const strokePathData = projectGeometryToStrokePathData(geometry, projection, options);
-  const bounds = getProjectedCoordinateBounds(geometry, projection);
-  if (!bounds) return null;
   const d3PathData = pathGenerator(geometry);
   if (!d3PathData) return null;
   const d3Bounds = pathGenerator.bounds(geometry);
   const pathData =
-    options.preferManualFill || shouldUseManualFillPath(d3PathData, d3Bounds, bounds)
-      ? strokePathData
+    options.preferManualFill || shouldUseManualFillPath(d3PathData, d3Bounds, projectedStroke.bounds)
+      ? projectedStroke.pathData
       : d3PathData;
   if (!pathData) return null;
 
   return {
     pathData,
-    strokePathData: strokePathData || pathData,
-    bounds,
+    strokePathData: projectedStroke.pathData || pathData,
+    bounds: projectedStroke.bounds,
   };
 }
+
+type ProjectedStrokePathData = {
+  pathData: string;
+  bounds: ProjectedBounds | null;
+};
+
+type ProjectionAccumulator = {
+  bounds: ProjectedBounds | null;
+};
 
 function projectGeometryToStrokePathData(
   geometry: Geometry,
   projection: GeoProjection,
   options: ProjectedPathOptions,
+): ProjectedStrokePathData {
+  const accumulator: ProjectionAccumulator = { bounds: null };
+  const pathData = projectGeometryToStrokePathDataInternal(geometry, projection, options, accumulator);
+
+  return {
+    pathData,
+    bounds: accumulator.bounds,
+  };
+}
+
+function projectGeometryToStrokePathDataInternal(
+  geometry: Geometry,
+  projection: GeoProjection,
+  options: ProjectedPathOptions,
+  accumulator: ProjectionAccumulator,
 ): string {
   if (geometry.type === "Polygon") {
-    return projectPolygonToStrokePathData(geometry.coordinates, projection, options);
+    return projectPolygonToStrokePathData(geometry.coordinates, projection, options, accumulator);
   }
 
   if (geometry.type === "MultiPolygon") {
     return geometry.coordinates
-      .map((polygon) => projectPolygonToStrokePathData(polygon, projection, options))
+      .map((polygon) => projectPolygonToStrokePathData(polygon, projection, options, accumulator))
       .join("");
   }
 
   if (geometry.type === "GeometryCollection") {
     return geometry.geometries
-      .map((childGeometry) => projectGeometryToStrokePathData(childGeometry, projection, options))
+      .map((childGeometry) => projectGeometryToStrokePathDataInternal(childGeometry, projection, options, accumulator))
       .join("");
   }
 
   if (geometry.type === "LineString") {
-    return projectLineStringToPathData(geometry.coordinates, projection, options);
+    return projectLineStringToPathData(geometry.coordinates, projection, options, accumulator);
   }
 
   if (geometry.type === "MultiLineString") {
-    return geometry.coordinates.map((line) => projectLineStringToPathData(line, projection, options)).join("");
+    return geometry.coordinates.map((line) => projectLineStringToPathData(line, projection, options, accumulator)).join("");
+  }
+
+  if (geometry.type === "Point") {
+    projectPosition(geometry.coordinates, projection, accumulator);
+    return "";
+  }
+
+  if (geometry.type === "MultiPoint") {
+    for (const position of geometry.coordinates) {
+      projectPosition(position, projection, accumulator);
+    }
   }
 
   return "";
@@ -92,6 +137,7 @@ function projectLineStringToPathData(
   line: Position[],
   projection: GeoProjection,
   options: ProjectedPathOptions,
+  accumulator: ProjectionAccumulator,
 ): string {
   let pathData = "";
   let subpathData = "";
@@ -108,14 +154,19 @@ function projectLineStringToPathData(
   };
 
   for (const position of line) {
-    const point = projection([position[0], position[1]]);
+    const point = projectPosition(position, projection, accumulator);
     if (!point) continue;
+    const crossesAntimeridianBoundary = previousPosition ? crossesAntimeridian(previousPosition, position) : false;
+    const crossesProjectionSeam = crossesProjectedSeam(previousPoint, point, options.seamBreakDistance);
+    const crossesStrokeSeam = previousPosition
+      ? crossesLikelyProjectedStrokeSeam(previousPosition, position, previousPoint, point)
+      : false;
     const startsSubpath =
       subpathDrawablePoints === 0 ||
       !previousPosition ||
-      crossesAntimeridian(previousPosition, position) ||
-      crossesProjectedSeam(previousPoint, point, options.seamBreakDistance) ||
-      crossesLikelyProjectedStrokeSeam(previousPosition, position, previousPoint, point);
+      crossesAntimeridianBoundary ||
+      crossesProjectionSeam ||
+      crossesStrokeSeam;
 
     if (startsSubpath) {
       commitSubpath();
@@ -138,6 +189,7 @@ function projectPolygonToStrokePathData(
   polygon: Position[][],
   projection: GeoProjection,
   options: ProjectedPathOptions,
+  accumulator: ProjectionAccumulator,
 ): string {
   let polygonPathData = "";
 
@@ -163,20 +215,21 @@ function projectPolygonToStrokePathData(
     };
 
     for (const position of drawableRing) {
-      const point = projection([position[0], position[1]]);
+      const point = projectPosition(position, projection, accumulator);
       if (!point) continue;
+      const crossesAntimeridianBoundary = crossesAntimeridian(previousPosition, position);
+      const crossesProjectionSeam = crossesProjectedSeam(previousPoint, point, options.seamBreakDistance);
+      const crossesStrokeSeam = crossesLikelyProjectedStrokeSeam(previousPosition, position, previousPoint, point);
       const startsSubpath =
         subpathDrawablePoints === 0 ||
-        crossesAntimeridian(previousPosition, position) ||
-        crossesProjectedSeam(previousPoint, point, options.seamBreakDistance) ||
-        crossesLikelyProjectedStrokeSeam(previousPosition, position, previousPoint, point);
+        crossesAntimeridianBoundary ||
+        crossesProjectionSeam ||
+        crossesStrokeSeam;
 
       if (startsSubpath) {
         const startsAfterSeam =
           subpathDrawablePoints > 0 &&
-          (crossesAntimeridian(previousPosition, position) ||
-            crossesProjectedSeam(previousPoint, point, options.seamBreakDistance) ||
-            crossesLikelyProjectedStrokeSeam(previousPosition, position, previousPoint, point));
+          (crossesAntimeridianBoundary || crossesProjectionSeam || crossesStrokeSeam);
         commitSubpath(!startsAfterSeam);
         subpathData = `M${formatPoint(point, options.coordinatePrecision)}`;
         subpathStartPosition = position;
@@ -213,6 +266,22 @@ function hasDuplicateClosingPosition(ring: Position[]): boolean {
 
 function formatPoint(point: [number, number], precision = 2): string {
   return `${point[0].toFixed(precision)},${point[1].toFixed(precision)}`;
+}
+
+function projectPosition(
+  position: Position,
+  projection: GeoProjection,
+  accumulator: ProjectionAccumulator,
+): [number, number] | null {
+  const point = projection([position[0], position[1]]);
+  if (!point || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) return null;
+  accumulator.bounds = mergeBounds(accumulator.bounds, {
+    minX: point[0],
+    minY: point[1],
+    maxX: point[0],
+    maxY: point[1],
+  });
+  return point;
 }
 
 function crossesAntimeridian(a: Position, b: Position): boolean {
@@ -282,49 +351,6 @@ function crossesLikelyProjectedClosureArtifact(
     (dx > 55 && dy > 3 && minY > 115 && maxY < 145) ||
     (dx > 35 && dy > 8 && minY < 120)
   );
-}
-
-function getProjectedCoordinateBounds(geometry: Geometry, projection: GeoProjection): ProjectedBounds | null {
-  let bounds: ProjectedBounds | null = null;
-
-  visitGeometryPositions(geometry, (position) => {
-    const point = projection([position[0], position[1]]);
-    if (!point || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) return;
-    bounds = mergeBounds(bounds, {
-      minX: point[0],
-      minY: point[1],
-      maxX: point[0],
-      maxY: point[1],
-    });
-  });
-
-  return bounds;
-}
-
-function visitGeometryPositions(geometry: Geometry, visitor: (position: Position) => void) {
-  if (geometry.type === "Polygon") {
-    geometry.coordinates.forEach((ring) => ring.forEach(visitor));
-    return;
-  }
-
-  if (geometry.type === "MultiPolygon") {
-    geometry.coordinates.forEach((polygon) => polygon.forEach((ring) => ring.forEach(visitor)));
-    return;
-  }
-
-  if (geometry.type === "GeometryCollection") {
-    geometry.geometries.forEach((childGeometry) => visitGeometryPositions(childGeometry, visitor));
-    return;
-  }
-
-  if (geometry.type === "LineString") {
-    geometry.coordinates.forEach(visitor);
-    return;
-  }
-
-  if (geometry.type === "MultiLineString") {
-    geometry.coordinates.forEach((line) => line.forEach(visitor));
-  }
 }
 
 function shouldUseManualFillPath(

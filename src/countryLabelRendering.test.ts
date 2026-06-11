@@ -48,8 +48,13 @@ describe("country underlay rendering", () => {
     expect(appSource).toContain("renderRegionTopologyGeometryById.get(regionId)");
     expect(appSource).toContain("simplifyPolygonalGeometry(geometry, mapRenderSimplifyTolerance)");
     expect(appSource).not.toContain("renderGapSensitiveEntityIds");
-    expect(appSource).not.toContain("combineProjectedPathData");
     expect(appSource).not.toContain("baseFillGeometry");
+  });
+
+  it("uses composed region fills for changed Russia underlays", () => {
+    expect(appSource).toContain('const composedFillSensitiveEntityIds = new Set(["RUS"]);');
+    expect(appSource).toContain("hasOwnershipChanges && composedFillSensitiveEntityIds.has(entityId)");
+    expect(appSource).toContain("combineProjectedPathData(");
   });
 });
 

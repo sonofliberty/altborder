@@ -88,8 +88,9 @@ const acquiredRegionRenderGapTolerance = 0.08;
 const mapRenderSimplifyTolerance = 0.07;
 const countryUnderlayUpdateDelayMs = 0;
 const projectedSeamBreakDistance = viewportWidth * 0.22;
-const projectedPathCacheVersion = "shared-subdivision-linework-v30";
+const projectedPathCacheVersion = "shared-subdivision-linework-v31";
 const baseGeometryUnionSensitiveEntityIds = new Set(["BOL", "BRA", "RUS", "USA"]);
+const composedFillSensitiveEntityIds = new Set(["RUS"]);
 const sliverProneBaseGeometryEntityIds = new Set(["BOL"]);
 const sliverComponentMinAreaRatio = 0.0005;
 const pathCullingMinZoom = 2.1;
@@ -704,10 +705,22 @@ export default function App() {
             : displayGeometry;
           const projected = projectGeometryToPathData(renderGeometry, projection, getProjectedPathOptions());
           if (!projected) continue;
+          const composedFill = hasOwnershipChanges && composedFillSensitiveEntityIds.has(entityId)
+            ? combineProjectedPathData(
+                (renderGeometriesByEntityId.get(entityId) ?? [])
+                  .map((regionGeometry) =>
+                    projectGeometryToPathData(
+                      simplifyPolygonalGeometry(regionGeometry, mapRenderSimplifyTolerance),
+                      projection,
+                      getProjectedPathOptions(),
+                    ),
+                  ),
+              )
+            : null;
 
           const underlay = {
             id: entityId,
-            pathData: projected.pathData,
+            pathData: composedFill?.pathData ?? projected.pathData,
             strokePathData: projected.strokePathData,
             bounds: projected.bounds,
           };
@@ -2046,13 +2059,19 @@ export default function App() {
     );
   }
 
-  const countryUnderlayElements = useMemo(() => {
-    if (!entities) return [];
-    const visibleUnderlays = shouldCullMapPaths
+  const visibleCountryUnderlays = useMemo(() => {
+    return shouldCullMapPaths
       ? countryUnderlays.filter((underlay) => boundsIntersect(underlay.bounds, settledViewportBounds))
       : countryUnderlays;
+  }, [countryUnderlays, settledViewportBounds, shouldCullMapPaths]);
 
-    return visibleUnderlays.map((underlay) => (
+  const countryUnderlayById = useMemo(() => {
+    return new Map(countryUnderlays.map((underlay) => [underlay.id, underlay]));
+  }, [countryUnderlays]);
+
+  const countryUnderlayElements = useMemo(() => {
+    if (!entities) return [];
+    return visibleCountryUnderlays.map((underlay) => (
       <path
         key={underlay.id}
         id={makeSvgElementId("country-shape", underlay.id)}
@@ -2067,12 +2086,10 @@ export default function App() {
       />
     ));
   }, [
-    countryUnderlays,
     entities,
-    settledViewportBounds,
-    shouldCullMapPaths,
     useLowZoomTransferCountryLayer,
     useSimplifiedCountryLayer,
+    visibleCountryUnderlays,
   ]);
 
   const subdivisionBorderZoomClass = getSubdivisionBorderZoomClass(zoom.k);
@@ -2214,7 +2231,7 @@ export default function App() {
 
   const selectedCountryOverlayElement = useMemo(() => {
     if (!selectedEntityId) return null;
-    const underlay = countryUnderlays.find((candidate) => candidate.id === selectedEntityId);
+    const underlay = countryUnderlayById.get(selectedEntityId);
     if (!underlay) return null;
 
     return (
@@ -2239,14 +2256,10 @@ export default function App() {
         />
       </g>
     );
-  }, [countryUnderlays, selectedEntityId]);
+  }, [countryUnderlayById, selectedEntityId]);
 
   const countryOutlineElements = useMemo(() => {
-    const visibleUnderlays = shouldCullMapPaths
-      ? countryUnderlays.filter((underlay) => boundsIntersect(underlay.bounds, settledViewportBounds))
-      : countryUnderlays;
-
-    return visibleUnderlays.map((underlay) => (
+    return visibleCountryUnderlays.map((underlay) => (
       <path
         key={underlay.id}
         className="country-outline"
@@ -2255,7 +2268,7 @@ export default function App() {
         fillRule="evenodd"
       />
     ));
-  }, [countryUnderlays, settledViewportBounds, shouldCullMapPaths]);
+  }, [visibleCountryUnderlays]);
 
   if (loadError && !data) {
     return (
@@ -3004,6 +3017,28 @@ function buildStableBaseRenderGeometry({
   return unionGeoJsonGeometriesClosingGaps
     ? unionGeoJsonGeometriesClosingGaps(expandedGeometries, unionGapTolerance ?? 0)
     : unionGeoJsonGeometries(expandedGeometries);
+}
+
+function combineProjectedPathData(projectedPaths: Array<ProjectedPathData | null>): ProjectedPathData | null {
+  let pathData = "";
+  let strokePathData = "";
+  let bounds: ProjectedPathData["bounds"] | null = null;
+
+  for (const projected of projectedPaths) {
+    if (!projected) continue;
+    pathData += projected.pathData;
+    strokePathData += projected.strokePathData;
+    bounds = bounds
+      ? {
+          minX: Math.min(bounds.minX, projected.bounds.minX),
+          minY: Math.min(bounds.minY, projected.bounds.minY),
+          maxX: Math.max(bounds.maxX, projected.bounds.maxX),
+          maxY: Math.max(bounds.maxY, projected.bounds.maxY),
+        }
+      : projected.bounds;
+  }
+
+  return pathData && bounds ? { pathData, strokePathData, bounds } : null;
 }
 
 function shouldSkipRenderGapClosing(
