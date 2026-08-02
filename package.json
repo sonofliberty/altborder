@@ -23,7 +23,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.16.0",
+    "@eslint/js": "^10.0.1",
     "@turf/rewind": "^7.3.5",
     "@turf/simplify": "^7.3.5",
     "@types/d3-geo": "^3.1.0",
@@ -33,16 +33,16 @@
     "@types/react-dom": "^19.0.0",
     "@types/topojson-client": "^3.1.4",
     "@vitejs/plugin-react": "^5.0.0",
-    "eslint": "^9.16.0",
-    "eslint-plugin-react-hooks": "^5.1.0",
-    "eslint-plugin-react-refresh": "^0.4.16",
+    "eslint": "^10.8.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.6.0",
-    "knip": "^6.14.2",
+    "knip": "^6.29.0",
     "topojson-client": "^3.1.0",
-    "typescript": "^5.7.0",
-    "typescript-eslint": "^8.60.0",
+    "typescript": "^7.0.2",
+    "typescript-eslint": "^8.65.0",
     "vite": "^6.0.0",
-    "vitest": "^4.1.7",
+    "vitest": "^4.1.10",
     "world-atlas": "^2.0.2"
   },
   "knip": {
