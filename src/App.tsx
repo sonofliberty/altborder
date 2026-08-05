@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Brush,
-  Check,
   Copy,
   Eye,
-  ArrowLeftRight,
   GitMerge,
   Globe2,
+  Minus,
   MousePointer2,
   PaintBucket,
+  Plus,
   RotateCcw,
   Share2,
   Split,
@@ -65,7 +64,12 @@ import {
   isValidTransferTarget,
   orderTransferTargetEntities,
 } from "./transferContext";
-import { getSubdivisionBorderSamplePoint, isSubdivisionBorderVisible } from "./subdivisionBorders";
+import {
+  batchSubdivisionBorderPathsByOwner,
+  getSubdivisionBorderSamplePoint,
+  isSubdivisionBorderVisible,
+} from "./subdivisionBorders";
+import { EditorSidePanel } from "./EditorSidePanel";
 import {
   geometryToSvgPath,
   projectGeometryToPathData,
@@ -194,6 +198,7 @@ export default function App() {
   const countryUnderlaysInitializedRef = useRef(false);
   const baseProjectedRegionCacheRef = useRef(new Map<string, ProjectedPathData>());
   const baseProjectedRegionDetailStrokeCacheRef = useRef(new Map<string, string>());
+  const metadataEditKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     baseProjectedRegionCacheRef.current.clear();
@@ -253,10 +258,6 @@ export default function App() {
           setData(mapData);
           setHistory({ present: initial, past: [], future: [] });
           setReadOnly(shouldReadOnly);
-          const firstEntity = Object.values(initial.entities).find((entity) => entity.regionIds.length);
-          if (firstEntity) {
-            setSelectedEntityId(firstEntity.id);
-          }
         }
       } catch (error) {
         if (!cancelled) {
@@ -994,6 +995,13 @@ export default function App() {
   }, [getRegionDisplayName, inspectRegions]);
 
   const inspectFocusedRegion = inspectFocusedRegionId ? regionById.get(inspectFocusedRegionId) : undefined;
+  const inspectFocusedRegionRow = inspectFocusedRegion
+    ? {
+        id: inspectFocusedRegion.id,
+        displayName: getRegionDisplayName(inspectFocusedRegion.id),
+        type: inspectFocusedRegion.type,
+      }
+    : undefined;
 
   const selectedTransferRegions = useMemo(() => {
     if (!regionOwners || !entities) return [];
@@ -1046,6 +1054,11 @@ export default function App() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [entities, mergeSelection]);
 
+  const mergeAvailableOptions = useMemo(
+    () => entityOptions.filter((entity) => !mergeSelection.has(entity.id)),
+    [entityOptions, mergeSelection],
+  );
+
   const transferTargetGroups = useMemo(() => {
     return orderTransferTargetEntities({
       entityOptions,
@@ -1053,6 +1066,13 @@ export default function App() {
       neighborEntityIds: selectedRegions.size > 0 ? neighborTargetEntityIds : new Set(),
     });
   }, [entityOptions, neighborTargetEntityIds, selectedEntityId, selectedRegions.size]);
+
+  const transferTargetOptions = useMemo(() => {
+    return [
+      ...transferTargetGroups.neighborTargets.map((entity) => ({ ...entity, meta: "Neighbor" })),
+      ...transferTargetGroups.otherTargets,
+    ];
+  }, [transferTargetGroups]);
 
   const useLowZoomTransferCountryLayer =
     mode === "transfer" && settledZoom.k < simplifiedCountryLayerMaxZoom;
@@ -1156,8 +1176,6 @@ export default function App() {
     : "";
   const divideLinePath = svgLineToPath(divideLine);
   const visibleDivideError = divideError || (!divideSplit.ok ? divideSplit.reason : "");
-  const showSidePanel = mode !== "inspect" || Boolean(selectedEntity || inspectFocusedRegion);
-
   useEffect(() => {
     if (!snapshot) return;
 
@@ -1219,6 +1237,7 @@ export default function App() {
 
   function commit(mutator: (draft: EditorSnapshot) => EditorSnapshot | void) {
     if (!history || readOnly) return;
+    finishMetadataEdit();
     const draft = cloneSnapshot(history.present);
     const result = mutator(draft) ?? draft;
     const next = updateEntityRegions(result);
@@ -1231,8 +1250,10 @@ export default function App() {
     });
   }
 
-  function commitMetadata(mutator: (current: EditorSnapshot) => EditorSnapshot) {
+  function commitMetadata(editKey: string, mutator: (current: EditorSnapshot) => EditorSnapshot) {
     if (readOnly) return;
+    const continuesCurrentEdit = metadataEditKeyRef.current === editKey;
+    metadataEditKeyRef.current = editKey;
     setShare(null);
     setHistory((currentHistory) => {
       if (!currentHistory) return currentHistory;
@@ -1240,14 +1261,20 @@ export default function App() {
       if (next === currentHistory.present) return currentHistory;
       return {
         present: next,
-        past: [...currentHistory.past, currentHistory.present].slice(-80),
+        past: continuesCurrentEdit
+          ? currentHistory.past
+          : [...currentHistory.past, currentHistory.present].slice(-80),
         future: [],
       };
     });
   }
 
+  function finishMetadataEdit() {
+    metadataEditKeyRef.current = null;
+  }
+
   function updateScenarioTitle(title: string) {
-    commitMetadata((current) => {
+    commitMetadata("scenario-title", (current) => {
       if (current.title === title) return current;
       return { ...current, title };
     });
@@ -1291,6 +1318,7 @@ export default function App() {
   }
 
   function selectMode(nextMode: EditMode) {
+    finishMetadataEdit();
     setMode(nextMode);
     setSelectedRegions(new Set());
     setTransferFocusedRegionId("");
@@ -1302,6 +1330,7 @@ export default function App() {
   }
 
   function clearMapSelection() {
+    finishMetadataEdit();
     setSelectedEntityId("");
     setTargetEntityId("");
     setSelectedRegions(new Set());
@@ -1313,6 +1342,7 @@ export default function App() {
   }
 
   function clearHistoryTransientState() {
+    finishMetadataEdit();
     setShare(null);
     setIsBrushDown(false);
     clearGeometryRenderCaches();
@@ -1333,6 +1363,7 @@ export default function App() {
   }
 
   function changeSelectedEntity(entityId: string) {
+    finishMetadataEdit();
     setSelectedEntityId(entityId);
     setInspectFocusedRegionId("");
     setSelectedRegions(new Set());
@@ -1346,6 +1377,18 @@ export default function App() {
     zoomRef.current = nextZoom;
     setZoom(nextZoom);
     setSettledZoom(nextZoom);
+  }
+
+  function zoomBy(factor: number) {
+    markMapMoving();
+    queueZoomUpdate(zoomAroundPoint(zoomRef.current, { x: viewportWidth / 2, y: viewportHeight / 2 }, factor));
+    settleMapMoving(180);
+  }
+
+  function resetMapView() {
+    markMapMoving();
+    queueZoomUpdate({ x: 0, y: 0, k: 1 });
+    settleMapMoving(180);
   }
 
   function zoomToRegion(regionId: string) {
@@ -1376,11 +1419,14 @@ export default function App() {
 
   function updateFocusedRegionName(name: string) {
     if (!inspectFocusedRegionId || readOnly) return;
-    commitMetadata((current) => renameRegion(current, inspectFocusedRegionId, name));
+    commitMetadata(`region-name:${inspectFocusedRegionId}`, (current) =>
+      renameRegion(current, inspectFocusedRegionId, name),
+    );
   }
 
   function separateRegion(regionId: string) {
     if (!snapshot || !history || !regionId || readOnly) return;
+    finishMetadataEdit();
     const regionName = getRegionDisplayName(regionId);
     const result = separateRegionAsCountry(
       snapshot,
@@ -1443,6 +1489,7 @@ export default function App() {
 
     if (!selectedEntityId || snapshot.regionOwners[regionId] !== selectedEntityId) {
       setSelectedEntityId(ownerId);
+      setTargetEntityId("");
       setSelectedRegions(new Set([regionId]));
       setTransferFocusedRegionId(regionId);
       return;
@@ -1479,6 +1526,7 @@ export default function App() {
 
     if (mode === "transfer") {
       setSelectedEntityId(entityId);
+      setTargetEntityId("");
       setSelectedRegions(new Set());
       setTransferFocusedRegionId("");
     }
@@ -1490,6 +1538,20 @@ export default function App() {
     setTransferFocusedRegionId(selectedEntityRegionIds[0] ?? "");
   }
 
+  function clearTransferSelection() {
+    setSelectedRegions(new Set());
+    setTransferFocusedRegionId("");
+    setTargetEntityId("");
+    setIsBrushDown(false);
+  }
+
+  function swapDivideSides() {
+    setDivideNewPieceIndex((current) => {
+      const active = current ?? (divideSplit.ok ? divideSplit.defaultNewPieceIndex : 0);
+      return active === 0 ? 1 : 0;
+    });
+  }
+
   function removeMergeCountry(entityId: string) {
     if (!snapshot) return;
     setMergeSelection((current) => {
@@ -1498,6 +1560,22 @@ export default function App() {
       setMergeName(makeDefaultMergeName(snapshot, next));
       return next;
     });
+  }
+
+  function addMergeCountry(entityId: string) {
+    if (!snapshot || !snapshot.entities[entityId] || readOnly) return;
+    setMergeSelection((current) => {
+      if (current.has(entityId)) return current;
+      const next = new Set(current).add(entityId);
+      setMergeName(makeDefaultMergeName(snapshot, next));
+      return next;
+    });
+    setSelectedEntityId(entityId);
+  }
+
+  function clearMergeSelection() {
+    setMergeSelection(new Set());
+    setMergeName("");
   }
 
   function toggleRegion(regionId: string) {
@@ -1514,6 +1592,7 @@ export default function App() {
 
   function applyTransfer() {
     if (!snapshot || !entities || !hasValidTransferTarget || selectedRegions.size === 0 || readOnly) return;
+    finishMetadataEdit();
     const regionIds = [...selectedRegions];
     const nextSelectedEntityId = targetEntityId;
     setShare(null);
@@ -1533,6 +1612,7 @@ export default function App() {
     setSelectedRegions(new Set());
     setTransferFocusedRegionId("");
     setSelectedEntityId(nextSelectedEntityId);
+    setTargetEntityId("");
   }
 
   function createCountryFromDivide() {
@@ -1631,7 +1711,7 @@ export default function App() {
   function updateSelectedName(name: string) {
     const entityId = selectedEntityId;
     if (!entityId || readOnly) return;
-    commitMetadata((current) => {
+    commitMetadata(`entity-name:${entityId}`, (current) => {
       const entity = current.entities[entityId];
       if (!entity || entity.name === name) return current;
       return {
@@ -1647,7 +1727,7 @@ export default function App() {
   function updateSelectedColor(color: string) {
     const entityId = selectedEntityId;
     if (!entityId || readOnly) return;
-    commitMetadata((current) => {
+    commitMetadata(`entity-color:${entityId}`, (current) => {
       const entity = current.entities[entityId];
       if (!entity || entity.color === color) return current;
       return {
@@ -1906,159 +1986,6 @@ export default function App() {
     settleMapMoving(180);
   }
 
-  function renderCountryContext() {
-    const selectedRegionCount = selectedEntity?.regionIds.length ?? 0;
-    const selectedEntityStatus = selectedEntity
-      ? selectedEntity.isCustom
-        ? "Custom country"
-        : "Base country"
-      : "No country selected";
-
-    return (
-      <section className="context-section country-context">
-        <div className="section-heading">COUNTRY</div>
-
-        <div className="country-summary">
-          <span
-            className="country-swatch"
-            style={{ backgroundColor: selectedEntity?.color ?? customCountryAccentColor }}
-            aria-hidden="true"
-          />
-          <div className="country-summary-text">
-            <strong>{selectedEntity?.name || "No country selected"}</strong>
-            <span>
-              {selectedEntityStatus}
-              {selectedEntity ? ` · ${selectedRegionCount.toLocaleString()} region${selectedRegionCount === 1 ? "" : "s"}` : ""}
-            </span>
-          </div>
-        </div>
-
-        <label className="field">
-          <span>Selected country</span>
-          <select value={selectedEntityId} onChange={(event) => changeSelectedEntity(event.target.value)}>
-            <option value="">No country selected</option>
-            {entityOptions.map((entity) => (
-              <option key={entity.id} value={entity.id}>
-                {entity.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="country-edit-fields">
-          <label className="field">
-            <span>Name</span>
-            <input
-              value={selectedEntity?.name ?? ""}
-              disabled={!selectedEntity || readOnly}
-              onChange={(event) => updateSelectedName(event.target.value)}
-            />
-          </label>
-
-          <label className="field color-field">
-            <span>Color</span>
-            <input
-              type="color"
-              value={selectedEntity?.color ?? customCountryAccentColor}
-              disabled={!selectedEntity || readOnly}
-              onInput={(event) => updateSelectedColor(event.currentTarget.value)}
-              onChange={(event) => updateSelectedColor(event.target.value)}
-            />
-          </label>
-        </div>
-      </section>
-    );
-  }
-
-  function renderRegionSummary({
-    title,
-    name,
-    meta,
-    className = "",
-    children,
-  }: {
-    title: string;
-    name: string;
-    meta: string[];
-    className?: string;
-    children?: React.ReactNode;
-  }) {
-    return (
-      <div className={["region-detail", className].filter(Boolean).join(" ")}>
-        <div className="region-detail-header">
-          <span>{title}</span>
-          <strong>{name}</strong>
-        </div>
-        {meta.length > 0 ? (
-          <div className="region-meta">
-            {meta.map((entry) => (
-              <span key={entry}>{entry}</span>
-            ))}
-          </div>
-        ) : null}
-        {children}
-      </div>
-    );
-  }
-
-  function renderRegionList({
-    regions,
-    focusedRegionId,
-    onSelect,
-    className = "",
-  }: {
-    regions: Array<{ id: string; displayName: string; type: string }>;
-    focusedRegionId: string;
-    onSelect: (regionId: string) => void;
-    className?: string;
-  }) {
-    return (
-      <div className={["region-list", className].filter(Boolean).join(" ")} role="list">
-        {regions.map((region) => (
-          <button
-            key={region.id}
-            className={focusedRegionId === region.id ? "region-row active" : "region-row"}
-            onClick={() => onSelect(region.id)}
-            role="listitem"
-          >
-            <span>{region.displayName}</span>
-            <small>{region.type}</small>
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  function renderCountryList({
-    entities,
-    onSelect,
-    onRemove,
-  }: {
-    entities: Array<{ id: string; name: string }>;
-    onSelect: (entityId: string) => void;
-    onRemove?: (entityId: string) => void;
-  }) {
-    return (
-      <div className="region-list country-list" role="list">
-        {entities.map((entity) => (
-          <button key={entity.id} className="region-row" onClick={() => onSelect(entity.id)} role="listitem">
-            <span>{entity.name}</span>
-            {onRemove ? (
-              <small
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRemove(entity.id);
-                }}
-              >
-                Remove
-              </small>
-            ) : null}
-          </button>
-        ))}
-      </div>
-    );
-  }
-
   const visibleCountryUnderlays = useMemo(() => {
     return shouldCullMapPaths
       ? countryUnderlays.filter((underlay) => boundsIntersect(underlay.bounds, settledViewportBounds))
@@ -2176,23 +2103,25 @@ export default function App() {
       ? projectedSubdivisionBorders.filter((border) => boundsIntersect(border.bounds, settledViewportBounds))
       : projectedSubdivisionBorders;
 
-    return visibleSubdivisionBorders
-      .filter((border) =>
+    const batchedSubdivisionBorders = batchSubdivisionBorderPathsByOwner(
+      visibleSubdivisionBorders.filter((border) =>
         isSubdivisionBorderVisible(border, regionOwners, {
           ownerRemainderGeometries: divideRemainderGeometriesByOwnerId,
         }),
-      )
-      .map((border) => (
-        <path
-          key={border.id}
-          className="subdivision-border-line"
-          data-owner-id={border.ownerId}
-          data-region-ids={border.regionIds.join(" ")}
-          d={border.pathData}
-          fill="none"
-          aria-hidden="true"
-        />
-      ));
+      ),
+    );
+
+    return batchedSubdivisionBorders.map((border) => (
+      <path
+        key={border.ownerId}
+        className="subdivision-border-line"
+        data-owner-id={border.ownerId}
+        data-region-ids={border.regionIds.join(" ")}
+        d={border.pathData}
+        fill="none"
+        aria-hidden="true"
+      />
+    ));
   }, [
     divideRemainderGeometriesByOwnerId,
     projectedSubdivisionBorders,
@@ -2309,6 +2238,7 @@ export default function App() {
               <input
                 value={snapshot.title}
                 onChange={(event) => updateScenarioTitle(event.target.value)}
+                onBlur={finishMetadataEdit}
               />
             )}
           </label>
@@ -2450,252 +2380,69 @@ export default function App() {
               </g>
             </g>
           </svg>
+          <div className="map-controls" role="group" aria-label="Map zoom controls">
+            <button onClick={() => zoomBy(1.25)} title="Zoom in" aria-label="Zoom in">
+              <Plus size={17} />
+            </button>
+            <button onClick={() => zoomBy(1 / 1.25)} title="Zoom out" aria-label="Zoom out">
+              <Minus size={17} />
+            </button>
+            <button onClick={resetMapView} title="Show whole world" aria-label="Show whole world">
+              <Globe2 size={17} />
+            </button>
+          </div>
         </section>
 
-        {showSidePanel ? (
-        <aside className="side-panel">
-          <PanelHeader mode={mode} readOnly={readOnly} />
-
-          {mode === "inspect" ? (
-            <>
-              {renderCountryContext()}
-
-                <section className="context-section">
-                  <div className="section-heading">REGION</div>
-
-                {inspectFocusedRegion ? (
-                  renderRegionSummary({
-                    title: "Focused region",
-                    name: getRegionDisplayName(inspectFocusedRegion.id),
-                    meta: [],
-                    children: (
-                      <label className="field">
-                        <span>Region name</span>
-                        <input
-                          value={getRegionDisplayName(inspectFocusedRegion.id)}
-                          disabled={readOnly}
-                          onChange={(event) => updateFocusedRegionName(event.target.value)}
-                        />
-                      </label>
-                    ),
-                  })
-                ) : (
-                  <p className="hint">Choose a region from the list to inspect or rename it.</p>
-                )}
-
-                {inspectRegionRows.length > 0 ? (
-                  renderRegionList({
-                    regions: inspectRegionRows,
-                    focusedRegionId: inspectFocusedRegionId,
-                    onSelect: focusInspectRegion,
-                  })
-                ) : (
-                  <>
-                  {selectedEntity ? (
-                    <div className="empty-state">No regions</div>
-                  ) : null}
-                  {!selectedEntity ? <div className="empty-state">No country selected</div> : null}
-                  </>
-                )}
-              </section>
-            </>
-          ) : (
-            <>
-              {renderCountryContext()}
-
-              {activeModeUsesRegions ? (
-                <section className="context-section compact-context-card">
-                  <div className="section-heading">SELECTION</div>
-                  <div className="switch-row">
-                    <button
-                      className={brushEnabled ? "active compact" : "compact"}
-                      disabled={readOnly}
-                      onClick={() => setBrushEnabled((value) => !value)}
-                    >
-                      <Brush size={15} /> Brush
-                    </button>
-                    <button
-                      className="compact"
-                      disabled={readOnly || selectedEntityRegionIds.length === 0}
-                      onClick={selectAllTransferRegions}
-                    >
-                      All regions
-                    </button>
-                  </div>
-                </section>
-              ) : null}
-            </>
-          )}
-
-          {mode === "transfer" ? (
-            <div className="tool-card">
-              {focusedTransferRegion ? (
-                renderRegionSummary({
-                  title: "Selected region",
-                  name: focusedTransferRegion.displayName,
-                  meta: [],
-                  className: "transfer-region-detail",
-                  children: (
-                    <div className="region-actions">
-                      <button onClick={() => separateRegion(focusedTransferRegion.id)} disabled={readOnly}>
-                        <Split size={15} /> Separate region
-                      </button>
-                    </div>
-                  ),
-                })
-              ) : (
-                <div className="empty-state">No region selected</div>
-              )}
-
-              {selectedTransferRegions.length > 1 ? (
-                renderRegionList({
-                  regions: selectedTransferRegions,
-                  focusedRegionId: focusedTransferRegion?.id ?? "",
-                  onSelect: focusTransferRegion,
-                  className: "transfer-region-list",
-                })
-              ) : null}
-
-              <label className="field">
-                <span>Transfer selected regions to</span>
-                <select
-                  value={targetEntityId}
-                  disabled={readOnly}
-                  onChange={(event) => setTargetEntityId(event.target.value)}
-                >
-                  <option value="">Choose target</option>
-                  {transferTargetGroups.neighborTargets.map((entity) => (
-                    <option key={entity.id} value={entity.id}>
-                      {entity.name}
-                    </option>
-                  ))}
-                  {transferTargetGroups.neighborTargets.length > 0 &&
-                  transferTargetGroups.otherTargets.length > 0 ? (
-                    <option disabled value="__neighbor-separator">
-                      ────────
-                    </option>
-                  ) : null}
-                  {transferTargetGroups.otherTargets.map((entity) => (
-                    <option key={entity.id} value={entity.id}>
-                      {entity.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {selectedRegions.size > 0 && transferTargetGroups.neighborTargets.length > 0 ? (
-                <p className="hint">Neighboring targets are listed first.</p>
-              ) : null}
-              <button
-                className="primary wide"
-                disabled={readOnly || !targetEntity || !hasValidTransferTarget || selectedRegions.size === 0}
-                onClick={applyTransfer}
-              >
-                <Check size={16} /> Transfer {selectedRegions.size || ""} region(s)
-              </button>
-            </div>
-          ) : null}
-
-          {mode === "divide" ? (
-            <div className="tool-card">
-              <div className="section-heading">NEW COUNTRY</div>
-              <div className="switch-row">
-                <button
-                  className="compact"
-                  disabled={readOnly || !divideSplit.ok}
-                  onClick={() =>
-                    setDivideNewPieceIndex((current) => {
-                      const active = current ?? (divideSplit.ok ? divideSplit.defaultNewPieceIndex : 0);
-                      return active === 0 ? 1 : 0;
-                    })
-                  }
-                >
-                  <ArrowLeftRight size={15} /> Swap
-                </button>
-                <button
-                  className="compact"
-                  disabled={readOnly || (divideLine.length === 0 && !divideIslandPoint)}
-                  onClick={clearDivideDraft}
-                >
-                  Clear
-                </button>
-              </div>
-              <p className="hint">Draw a cut or click a separate island. Use Swap to choose the new side.</p>
-              {visibleDivideError ? <div className="tool-error">{visibleDivideError}</div> : null}
-              <label className="field">
-                <span>Name</span>
-                <input
-                  value={newCountryName}
-                  disabled={readOnly}
-                  onChange={(event) => setNewCountryName(event.target.value)}
-                  placeholder="Required"
-                />
-              </label>
-              <label className="field color-field">
-                <span>Color</span>
-                <input
-                  type="color"
-                  value={newCountryColor}
-                  disabled={readOnly}
-                  onInput={(event) => setNewCountryColor(event.currentTarget.value)}
-                  onChange={(event) => setNewCountryColor(event.target.value)}
-                />
-              </label>
-              <button
-                className="primary wide"
-                disabled={readOnly || !divideSplit.ok || !newCountryName.trim()}
-                onClick={createCountryFromDivide}
-              >
-                <Split size={16} /> Create country
-              </button>
-            </div>
-          ) : null}
-
-          {mode === "merge" ? (
-            <div className="tool-card">
-              <div className="section-heading">SELECTED COUNTRIES</div>
-              {mergeSelectedEntities.length > 0 ? (
-                renderCountryList({
-                  entities: mergeSelectedEntities,
-                  onSelect: zoomToEntity,
-                  onRemove: removeMergeCountry,
-                })
-              ) : (
-                <div className="empty-state">Click countries on the map to merge them</div>
-              )}
-              <div className="switch-row">
-                <button
-                  className="compact"
-                  disabled={mergeSelection.size === 0}
-                  onClick={() => {
-                    setMergeSelection(new Set());
-                    setMergeName("");
-                  }}
-                >
-                  Clear
-                </button>
-              </div>
-              <label className="field">
-                <span>Name</span>
-                <input
-                  value={mergeName}
-                  disabled={readOnly}
-                  onChange={(event) => setMergeName(event.target.value)}
-                  placeholder="Generated if blank"
-                />
-              </label>
-              <button
-                className="primary wide"
-                disabled={readOnly || mergeSelection.size < 2}
-                onClick={mergeCountries}
-              >
-                <GitMerge size={16} /> Merge selected
-              </button>
-            </div>
-          ) : null}
-
-          <div className="attribution">{data.attribution}</div>
-        </aside>
-        ) : null}
+        <EditorSidePanel
+          mode={mode}
+          readOnly={readOnly}
+          attribution={data.attribution}
+          entityOptions={entityOptions}
+          selectedEntity={selectedEntity}
+          selectedEntityId={selectedEntityId}
+          onSelectEntity={changeSelectedEntity}
+          onUpdateEntityName={updateSelectedName}
+          onUpdateEntityColor={updateSelectedColor}
+          onFinishMetadataEdit={finishMetadataEdit}
+          inspectFocusedRegion={inspectFocusedRegionRow}
+          inspectRegionRows={inspectRegionRows}
+          onFocusInspectRegion={focusInspectRegion}
+          onUpdateFocusedRegionName={updateFocusedRegionName}
+          brushEnabled={brushEnabled}
+          onToggleBrush={() => setBrushEnabled((value) => !value)}
+          onSelectAllTransferRegions={selectAllTransferRegions}
+          onClearTransferSelection={clearTransferSelection}
+          selectedTransferRegions={selectedTransferRegions}
+          focusedTransferRegion={focusedTransferRegion}
+          onFocusTransferRegion={focusTransferRegion}
+          onSeparateRegion={separateRegion}
+          transferTargetOptions={transferTargetOptions}
+          targetEntityId={targetEntityId}
+          onSelectTransferTarget={setTargetEntityId}
+          canTransfer={Boolean(targetEntity && hasValidTransferTarget && selectedRegions.size > 0)}
+          onApplyTransfer={applyTransfer}
+          divideCanSwap={divideSplit.ok}
+          divideHasDraft={divideLine.length > 0 || Boolean(divideIslandPoint)}
+          divideError={visibleDivideError}
+          newCountryName={newCountryName}
+          newCountryColor={newCountryColor}
+          onSwapDivideSides={swapDivideSides}
+          onClearDivideDraft={clearDivideDraft}
+          onChangeNewCountryName={setNewCountryName}
+          onChangeNewCountryColor={setNewCountryColor}
+          canCreateDividedCountry={Boolean(divideSplit.ok && newCountryName.trim())}
+          onCreateDividedCountry={createCountryFromDivide}
+          mergeAvailableOptions={mergeAvailableOptions}
+          mergeSelectedEntities={mergeSelectedEntities}
+          mergeName={mergeName}
+          onAddMergeEntity={addMergeCountry}
+          onZoomToMergeEntity={zoomToEntity}
+          onRemoveMergeEntity={removeMergeCountry}
+          onClearMergeSelection={clearMergeSelection}
+          onChangeMergeName={setMergeName}
+          canMerge={mergeSelection.size >= 2}
+          onMerge={mergeCountries}
+        />
       </section>
 
       {share ? (
@@ -2743,31 +2490,6 @@ function ToolButton({
       {icon}
     </button>
   );
-}
-
-function PanelHeader({ mode, readOnly }: { mode: EditMode; readOnly: boolean }) {
-  return (
-    <div className="panel-header">
-      <div>
-        <span>{readOnly ? "Viewer" : "Editor"}</span>
-        <h1>{modeLabel(mode)}</h1>
-      </div>
-      {readOnly ? <Eye size={20} /> : null}
-    </div>
-  );
-}
-
-function modeLabel(mode: EditMode) {
-  switch (mode) {
-    case "inspect":
-      return "Inspect";
-    case "transfer":
-      return "Transfer regions";
-    case "divide":
-      return "Divide country";
-    case "merge":
-      return "Merge countries";
-  }
 }
 
 function getProjectedPathOptions(preferManualFill = false) {

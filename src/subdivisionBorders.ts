@@ -5,6 +5,48 @@ type SubdivisionBorderVisibilityOptions = {
   ownerRemainderGeometries?: ReadonlyMap<string, readonly Geometry[]>;
 };
 
+type ProjectedSubdivisionBorderPath = Pick<SubdivisionBorderRecord, "ownerId" | "regionIds"> & {
+  pathData: string;
+};
+
+export type BatchedSubdivisionBorderPath = {
+  ownerId: string;
+  regionIds: string[];
+  pathData: string;
+};
+
+export function batchSubdivisionBorderPathsByOwner(
+  borders: readonly ProjectedSubdivisionBorderPath[],
+): BatchedSubdivisionBorderPath[] {
+  const batches = new Map<string, BatchedSubdivisionBorderPath & { regionIdSet: Set<string> }>();
+
+  for (const border of borders) {
+    let batch = batches.get(border.ownerId);
+    if (!batch) {
+      batch = {
+        ownerId: border.ownerId,
+        regionIds: [],
+        pathData: "",
+        regionIdSet: new Set<string>(),
+      };
+      batches.set(border.ownerId, batch);
+    }
+
+    batch.pathData += border.pathData;
+    for (const regionId of border.regionIds) {
+      if (batch.regionIdSet.has(regionId)) continue;
+      batch.regionIdSet.add(regionId);
+      batch.regionIds.push(regionId);
+    }
+  }
+
+  return [...batches.values()].map((batch) => ({
+    ownerId: batch.ownerId,
+    regionIds: batch.regionIds,
+    pathData: batch.pathData,
+  }));
+}
+
 export function isSubdivisionBorderVisible(
   border: Pick<SubdivisionBorderRecord, "ownerId" | "regionIds"> & { samplePoint?: Position | null },
   regionOwners: Record<string, string>,

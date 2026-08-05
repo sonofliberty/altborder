@@ -1,5 +1,66 @@
 import { describe, expect, it } from "vitest";
-import { getSubdivisionBorderSamplePoint, isSubdivisionBorderVisible } from "./subdivisionBorders";
+import {
+  batchSubdivisionBorderPathsByOwner,
+  getSubdivisionBorderSamplePoint,
+  isSubdivisionBorderVisible,
+} from "./subdivisionBorders";
+
+describe("subdivision border path batching", () => {
+  it("groups paths by owner while preserving owner and path order", () => {
+    expect(
+      batchSubdivisionBorderPathsByOwner([
+        { ownerId: "AAA", regionIds: ["a1", "a2"], pathData: "M0,0L1,1" },
+        { ownerId: "BBB", regionIds: ["b1", "b2"], pathData: "M2,2L3,3" },
+        { ownerId: "AAA", regionIds: ["a2", "a3"], pathData: "M4,4L5,5" },
+      ]),
+    ).toEqual([
+      {
+        ownerId: "AAA",
+        regionIds: ["a1", "a2", "a3"],
+        pathData: "M0,0L1,1M4,4L5,5",
+      },
+      {
+        ownerId: "BBB",
+        regionIds: ["b1", "b2"],
+        pathData: "M2,2L3,3",
+      },
+    ]);
+  });
+
+  it("returns no batches when no visible borders are supplied", () => {
+    expect(batchSubdivisionBorderPathsByOwner([])).toEqual([]);
+  });
+
+  it("preserves the complete path data from each owner", () => {
+    const borders = [
+      { ownerId: "AAA", regionIds: ["a1", "a2"] as [string, string], pathData: "M0,0L1,1" },
+      { ownerId: "AAA", regionIds: ["a2", "a3"] as [string, string], pathData: "M2,2L3,3" },
+    ];
+
+    const [batch] = batchSubdivisionBorderPathsByOwner(borders);
+
+    expect(batch.pathData).toBe(borders.map((border) => border.pathData).join(""));
+    expect(batch.pathData.length).toBe(
+      borders.reduce((total, border) => total + border.pathData.length, 0),
+    );
+  });
+
+  it("batches only borders retained by visibility filtering", () => {
+    const borders = [
+      { ownerId: "AAA", regionIds: ["left", "right"] as [string, string], pathData: "VISIBLE" },
+      { ownerId: "AAA", regionIds: ["right", "moved"] as [string, string], pathData: "HIDDEN" },
+    ];
+    const regionOwners = { left: "AAA", right: "AAA", moved: "BBB" };
+
+    const batches = batchSubdivisionBorderPathsByOwner(
+      borders.filter((border) => isSubdivisionBorderVisible(border, regionOwners)),
+    );
+
+    expect(batches).toEqual([
+      { ownerId: "AAA", regionIds: ["left", "right"], pathData: "VISIBLE" },
+    ]);
+  });
+});
 
 describe("subdivision border visibility", () => {
   const border = {

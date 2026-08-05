@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import appSource from "./App.tsx?raw";
+import panelSource from "./EditorSidePanel.tsx?raw";
 
 describe("shared-link recovery", () => {
   it("offers an explicit fresh-start action when shared data is invalid", () => {
@@ -19,7 +20,32 @@ describe("scenario metadata UI", () => {
     expect(appSource).not.toContain("updateScenarioDescription");
     expect(appSource).not.toContain("currentSnapshot.description");
     expect(appSource).not.toContain('className="scenario-description"');
-    expect(appSource).toContain("selectedEntity || inspectFocusedRegion");
+  });
+
+  it("coalesces continuous metadata edits into a single undo step", () => {
+    expect(appSource).toContain("metadataEditKeyRef");
+    expect(appSource).toContain("continuesCurrentEdit");
+    expect(appSource).toContain('commitMetadata("scenario-title"');
+    expect(appSource).toContain("onBlur={finishMetadataEdit}");
+  });
+});
+
+describe("editor side panel", () => {
+  it("stays available before a country is selected", () => {
+    expect(appSource).toContain("<EditorSidePanel");
+    expect(appSource).not.toContain("selectedEntity || inspectFocusedRegion");
+    expect(panelSource).toContain("Click a country on the map or search below to start exploring.");
+    expect(panelSource).toContain("<CountrySearchSelect");
+  });
+
+  it("shows the transfer workflow in source, region, destination order", () => {
+    const sourceStep = panelSource.indexOf('title="Choose a source country"');
+    const regionStep = panelSource.indexOf('title="Select regions"');
+    const destinationStep = panelSource.indexOf('title="Choose a destination"');
+
+    expect(sourceStep).toBeGreaterThan(-1);
+    expect(regionStep).toBeGreaterThan(sourceStep);
+    expect(destinationStep).toBeGreaterThan(regionStep);
   });
 });
 
