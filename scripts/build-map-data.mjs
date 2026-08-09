@@ -18,10 +18,10 @@ const root = path.resolve(__dirname, "..");
 const cacheDir = path.join(root, ".cache/geoboundaries");
 const adm1SimplifyTolerance = 0.03;
 const fallbackSimplifyTolerance = 0.015;
-const fallbackSimplifyToleranceByCountryId = new Map([["CAN", 0.008]]);
 const singleRegionAdm0SimplifyToleranceByCountryId = new Map([["CAN", 0.01]]);
 const subdivisionBorderSimplifyTolerance = 0.03;
 const subdivisionBorderMatchTolerance = 0.02;
+const stableBorderRegionMatchTolerance = 0.08;
 const minimumSubdivisionBorderLength = 1e-6;
 const minimumPolygonArea = 0.005;
 const minimumClippedAreaRetentionRatio = 0.2;
@@ -175,12 +175,33 @@ const singleRegionCountryByName = new Map(
 
 async function main() {
   const colorScheme = await loadColorScheme();
-  const topoPath = path.join(root, "node_modules/world-atlas/countries-10m.json");
-  const topo = JSON.parse(await fs.readFile(topoPath, "utf8"));
-  const countryCollection = feature(topo, topo.objects.countries);
-  const worldCountries = countryCollection.features;
+  const coarseTopoPath = path.join(root, "node_modules/world-atlas/countries-50m.json");
+  const detailedTopoPath = path.join(root, "node_modules/world-atlas/countries-10m.json");
+  const [coarseTopo, detailedTopo] = await Promise.all(
+    [coarseTopoPath, detailedTopoPath].map(async (topoPath) =>
+      JSON.parse(await fs.readFile(topoPath, "utf8")),
+    ),
+  );
+  const coarseCountryCollection = feature(coarseTopo, coarseTopo.objects.countries);
+  const detailedCountryCollection = feature(detailedTopo, detailedTopo.objects.countries);
+  const coarseCountryNames = new Set(
+    coarseCountryCollection.features.map((worldFeature) =>
+      normalizeName(String(worldFeature.properties?.name ?? "")),
+    ),
+  );
+  const missingDetailedCountries = detailedCountryCollection.features.filter(
+    (worldFeature) =>
+      !coarseCountryNames.has(normalizeName(String(worldFeature.properties?.name ?? ""))),
+  );
+  const worldCountries = [
+    ...coarseCountryCollection.features,
+    ...missingDetailedCountries,
+  ].map((worldFeature) => ({
+    ...worldFeature,
+    geometry: prepareStableWorldGeometry(worldFeature.geometry),
+  }));
   const worldLandFeatures = worldCountries.flatMap((worldFeature) =>
-    getGeometryPolygons(simplifyGeometry(worldFeature.geometry, fallbackSimplifyTolerance)).map((polygon) => ({
+    getGeometryPolygons(worldFeature.geometry).map((polygon) => ({
       geometry: polygonsToGeometry([polygon]),
       bbox: polygonBoundingBox(polygon),
     })),
@@ -249,10 +270,7 @@ async function main() {
     const nonSovereignOwnerId = nonSovereignFallbackOwners[normalizedWorldName];
     const singleRegionCountry = singleRegionCountryByName.get(normalizedWorldName);
     const fallbackCountryId = singleRegionCountry?.iso3 || `NE-${worldFeatureId}`;
-    const worldGeometry = simplifyGeometry(
-      worldFeature.geometry,
-      fallbackSimplifyToleranceByCountryId.get(fallbackCountryId) ?? fallbackSimplifyTolerance,
-    );
+    const worldGeometry = worldFeature.geometry;
 
     if (hiddenFallbackNames.has(normalizedWorldName)) {
       continue;
@@ -321,11 +339,11 @@ async function main() {
   attachNonSovereignFallbacks({ countries, baseCountries, nonSovereignFallbacks, errors });
   addFrenchOverseasRegions({ countries, regions, baseCountries, usedRegionIds });
   assignCountryColors({ countries, baseCountries, colorScheme });
-  const subdivisionBorders = buildSubdivisionBorders(countries, regions);
+  const boundaryEdges = buildBoundaryEdges(countries, regions, baseCountries);
 
   countries.sort((a, b) => a.name.localeCompare(b.name));
   regions.sort((a, b) => a.id.localeCompare(b.id));
-  subdivisionBorders.sort((a, b) => a.id.localeCompare(b.id));
+  boundaryEdges.sort((a, b) => a.id.localeCompare(b.id));
   const outputBaseCountries = filterOutputBaseCountries(baseCountries, countries);
   const outputCountries = stripInternalCountryFields(countries);
   const outputRegions = stripInternalRegionFields(regions);
@@ -333,13 +351,13 @@ async function main() {
   const outputBaseCountryRecords = stripInternalBaseCountryFields(outputBaseCountries);
 
   const output = {
-    version: 1,
+    version: 2,
     attribution:
       "Administrative regions from geoBoundaries Open (CC BY 4.0). Fallback country geometry from geoBoundaries ADM0 where configured, otherwise world-atlas / Natural Earth public domain data.",
     baseCountries: outputBaseCountryRecords,
     countries: outputCountries,
     regions: outputRegions,
-    subdivisionBorders,
+    boundaryEdges,
   };
 
   await fs.mkdir(path.join(root, "public/data"), { recursive: true });
@@ -380,7 +398,57 @@ function stripInternalRegionFields(regions) {
   });
 }
 
-function buildSubdivisionBorders(countries, regions) {
+function buildBoundaryEdges(countries, regions, baseCountries) {
+  const internalEdges = buildInternalBoundaryEdges(countries, regions);
+  const { coastlineEdges, internationalEdges } = buildStableBoundaryEdges(countries, regions, baseCountries);
+  return dedupeBoundaryEdgeSegments([...internationalEdges, ...coastlineEdges, ...internalEdges]);
+}
+
+function dedupeBoundaryEdgeSegments(edges) {
+  const seenSegments = new Set();
+  const dedupedEdges = [];
+
+  for (const edge of edges) {
+    const keptLines = [];
+    for (const line of collectLineStrings(edge.geometry)) {
+      let currentLine = [];
+      for (let index = 1; index < line.length; index += 1) {
+        const start = line[index - 1];
+        const end = line[index];
+        const key = boundarySegmentKey(start, end);
+        if (seenSegments.has(key)) {
+          if (currentLine.length >= 2) keptLines.push(currentLine);
+          currentLine = [];
+          continue;
+        }
+
+        seenSegments.add(key);
+        if (currentLine.length === 0) currentLine.push(copyPosition(start));
+        currentLine.push(copyPosition(end));
+      }
+      if (currentLine.length >= 2) keptLines.push(currentLine);
+    }
+
+    const validLines = keptLines.filter((line) => sharedLineLength(line) > minimumSubdivisionBorderLength);
+    if (validLines.length === 0) continue;
+    dedupedEdges.push({
+      ...edge,
+      geometry: validLines.length === 1
+        ? { type: "LineString", coordinates: validLines[0] }
+        : { type: "MultiLineString", coordinates: validLines },
+    });
+  }
+
+  return dedupedEdges;
+}
+
+function boundarySegmentKey(first, second) {
+  const firstKey = `${first[0]},${first[1]}`;
+  const secondKey = `${second[0]},${second[1]}`;
+  return firstKey < secondKey ? `${firstKey}|${secondKey}` : `${secondKey}|${firstKey}`;
+}
+
+function buildInternalBoundaryEdges(countries, regions) {
   const regionById = new Map(regions.map((region) => [region.id, region]));
   const borders = [];
 
@@ -407,16 +475,446 @@ function buildSubdivisionBorders(countries, regions) {
 
         const regionIds = [first.id, second.id].sort();
         borders.push({
-          id: `${country.id}:${regionIds[0]}:${regionIds[1]}`,
-          ownerId: country.id,
+          id: `internal:${regionIds[0]}:${regionIds[1]}`,
           regionIds,
-          geometry,
+          geometry: stitchLinealGeometry(geometry),
         });
       }
     }
   }
 
   return borders;
+}
+
+function buildStableBoundaryEdges(countries, regions, baseCountries) {
+  const regionBoundaryMatchIndex = new Map(
+    regions.filter((region) => isPolygonalGeometry(region.geometry)).map((region) => [
+      region.id,
+      {
+        bounds: geometryBoundingBox(region.geometry),
+        matchArea: null,
+        region,
+      },
+    ]),
+  );
+  const regionsByOwnerId = new Map();
+  for (const country of countries) {
+    const regionIdSet = new Set(country.regionIds);
+    regionsByOwnerId.set(
+      country.id,
+      regions.filter((region) => regionIdSet.has(region.id) && isPolygonalGeometry(region.geometry)),
+    );
+  }
+
+  const stableCountries = mergeBaseCountriesByEntity(baseCountries)
+    .filter((country) => regionsByOwnerId.has(country.entityId) && isPolygonalGeometry(country.geometry))
+    .map((country) => {
+      const boundaryGeometry = polygonalBoundaryGeometry(country.geometry);
+      return {
+        id: country.entityId,
+        geometry: country.geometry,
+        bounds: geometryBoundingBox(country.geometry),
+        boundaryGeometry,
+        boundary: reader.read(boundaryGeometry),
+        sharedBoundaries: [],
+      };
+    });
+  const internationalEdges = [];
+
+  for (let firstIndex = 0; firstIndex < stableCountries.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < stableCountries.length; secondIndex += 1) {
+      const first = stableCountries[firstIndex];
+      const second = stableCountries[secondIndex];
+      if (!bboxIntersectsWithTolerance(first.bounds, second.bounds, 0.001)) continue;
+
+      const sharedGeometry = exactSharedBoundaryGeometry(first.boundary, second.boundary);
+      if (!sharedGeometry) continue;
+      first.sharedBoundaries.push(sharedGeometry);
+      second.sharedBoundaries.push(sharedGeometry);
+
+      const firstRegions = regionsByOwnerId.get(first.id) ?? [];
+      const secondRegions = regionsByOwnerId.get(second.id) ?? [];
+      internationalEdges.push(
+        ...splitStableSharedBorderByRegions(
+          sharedGeometry,
+          firstRegions,
+          secondRegions,
+          regionBoundaryMatchIndex,
+        ),
+      );
+    }
+  }
+
+  const coastlineEdges = stableCountries.flatMap((country) => {
+    const coastline = subtractSharedBoundaries(
+      country.boundary,
+      country.boundaryGeometry,
+      country.sharedBoundaries,
+    );
+    if (!coastline) return [];
+    return splitStableCoastlineByRegions(
+      coastline,
+      regionsByOwnerId.get(country.id) ?? [],
+      country.id,
+      regionBoundaryMatchIndex,
+    );
+  });
+
+  return { coastlineEdges, internationalEdges };
+}
+
+function mergeBaseCountriesByEntity(baseCountries) {
+  const geometriesByEntity = new Map();
+  for (const country of baseCountries) {
+    const geometries = geometriesByEntity.get(country.entityId) ?? [];
+    geometries.push(country.geometry);
+    geometriesByEntity.set(country.entityId, geometries);
+  }
+
+  return [...geometriesByEntity].flatMap(([entityId, geometries]) => {
+    const geometry = geometries.length === 1
+      ? geometries[0]
+      : mergePolygonalGeometries(geometries);
+    return geometry ? [{ entityId, geometry }] : [];
+  });
+}
+
+function exactSharedBoundaryGeometry(firstBoundary, secondBoundary) {
+  try {
+    const intersection = OverlayOp.intersection(firstBoundary, secondBoundary);
+    if (intersection.isEmpty()) return null;
+    const lineal = collectLinealGeometry(writer.write(intersection));
+    if (!lineal || sharedLinealLength(lineal) <= minimumSubdivisionBorderLength) return null;
+    return stitchLinealGeometry(roundGeometry(lineal));
+  } catch {
+    return null;
+  }
+}
+
+function splitStableSharedBorderByRegions(
+  sharedGeometry,
+  firstRegions,
+  secondRegions,
+  regionBoundaryMatchIndex,
+) {
+  const sharedJsts = reader.read(sharedGeometry);
+  const sharedBounds = linealGeometryBoundingBox(sharedGeometry);
+  const matchingFirst = firstRegions.filter((region) =>
+    bboxIntersectsWithTolerance(
+      regionBoundaryMatchIndex.get(region.id)?.bounds ?? geometryBoundingBox(region.geometry),
+      sharedBounds,
+      stableBorderRegionMatchTolerance,
+    ),
+  );
+  const matchingSecond = secondRegions.filter((region) =>
+    bboxIntersectsWithTolerance(
+      regionBoundaryMatchIndex.get(region.id)?.bounds ?? geometryBoundingBox(region.geometry),
+      sharedBounds,
+      stableBorderRegionMatchTolerance,
+    ),
+  );
+  const edges = [];
+
+  for (const first of matchingFirst) {
+    let firstPart;
+    try {
+      firstPart = OverlayOp.intersection(
+        sharedJsts,
+        getRegionBoundaryMatchArea(first, regionBoundaryMatchIndex),
+      );
+    } catch {
+      continue;
+    }
+    if (firstPart.isEmpty()) continue;
+
+    for (const second of matchingSecond) {
+      try {
+        const intersection = OverlayOp.intersection(
+          firstPart,
+          getRegionBoundaryMatchArea(second, regionBoundaryMatchIndex),
+        );
+        if (intersection.isEmpty()) continue;
+        const geometry = normalizeBoundaryLineGeometry(writer.write(intersection));
+        if (!geometry) continue;
+        const regionIds = [first.id, second.id].sort();
+        edges.push({
+          id: `country:${regionIds[0]}:${regionIds[1]}`,
+          regionIds,
+          geometry,
+        });
+      } catch {
+        // Skip invalid regional matches. The stable country boundary remains available to other matches.
+      }
+    }
+  }
+
+  return mergeBoundaryEdgesByRegionPair(edges);
+}
+
+function subtractSharedBoundaries(boundary, boundaryGeometry, sharedGeometries) {
+  if (sharedGeometries.length === 0) {
+    return normalizeBoundaryLineGeometry(boundaryGeometry);
+  }
+
+  try {
+    const shared = unionJstsGeometries(sharedGeometries.map((geometry) => reader.read(geometry)));
+    const coastline = OverlayOp.difference(boundary, shared);
+    return coastline.isEmpty() ? null : normalizeBoundaryLineGeometry(writer.write(coastline));
+  } catch {
+    return normalizeBoundaryLineGeometry(boundaryGeometry);
+  }
+}
+
+function polygonalBoundaryGeometry(geometry) {
+  try {
+    const dissolvedBoundary = collectLinealGeometry(writer.write(readGeometry(geometry).getBoundary()));
+    const seamSafeBoundary = removeAntimeridianWrappingLineSegments(dissolvedBoundary);
+    if (seamSafeBoundary) {
+      return roundGeometry(seamSafeBoundary);
+    }
+  } catch {
+    // Fall back to the source rings if JSTS cannot normalize the polygon.
+  }
+
+  const lines = getGeometryPolygons(geometry).flatMap((polygon) => polygon);
+  return removeAntimeridianWrappingLineSegments(lines.length === 1
+    ? { type: "LineString", coordinates: lines[0] }
+    : { type: "MultiLineString", coordinates: lines });
+}
+
+function removeAntimeridianWrappingLineSegments(geometry) {
+  if (!geometry) return null;
+  const parts = collectLineStrings(geometry).flatMap((line) =>
+    splitLineBySegmentPredicate(
+      line,
+      (previous, position) => Math.abs(previous[0] - position[0]) <= 180,
+    ),
+  );
+  if (parts.length === 0) return null;
+  return parts.length === 1
+    ? { type: "LineString", coordinates: parts[0] }
+    : { type: "MultiLineString", coordinates: parts };
+}
+
+function splitStableCoastlineByRegions(coastline, regions, ownerId, regionBoundaryMatchIndex) {
+  const coastlineJsts = reader.read(coastline);
+  const coastlineBounds = linealGeometryBoundingBox(coastline);
+  const coastlineSegments = collectLineSegments(coastline);
+  const edges = [];
+
+  for (const region of regions) {
+    if (
+      !bboxIntersectsWithTolerance(
+        regionBoundaryMatchIndex.get(region.id)?.bounds ?? geometryBoundingBox(region.geometry),
+        coastlineBounds,
+        stableBorderRegionMatchTolerance,
+      )
+    ) {
+      continue;
+    }
+
+    try {
+      const intersection = OverlayOp.intersection(
+        coastlineJsts,
+        getRegionBoundaryMatchArea(region, regionBoundaryMatchIndex),
+      );
+      if (intersection.isEmpty()) continue;
+      const geometry = removeSuspiciousPolarCoastlineSegments(
+        filterLineSegmentsToSource(
+          normalizeBoundaryLineGeometry(writer.write(intersection)),
+          coastlineSegments,
+        ),
+      );
+      if (!geometry) continue;
+      edges.push({
+        id: `coast:${region.id}`,
+        regionIds: [region.id, null],
+        geometry,
+      });
+    } catch {
+      // Keep processing the remaining coastline parts.
+    }
+  }
+
+  if (edges.length > 0) return edges;
+  const fallbackRegionId = regions[0]?.id;
+  return fallbackRegionId
+    ? [{ id: `coast:${ownerId}`, regionIds: [fallbackRegionId, null], geometry: coastline }]
+    : [];
+}
+
+function collectLineSegments(geometry) {
+  return collectLineStrings(geometry).flatMap((line) =>
+    line.slice(1).flatMap((position, index) => {
+      const previous = line[index];
+      return Math.abs(previous[0] - position[0]) > 180
+        ? []
+        : [[previous, position]];
+    }),
+  );
+}
+
+function filterLineSegmentsToSource(geometry, sourceSegments, tolerance = 0.035) {
+  if (!geometry) return null;
+  const parts = collectLineStrings(geometry).flatMap((line) =>
+    splitLineBySegmentPredicate(line, (previous, position) => {
+      const midpoint = [
+        (previous[0] + position[0]) / 2,
+        (previous[1] + position[1]) / 2,
+      ];
+      return sourceSegments.some(
+        ([sourceStart, sourceEnd]) =>
+          pointToSegmentDistance(midpoint, sourceStart, sourceEnd) <= tolerance,
+      );
+    }),
+  );
+
+  if (parts.length === 0) return null;
+  return parts.length === 1
+    ? { type: "LineString", coordinates: parts[0] }
+    : { type: "MultiLineString", coordinates: parts };
+}
+
+function splitLineBySegmentPredicate(line, keepSegment) {
+  if (line.length < 2) return [];
+  const parts = [];
+  let current = [line[0]];
+
+  for (let index = 1; index < line.length; index += 1) {
+    const previous = line[index - 1];
+    const position = line[index];
+    if (keepSegment(previous, position)) {
+      current.push(position);
+    } else {
+      if (current.length >= 2) parts.push(current);
+      current = [position];
+    }
+  }
+
+  if (current.length >= 2) parts.push(current);
+  return parts;
+}
+
+function pointToSegmentDistance(point, start, end) {
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  if (dx === 0 && dy === 0) {
+    return Math.hypot(point[0] - start[0], point[1] - start[1]);
+  }
+  const t = Math.max(
+    0,
+    Math.min(1, ((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / (dx * dx + dy * dy)),
+  );
+  return Math.hypot(point[0] - (start[0] + t * dx), point[1] - (start[1] + t * dy));
+}
+
+function removeSuspiciousPolarCoastlineSegments(geometry) {
+  if (!geometry) return null;
+  const parts = collectLineStrings(geometry).flatMap((line) =>
+    splitLineBySegmentPredicate(line, (previous, position) => {
+      const longitudeDelta = Math.abs(previous[0] - position[0]);
+      const latitudeDelta = Math.abs(previous[1] - position[1]);
+      const isPolarClosure =
+        Math.min(previous[1], position[1]) > 60 &&
+        ((longitudeDelta > 5 && latitudeDelta < 0.1) ||
+          (longitudeDelta > 1.5 && latitudeDelta < 0.011));
+      return !isPolarClosure;
+    }),
+  );
+
+  if (parts.length === 0) return null;
+  return parts.length === 1
+    ? { type: "LineString", coordinates: parts[0] }
+    : { type: "MultiLineString", coordinates: parts };
+}
+
+function getRegionBoundaryMatchArea(region, regionBoundaryMatchIndex) {
+  const indexed = regionBoundaryMatchIndex.get(region.id);
+  if (!indexed) {
+    return BufferOp.bufferOp(readGeometry(region.geometry), stableBorderRegionMatchTolerance);
+  }
+  indexed.matchArea ??= BufferOp.bufferOp(readGeometry(indexed.region.geometry), stableBorderRegionMatchTolerance);
+  return indexed.matchArea;
+}
+
+function mergeBoundaryEdgesByRegionPair(edges) {
+  const grouped = new Map();
+  for (const edge of edges) {
+    const existing = grouped.get(edge.id);
+    if (existing) {
+      existing.push(edge.geometry);
+    } else {
+      grouped.set(edge.id, [edge.geometry]);
+    }
+  }
+
+  return [...grouped].flatMap(([id, geometries]) => {
+    const lines = geometries.flatMap(collectLineStrings);
+    const geometry = normalizeBoundaryLineGeometry({
+      type: lines.length === 1 ? "LineString" : "MultiLineString",
+      coordinates: lines.length === 1 ? lines[0] : lines,
+    });
+    if (!geometry) return [];
+    const [, firstRegionId, secondRegionId] = id.split(":");
+    return [{ id, regionIds: [firstRegionId, secondRegionId], geometry }];
+  });
+}
+
+function normalizeBoundaryLineGeometry(geometry) {
+  const lineal = collectLinealGeometry(geometry);
+  if (!lineal) return null;
+  const pruned = pruneShortLinealParts(lineal, minimumSubdivisionBorderLength);
+  if (!pruned) return null;
+  const stitched = stitchLinealGeometry(roundGeometry(pruned));
+  return pruneShortLinealParts(stitched, minimumSubdivisionBorderLength);
+}
+
+function stitchLinealGeometry(geometry) {
+  const remaining = collectLineStrings(geometry).map((line) => line.map(copyPosition));
+  const stitched = [];
+
+  while (remaining.length > 0) {
+    const line = remaining.pop();
+    if (!line) continue;
+    let joined = true;
+    while (joined) {
+      joined = false;
+      for (let index = remaining.length - 1; index >= 0; index -= 1) {
+        const candidate = remaining[index];
+        if (positionsEqual(line[line.length - 1], candidate[0])) {
+          line.push(...candidate.slice(1));
+        } else if (positionsEqual(line[line.length - 1], candidate[candidate.length - 1])) {
+          line.push(...candidate.slice(0, -1).reverse());
+        } else if (positionsEqual(line[0], candidate[candidate.length - 1])) {
+          line.unshift(...candidate.slice(0, -1));
+        } else if (positionsEqual(line[0], candidate[0])) {
+          line.unshift(...candidate.slice(1).reverse());
+        } else {
+          continue;
+        }
+        remaining.splice(index, 1);
+        joined = true;
+        break;
+      }
+    }
+    stitched.push(line);
+  }
+
+  if (stitched.length === 1) return { type: "LineString", coordinates: stitched[0] };
+  return { type: "MultiLineString", coordinates: stitched };
+}
+
+function linealGeometryBoundingBox(geometry) {
+  const bounds = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const line of collectLineStrings(geometry)) {
+    for (const position of line) {
+      bounds[0] = Math.min(bounds[0], position[0]);
+      bounds[1] = Math.min(bounds[1], position[1]);
+      bounds[2] = Math.max(bounds[2], position[0]);
+      bounds[3] = Math.max(bounds[3], position[1]);
+    }
+  }
+  return bounds;
 }
 
 function sharedSubdivisionBorderGeometry(firstBoundary, secondBoundary) {
@@ -1030,6 +1528,10 @@ function cleanDisplayName(value) {
 
 function normalizeName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function prepareStableWorldGeometry(geometry) {
+  return roundGeometry(pruneSmallPolygonParts(geometry));
 }
 
 function simplifyGeometry(geometry, tolerance) {

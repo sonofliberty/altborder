@@ -18,6 +18,7 @@ import { geoNaturalEarth1 } from "d3-geo";
 import type { FeatureCollection, Geometry, Position } from "geojson";
 import type { GeoProjection } from "d3-geo";
 import type {
+  BoundaryEdgeRecord,
   CountryFlag,
   EditMode,
   EditorSnapshot,
@@ -60,7 +61,7 @@ import {
   getCountryLabelMinScreenFontSize,
 } from "./mapLabelDisplay";
 import { zoomToBounds, type ProjectedBounds } from "./mapZoom";
-import { getSubdivisionBorderZoomClass } from "./mapVisualStyle";
+import { getAdministrativeBorderZoomClass } from "./mapVisualStyle";
 import { boundsIntersect, projectedViewportBounds, shouldCullPaths } from "./mapCulling";
 import { findRegionAtProjectedPoint } from "./geometryHitTest";
 import { customCountryAccentColor, getFallbackCountryColor } from "./colorRuntime";
@@ -71,11 +72,7 @@ import {
   isValidTransferTarget,
   orderTransferTargetEntities,
 } from "./transferContext";
-import {
-  batchSubdivisionBorderPathsByOwner,
-  getSubdivisionBorderSamplePoint,
-  isSubdivisionBorderVisible,
-} from "./subdivisionBorders";
+import { batchBoundaryPaths, type ProjectedBoundaryEdge } from "./boundaryEdges";
 import { EditorSidePanel } from "./EditorSidePanel";
 import {
   geometryToSvgPath,
@@ -99,7 +96,7 @@ const acquiredRegionRenderGapTolerance = 0.08;
 const mapRenderSimplifyTolerance = 0.07;
 const countryUnderlayUpdateDelayMs = 0;
 const projectedSeamBreakDistance = viewportWidth * 0.22;
-const projectedPathCacheVersion = "shared-subdivision-linework-v31";
+const projectedPathCacheVersion = "shared-boundary-linework-v32";
 const baseGeometryUnionSensitiveEntityIds = new Set(["BOL", "BRA", "RUS", "USA"]);
 const composedFillSensitiveEntityIds = new Set(["RUS"]);
 const sliverProneBaseGeometryEntityIds = new Set(["BOL"]);
@@ -110,6 +107,7 @@ const svgPathCoordinatePrecision = 2;
 const simplifiedCountryLayerMaxZoom = 1.35;
 const wheelZoomMaxDelta = 80;
 const wheelZoomSensitivity = 0.001;
+const countryFlagImageRasterScale = 16;
 
 type ZoomState = {
   x: number;
@@ -139,16 +137,11 @@ type SimpleMapLabel = {
 type CountryUnderlay = {
   id: string;
   pathData: string;
-  strokePathData: string;
   bounds: ProjectedBounds;
+  sealInternalSeams: boolean;
 };
 
-type ProjectedSubdivisionBorder = {
-  id: string;
-  ownerId: string;
-  regionIds: [string, string];
-  samplePoint: Position | null;
-  pathData: string;
+type ProjectedBoundaryEdgeWithBounds = ProjectedBoundaryEdge & {
   bounds: ProjectedBounds;
 };
 
@@ -180,6 +173,7 @@ export default function App() {
   const [isMapMoving, setIsMapMoving] = useState(false);
   const [countryUnderlays, setCountryUnderlays] = useState<CountryUnderlay[]>([]);
   const [countryLabelLayouts, setCountryLabelLayouts] = useState<FittedCountryLabel[]>([]);
+  const [customBoundaryEdges, setCustomBoundaryEdges] = useState<BoundaryEdgeRecord[]>([]);
   const [inspectFocusedRegionId, setInspectFocusedRegionId] = useState("");
   const [transferFocusedRegionId, setTransferFocusedRegionId] = useState("");
   const [neighborTargetEntityIds, setNeighborTargetEntityIds] = useState<Set<string>>(new Set());
@@ -288,21 +282,30 @@ export default function App() {
     return Object.values(snapshot?.customRegions ?? {});
   }, [snapshot?.customRegions]);
 
-  const divideRemainderGeometriesByOwnerId = useMemo(() => {
-    const geometriesByOwnerId = new Map<string, Geometry[]>();
-    for (const region of customRegionRecords) {
-      if (region.type !== "Custom divide remainder" || !region.ownerId) continue;
-      const geometries = geometriesByOwnerId.get(region.ownerId) ?? [];
-      geometries.push(region.geometry);
-      geometriesByOwnerId.set(region.ownerId, geometries);
-    }
-    return geometriesByOwnerId;
-  }, [customRegionRecords]);
-
   const effectiveRegions = useMemo(() => {
     if (!data) return [];
     return [...data.regions, ...customRegionRecords];
   }, [customRegionRecords, data]);
+
+  useEffect(() => {
+    if (!regionOwners || customRegionRecords.length === 0) {
+      setCustomBoundaryEdges([]);
+      return;
+    }
+
+    let cancelled = false;
+    const activeRegions = effectiveRegions.filter((region) => Boolean(regionOwners[region.id]));
+    const customRegionIds = new Set(customRegionRecords.map((region) => region.id));
+    void import("./geometrySplit").then(({ buildCustomBoundaryEdges }) => {
+      if (!cancelled) {
+        setCustomBoundaryEdges(buildCustomBoundaryEdges(activeRegions, customRegionIds));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [customRegionRecords, effectiveRegions, regionOwners]);
 
   const regionById = useMemo(() => {
     return new Map(effectiveRegions.map((region) => [region.id, region]));
@@ -369,7 +372,7 @@ export default function App() {
       data.baseCountries.map((country) => [
         country.entityId,
         {
-          geometry: simplifyPolygonalGeometry(country.geometry, mapRenderSimplifyTolerance),
+          geometry: country.geometry,
         },
       ]),
     );
@@ -457,22 +460,20 @@ export default function App() {
     return customProjectedRegionById.get(regionId)?.bounds ?? getBaseProjectedRegion(regionId)?.bounds ?? null;
   }, [customProjectedRegionById, getBaseProjectedRegion]);
 
-  const projectedSubdivisionBorders = useMemo(() => {
-    const projectedBorders: ProjectedSubdivisionBorder[] = [];
-    for (const border of data?.subdivisionBorders ?? []) {
-      const projected = projectGeometryToPathData(border.geometry, projection, getProjectedPathOptions());
+  const projectedBoundaryEdges = useMemo(() => {
+    const projectedEdges: ProjectedBoundaryEdgeWithBounds[] = [];
+    for (const edge of [...(data?.boundaryEdges ?? []), ...customBoundaryEdges]) {
+      const projected = projectGeometryToPathData(edge.geometry, projection, getProjectedPathOptions());
       if (!projected) continue;
-      projectedBorders.push({
-        id: border.id,
-        ownerId: border.ownerId,
-        regionIds: border.regionIds,
-        samplePoint: getSubdivisionBorderSamplePoint(border.geometry),
+      projectedEdges.push({
+        id: edge.id,
+        regionIds: edge.regionIds,
         pathData: projected.strokePathData,
         bounds: projected.bounds,
       });
     }
-    return projectedBorders;
-  }, [data?.subdivisionBorders, projection]);
+    return projectedEdges;
+  }, [customBoundaryEdges, data?.boundaryEdges, projection]);
 
   const settledViewportBounds = useMemo(() => {
     return projectedViewportBounds({
@@ -710,19 +711,21 @@ export default function App() {
           const displayGeometry = sliverProneBaseGeometryEntityIds.has(entityId)
             ? removeSmallPolygonalGeometryComponents(geometry, sliverComponentMinAreaRatio)
             : geometry;
-          const renderGeometry = hasOwnershipChanges
-            ? simplifyPolygonalGeometry(displayGeometry, mapRenderSimplifyTolerance)
-            : displayGeometry;
-          const projected = projectGeometryToPathData(renderGeometry, projection, getProjectedPathOptions());
+          const renderGeometry = displayGeometry;
+          const projected = projectGeometryToPathData(
+            renderGeometry,
+            projection,
+            getProjectedPathOptions(false, entityId === "RUS"),
+          );
           if (!projected) continue;
           const composedFill = hasOwnershipChanges && composedFillSensitiveEntityIds.has(entityId)
             ? combineProjectedPathData(
                 (renderGeometriesByEntityId.get(entityId) ?? [])
                   .map((regionGeometry) =>
                     projectGeometryToPathData(
-                      simplifyPolygonalGeometry(regionGeometry, mapRenderSimplifyTolerance),
+                      regionGeometry,
                       projection,
-                      getProjectedPathOptions(),
+                      getProjectedPathOptions(false, true),
                     ),
                   ),
               )
@@ -731,8 +734,8 @@ export default function App() {
           const underlay = {
             id: entityId,
             pathData: composedFill?.pathData ?? projected.pathData,
-            strokePathData: projected.strokePathData,
             bounds: projected.bounds,
+            sealInternalSeams: Boolean(composedFill),
           };
           countryUnderlayCacheRef.current.set(cacheKey, underlay);
           nextUnderlays.push(underlay);
@@ -2027,20 +2030,25 @@ export default function App() {
 
   const countryUnderlayElements = useMemo(() => {
     if (!entities) return [];
-    return visibleCountryUnderlays.map((underlay) => (
-      <path
-        key={underlay.id}
-        id={makeSvgElementId("country-shape", underlay.id)}
-        className={[
-          "country-underlay",
-          useSimplifiedCountryLayer || useLowZoomTransferCountryLayer ? "country-underlay-interactive" : "",
-        ].join(" ")}
-        data-entity-id={underlay.id}
-        d={underlay.pathData}
-        fill={entities[underlay.id]?.color ?? "#D7D2C8"}
-        fillRule="evenodd"
-      />
-    ));
+    return visibleCountryUnderlays.map((underlay) => {
+      const color = entities[underlay.id]?.color ?? "#D7D2C8";
+      return (
+        <path
+          key={underlay.id}
+          id={makeSvgElementId("country-shape", underlay.id)}
+          className={[
+            "country-underlay",
+            underlay.sealInternalSeams ? "country-underlay-composed" : "",
+            useSimplifiedCountryLayer || useLowZoomTransferCountryLayer ? "country-underlay-interactive" : "",
+          ].join(" ")}
+          data-entity-id={underlay.id}
+          d={underlay.pathData}
+          fill={color}
+          fillRule="evenodd"
+          stroke={underlay.sealInternalSeams ? color : undefined}
+        />
+      );
+    });
   }, [
     entities,
     useLowZoomTransferCountryLayer,
@@ -2048,47 +2056,46 @@ export default function App() {
     visibleCountryUnderlays,
   ]);
 
-  const subdivisionBorderZoomClass = getSubdivisionBorderZoomClass(zoom.k);
-  const useDetailedRegionBorderStrokes = subdivisionBorderZoomClass !== "map-admin-borders-default";
+  const administrativeBorderZoomClass = getAdministrativeBorderZoomClass(zoom.k);
+  const useDetailedRegionBorderStrokes = administrativeBorderZoomClass !== "map-admin-borders-default";
 
-  const regionPathElements = useMemo(() => {
-    if (!entities || !regionOwners) return [];
-    const regionsToRender = useSimplifiedCountryLayer
+  const regionsToRender = useMemo(() => {
+    if (!regionOwners) return [];
+    return useSimplifiedCountryLayer
       ? visibleRegions.filter((region) => changedRegionIds.has(region.id))
       : useLowZoomTransferCountryLayer
         ? visibleRegions.filter((region) => selectedEntityId && regionOwners[region.id] === selectedEntityId)
         : visibleRegions;
+  }, [
+    changedRegionIds,
+    regionOwners,
+    selectedEntityId,
+    useLowZoomTransferCountryLayer,
+    useSimplifiedCountryLayer,
+    visibleRegions,
+  ]);
+
+  const regionInteractionElements = useMemo(() => {
+    if (!entities || !regionOwners) return [];
 
     return regionsToRender.map((region) => {
       const regionId = region.id;
       const ownerId = regionOwners[regionId];
       const owner = entities[ownerId];
       if (!ownerId || !owner) return null;
-      const isSelectedRegion = selectedRegions.has(regionId);
-      const isInspectFocusedRegion = mode === "inspect" && inspectFocusedRegionId === regionId;
-      const isTransferFocusedRegion = mode === "transfer" && transferFocusedRegionId === regionId;
-      const isMergeSelected = mergeSelection.has(ownerId);
       const isEditableRegion = activeModeUsesRegions && (!selectedEntityId || selectedEntityId === ownerId);
 
       const regionClasses = [
         "region",
         isEditableRegion ? "region-editable" : "",
       ].join(" ");
-      const borderClasses = [
-        "region-border",
-        isSelectedRegion ? "region-selected" : "",
-        isInspectFocusedRegion || isTransferFocusedRegion ? "region-focused" : "",
-        isMergeSelected ? "merge-selected" : "",
-        isEditableRegion ? "region-editable" : "",
-      ].join(" ");
-
       return (
         <g key={regionId} className="region-layer">
           <path
             d={getRegionPath(regionId)}
             data-region-id={regionId}
             className={regionClasses}
-            fill={owner.color}
+            fill="transparent"
             fillRule="evenodd"
             onPointerEnter={() => addRegionByBrush(regionId)}
           >
@@ -2096,68 +2103,62 @@ export default function App() {
               {getRegionDisplayName(regionId)} · {owner.name}
             </title>
           </path>
-          <path
-            d={getRegionStrokePath(regionId, useDetailedRegionBorderStrokes)}
-            className={borderClasses}
-            fill="none"
-            aria-hidden="true"
-          />
         </g>
       );
     });
   }, [
     activeModeUsesRegions,
     addRegionByBrush,
-    changedRegionIds,
     getRegionDisplayName,
     getRegionPath,
-    getRegionStrokePath,
-    inspectFocusedRegionId,
-    mergeSelection,
-    mode,
     entities,
     regionOwners,
     selectedEntityId,
-    selectedRegions,
-    transferFocusedRegionId,
-    useDetailedRegionBorderStrokes,
-    useLowZoomTransferCountryLayer,
-    useSimplifiedCountryLayer,
-    visibleRegions,
+    regionsToRender,
   ]);
 
-  const subdivisionBorderElements = useMemo(() => {
-    if (!regionOwners) return [];
-    const visibleSubdivisionBorders = shouldCullMapPaths
-      ? projectedSubdivisionBorders.filter((border) => boundsIntersect(border.bounds, settledViewportBounds))
-      : projectedSubdivisionBorders;
-
-    const batchedSubdivisionBorders = batchSubdivisionBorderPathsByOwner(
-      visibleSubdivisionBorders.filter((border) =>
-        isSubdivisionBorderVisible(border, regionOwners, {
-          ownerRemainderGeometries: divideRemainderGeometriesByOwnerId,
-        }),
-      ),
-    );
-
-    return batchedSubdivisionBorders.map((border) => (
-      <path
-        key={border.ownerId}
-        className="subdivision-border-line"
-        data-owner-id={border.ownerId}
-        data-region-ids={border.regionIds.join(" ")}
-        d={border.pathData}
-        fill="none"
-        aria-hidden="true"
-      />
-    ));
+  const boundaryPaths = useMemo(() => {
+    if (!regionOwners) return null;
+    const visibleEdges = shouldCullMapPaths
+      ? projectedBoundaryEdges.filter((edge) => boundsIntersect(edge.bounds, settledViewportBounds))
+      : projectedBoundaryEdges;
+    const activeAdministrativeEntityId =
+      selectedEntityId && (mode === "transfer" || mode === "divide")
+        ? selectedEntityId
+        : undefined;
+    return batchBoundaryPaths(visibleEdges, regionOwners, {
+      activeAdministrativeEntityId,
+      selectedEntityId: selectedEntityId || undefined,
+    });
   }, [
-    divideRemainderGeometriesByOwnerId,
-    projectedSubdivisionBorders,
+    mode,
+    projectedBoundaryEdges,
     regionOwners,
+    selectedEntityId,
     settledViewportBounds,
     shouldCullMapPaths,
   ]);
+
+  const boundaryElements = boundaryPaths ? (
+    <g className="boundary-lines" aria-hidden="true">
+      {boundaryPaths.coastlinePath ? (
+        <path className="coastline-line" d={boundaryPaths.coastlinePath} fill="none" />
+      ) : null}
+      {boundaryPaths.activeAdministrativePath ? (
+        <path
+          className="administrative-border-line administrative-border-active"
+          d={boundaryPaths.activeAdministrativePath}
+          fill="none"
+        />
+      ) : null}
+      {boundaryPaths.countryPath ? (
+        <path className="country-border-line" d={boundaryPaths.countryPath} fill="none" />
+      ) : null}
+      {boundaryPaths.selectedCountryPath ? (
+        <path className="selected-country-outline" d={boundaryPaths.selectedCountryPath} fill="none" />
+      ) : null}
+    </g>
+  ) : null;
 
   const selectedRegionOverlayElements = useMemo(() => {
     if (selectedRegions.size === 0) return [];
@@ -2172,13 +2173,7 @@ export default function App() {
             aria-hidden="true"
           />
           <path
-            className="selected-region-outline selected-region-outline-halo"
-            d={getRegionStrokePath(region.id, useDetailedRegionBorderStrokes)}
-            fill="none"
-            aria-hidden="true"
-          />
-          <path
-            className="selected-region-outline selected-region-outline-inner"
+            className="selected-region-outline"
             d={getRegionStrokePath(region.id, useDetailedRegionBorderStrokes)}
             fill="none"
             aria-hidden="true"
@@ -2200,33 +2195,9 @@ export default function App() {
           fillRule="evenodd"
           aria-hidden="true"
         />
-        <path
-          className="selected-country-outline selected-country-outline-halo"
-          d={underlay.strokePathData}
-          fill="none"
-          aria-hidden="true"
-        />
-        <path
-          className="selected-country-outline selected-country-outline-inner"
-          d={underlay.strokePathData}
-          fill="none"
-          aria-hidden="true"
-        />
       </g>
     );
   }, [countryUnderlayById, selectedEntityId]);
-
-  const countryOutlineElements = useMemo(() => {
-    return visibleCountryUnderlays.map((underlay) => (
-      <path
-        key={underlay.id}
-        className="country-outline"
-        data-entity-id={underlay.id}
-        d={underlay.strokePathData}
-        fillRule="evenodd"
-      />
-    ));
-  }, [visibleCountryUnderlays]);
 
   if (loadError && !data) {
     return (
@@ -2336,7 +2307,7 @@ export default function App() {
             viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}
             className={[
               "map",
-              subdivisionBorderZoomClass,
+              administrativeBorderZoomClass,
               brushEnabled && activeModeUsesRegions ? "brush-map" : "",
               mode === "divide" && !readOnly ? "divide-map" : "",
             ].join(" ")}
@@ -2354,14 +2325,9 @@ export default function App() {
               <g aria-hidden="true">
                 {countryUnderlayElements}
               </g>
-              {regionPathElements}
-              <g aria-hidden="true">
-                {subdivisionBorderElements}
-              </g>
-              <g aria-hidden="true">
-                {countryOutlineElements}
-              </g>
               {selectedCountryOverlayElement}
+              {boundaryElements}
+              {regionInteractionElements}
               <g className="selected-region-overlays" aria-hidden="true">
                 {selectedRegionOverlayElements}
               </g>
@@ -2380,13 +2346,14 @@ export default function App() {
                     key={label.id}
                     transform={`translate(${label.x} ${label.y}) rotate(${label.angle})`}
                   >
-                    <image
-                      className="country-flag"
-                      href={getCountryFlagUrl(getCountryFlag(entities?.[label.id]))}
-                      x={-label.contentWidth / 2}
-                      y={-label.flagHeight / 2}
-                      width={label.flagWidth}
-                      height={label.flagHeight}
+                      <image
+                        className="country-flag"
+                        href={getCountryFlagUrl(getCountryFlag(entities?.[label.id]))}
+                        x={(-label.contentWidth / 2) * countryFlagImageRasterScale}
+                        y={(-label.flagHeight / 2) * countryFlagImageRasterScale}
+                        width={label.flagWidth * countryFlagImageRasterScale}
+                        height={label.flagHeight * countryFlagImageRasterScale}
+                        transform={`scale(${1 / countryFlagImageRasterScale})`}
                       preserveAspectRatio="xMidYMid meet"
                       aria-hidden="true"
                     />
@@ -2547,9 +2514,10 @@ function ToolButton({
   );
 }
 
-function getProjectedPathOptions(preferManualFill = false) {
+function getProjectedPathOptions(preferManualFill = false, preferD3Fill = false) {
   return {
     coordinatePrecision: svgPathCoordinatePrecision,
+    preferD3Fill,
     seamBreakDistance: projectedSeamBreakDistance,
     preferManualFill,
   };

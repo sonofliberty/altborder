@@ -333,7 +333,14 @@ textarea {
 
 .country-underlay {
   pointer-events: none;
-  stroke: none;
+}
+
+.country-underlay-composed {
+  paint-order: stroke fill;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.6;
+  vector-effect: non-scaling-stroke;
 }
 
 .country-underlay-interactive {
@@ -341,14 +348,31 @@ textarea {
   pointer-events: auto;
 }
 
-.country-outline {
-  fill: none;
+.boundary-lines,
+.coastline-line,
+.country-border-line,
+.administrative-border-line {
   pointer-events: none;
-  stroke: rgba(4, 7, 7, 0.76);
-  stroke-linecap: round;
+}
+
+.coastline-line,
+.country-border-line,
+.administrative-border-line,
+.selected-country-outline {
+  fill: none;
+  stroke-linecap: butt;
   stroke-linejoin: round;
-  stroke-width: 1.1;
   vector-effect: non-scaling-stroke;
+}
+
+.coastline-line {
+  stroke: rgba(4, 7, 7, 0.52);
+  stroke-width: 0.65;
+}
+
+.country-border-line {
+  stroke: rgba(4, 7, 7, 0.76);
+  stroke-width: 0.9;
 }
 
 .region {
@@ -359,67 +383,29 @@ textarea {
     opacity 120ms ease;
 }
 
-.region-border {
+.administrative-border-line {
   pointer-events: none;
-  stroke: rgba(6, 9, 8, 0.2);
-  stroke-linejoin: round;
+  stroke: rgba(6, 9, 8, 0.38);
   stroke-opacity: 0;
-  stroke-width: 0.22;
-  vector-effect: non-scaling-stroke;
+  stroke-width: 0.4;
   transition:
-    stroke-width 120ms ease,
-    opacity 120ms ease;
-}
-
-.map-admin-borders-close .region-border {
-  stroke: rgba(6, 9, 8, 0.26);
-  stroke-opacity: 0.52;
-  stroke-width: 0.28;
-}
-
-.map-admin-borders-detail .region-border {
-  stroke: rgba(6, 9, 8, 0.34);
-  stroke-opacity: 0.68;
-  stroke-width: 0.38;
-}
-
-.region-layer:has(.region:hover) .region-border,
-.region-layer:has(.region-editable:hover) .region-border {
-  stroke: rgba(6, 9, 8, 0.46);
-  stroke-opacity: 1;
-  stroke-width: 0.56;
-}
-
-.subdivision-border-line {
-  pointer-events: none;
-  stroke: rgba(6, 9, 8, 0.24);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-opacity: 0.76;
-  stroke-width: 0.3;
-  vector-effect: non-scaling-stroke;
-  transition:
-    stroke 120ms ease,
+    stroke-opacity 120ms ease,
     stroke-width 120ms ease;
 }
 
-.map-admin-borders-close .subdivision-border-line {
-  stroke: rgba(6, 9, 8, 0.34);
-  stroke-opacity: 0.82;
-  stroke-width: 0.52;
+.map-admin-borders-close .administrative-border-line {
+  stroke-opacity: 0;
+  stroke-width: 0.4;
 }
 
-.map-admin-borders-detail .subdivision-border-line {
-  stroke: rgba(6, 9, 8, 0.44);
-  stroke-opacity: 0.88;
-  stroke-width: 0.72;
+.map-admin-borders-detail .administrative-border-line {
+  stroke-opacity: 0;
+  stroke-width: 0.55;
 }
 
-.region-selected {
-  stroke: #fff2a8;
-  stroke-opacity: 1;
-  stroke-width: 1.55;
-  vector-effect: non-scaling-stroke;
+.administrative-border-line.administrative-border-active {
+  stroke-opacity: 0.56;
+  stroke-width: 0.4;
 }
 
 .selected-region-overlays,
@@ -442,43 +428,20 @@ textarea {
 
 .selected-country-outline,
 .selected-region-outline {
+  fill: none;
+  stroke: #ffe98f;
+  stroke-linecap: butt;
   stroke-linejoin: round;
   stroke-opacity: 1;
   vector-effect: non-scaling-stroke;
 }
 
-.selected-country-outline-halo {
-  stroke: rgba(3, 7, 6, 0.76);
-  stroke-width: 4.8;
+.selected-country-outline {
+  stroke-width: 1.6;
 }
 
-.selected-country-outline-inner {
-  stroke: #ffe98f;
-  stroke-width: 1.7;
-}
-
-.selected-region-outline-halo {
-  stroke: rgba(3, 7, 6, 0.8);
-  stroke-width: 3.9;
-}
-
-.selected-region-outline-inner {
-  stroke: #ffe98f;
-  stroke-width: 1.55;
-}
-
-.merge-selected {
-  stroke: #dce9ff;
-  stroke-opacity: 1;
-  stroke-width: 1.75;
-  vector-effect: non-scaling-stroke;
-}
-
-.region-focused {
-  stroke: #ffe98f;
-  stroke-opacity: 1;
-  stroke-width: 2.05;
-  vector-effect: non-scaling-stroke;
+.selected-region-outline {
+  stroke-width: 1.5;
 }
 
 .divide-preview {

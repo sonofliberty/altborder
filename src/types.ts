@@ -28,10 +28,9 @@ type BaseCountryRecord = {
   geometry: Geometry;
 };
 
-export type SubdivisionBorderRecord = {
+export type BoundaryEdgeRecord = {
   id: string;
-  ownerId: string;
-  regionIds: [string, string];
+  regionIds: [string, string | null];
   geometry: LineString | MultiLineString;
 };
 
@@ -41,7 +40,7 @@ export type MapData = {
   baseCountries: BaseCountryRecord[];
   countries: CountryEntity[];
   regions: RegionRecord[];
-  subdivisionBorders: SubdivisionBorderRecord[];
+  boundaryEdges: BoundaryEdgeRecord[];
 };
 
 export type EditorSnapshot = {

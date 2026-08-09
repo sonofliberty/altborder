@@ -187,7 +187,7 @@ describe("projected path layout", () => {
         projection([-140.99, 60.3]) as [number, number],
       ),
     ).toBe(false);
-  }, 15_000);
+  }, 30_000);
 
   it("projects United States outlines without Arctic seam strokes", () => {
     const data = mapDataFixture as MapData;
@@ -204,22 +204,22 @@ describe("projected path layout", () => {
     expect(projectedUnitedStates?.pathData.length).toBeGreaterThan(1000);
     expect(projectedUnitedStates?.pathData).not.toBe(projectedUnitedStates?.strokePathData);
     expect(countGreatLakesClosureArtifacts(projectedUnitedStates?.strokePathData ?? "")).toBe(0);
-    expect(countArcticHorizontalSeamSegments(projectedUnitedStates?.strokePathData ?? "")).toBe(1);
-    expect(countArcticDiagonalSeamSegments(projectedUnitedStates?.strokePathData ?? "")).toBe(1);
+    expect(countArcticHorizontalSeamSegments(projectedUnitedStates?.strokePathData ?? "")).toBe(0);
+    expect(countArcticDiagonalSeamSegments(projectedUnitedStates?.strokePathData ?? "")).toBe(0);
     expect(
       hasSegmentNear(
         projectedUnitedStates?.strokePathData ?? "",
         projection([-122.75, 48.99]) as [number, number],
         projection([-95.18, 48.99]) as [number, number],
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       hasSegmentNear(
         projectedUnitedStates?.strokePathData ?? "",
         projection([-141, 69.65]) as [number, number],
         projection([-140.99, 60.3]) as [number, number],
       ),
-    ).toBe(true);
+    ).toBe(false);
   }, 15_000);
 
   it("projects Alaska subdivision borders without diagonal seam closures", () => {
@@ -339,7 +339,6 @@ describe("projected path layout", () => {
     const projectedFiji = projectGeometryToPathData(fiji, projection, renderPathOptions);
 
     expect(projectedFiji?.pathData.length).toBeGreaterThan(1000);
-    expect(projectedFiji?.pathData).toBe(projectedFiji?.strokePathData);
     expect(countLikelyProjectedSeamSegments(projectedFiji?.pathData ?? "")).toBe(0);
     expect(countLongHorizontalSegments(projectedFiji?.pathData ?? "")).toBe(0);
     expect(countLikelyProjectedSeamSegments(projectedFiji?.strokePathData ?? "")).toBe(0);

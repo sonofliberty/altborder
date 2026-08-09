@@ -7,8 +7,8 @@ import Polygonizer from "jsts/org/locationtech/jts/operation/polygonize/Polygoni
 import RelateOp from "jsts/org/locationtech/jts/operation/relate/RelateOp.js";
 import UnaryUnionOp from "jsts/org/locationtech/jts/operation/union/UnaryUnionOp.js";
 import ArrayList from "jsts/java/util/ArrayList.js";
-import type { Geometry, Position } from "geojson";
-import type { RegionRecord } from "./types";
+import type { Geometry, LineString, MultiLineString, Position } from "geojson";
+import type { BoundaryEdgeRecord, RegionRecord } from "./types";
 import { simplifyPolygonalGeometry } from "./geometrySimplify";
 
 type JstsGeometry = {
@@ -50,6 +50,62 @@ const writer = new GeoJSONWriter();
 const minArea = 1e-10;
 const splitSimplifyTolerance = 0.0015;
 const outputSimplifyTolerance = 0.004;
+const customBoundaryMatchTolerance = 0.02;
+const minimumCustomBoundaryLength = 1e-6;
+
+export function buildCustomBoundaryEdges(
+  activeRegions: RegionRecord[],
+  customRegionIds: ReadonlySet<string>,
+): BoundaryEdgeRecord[] {
+  if (customRegionIds.size === 0) return [];
+
+  const indexedRegions = activeRegions.flatMap((region) => {
+    if (!isPolygonalGeometry(region.geometry)) return [];
+    try {
+      const polygon = readGeometry(region.geometry);
+      return [{
+        id: region.id,
+        boundary: polygon.getBoundary(),
+        bounds: boundsForGeometry(polygon),
+        isCustom: customRegionIds.has(region.id),
+      }];
+    } catch {
+      return [];
+    }
+  });
+  const edges: BoundaryEdgeRecord[] = [];
+
+  for (let firstIndex = 0; firstIndex < indexedRegions.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < indexedRegions.length; secondIndex += 1) {
+      const firstCandidate = indexedRegions[firstIndex];
+      const secondCandidate = indexedRegions[secondIndex];
+      if (!firstCandidate.isCustom && !secondCandidate.isCustom) continue;
+      if (!boundsOverlapWithTolerance(firstCandidate.bounds, secondCandidate.bounds, customBoundaryMatchTolerance)) {
+        continue;
+      }
+
+      const first = firstCandidate.isCustom ? firstCandidate : secondCandidate;
+      const second = firstCandidate.isCustom ? secondCandidate : firstCandidate;
+      try {
+        const matchArea = BufferOp.bufferOp(second.boundary, customBoundaryMatchTolerance) as JstsGeometry;
+        const intersection = OverlayOp.intersection(first.boundary, matchArea) as JstsGeometry;
+        if (intersection.isEmpty()) continue;
+        const geometry = collectLinealGeometry(rawWriteGeometry(intersection));
+        if (!geometry || linealGeometryLength(geometry) <= minimumCustomBoundaryLength) continue;
+        const regionIds = [first.id, second.id].sort() as [string, string];
+        edges.push({
+          id: `custom:${regionIds[0]}:${regionIds[1]}`,
+          regionIds,
+          geometry: roundLinealGeometry(geometry),
+        });
+      } catch {
+        // A malformed neighbor must not stop the remaining custom edges.
+      }
+    }
+  }
+
+  return edges;
+}
 
 export function splitCountryGeometry(regions: RegionRecord[], cutLine: Position[]): CountrySplit {
   if (regions.length === 0) {
@@ -539,6 +595,54 @@ function boundsForCoordinates(coordinates: Position[]): [number, number, number,
 
 function boundsOverlap(a: [number, number, number, number], b: [number, number, number, number]): boolean {
   return a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
+}
+
+function boundsOverlapWithTolerance(
+  a: [number, number, number, number],
+  b: [number, number, number, number],
+  tolerance: number,
+): boolean {
+  return (
+    a[0] - tolerance <= b[2] &&
+    a[2] + tolerance >= b[0] &&
+    a[1] - tolerance <= b[3] &&
+    a[3] + tolerance >= b[1]
+  );
+}
+
+function collectLinealGeometry(geometry: Geometry): LineString | MultiLineString | null {
+  const lines = collectLineStrings(geometry);
+  if (lines.length === 0) return null;
+  return lines.length === 1
+    ? { type: "LineString", coordinates: lines[0] }
+    : { type: "MultiLineString", coordinates: lines };
+}
+
+function collectLineStrings(geometry: Geometry): Position[][] {
+  if (geometry.type === "LineString") {
+    return geometry.coordinates.length >= 2 ? [geometry.coordinates] : [];
+  }
+  if (geometry.type === "MultiLineString") {
+    return geometry.coordinates.filter((line) => line.length >= 2);
+  }
+  if (geometry.type === "GeometryCollection") {
+    return geometry.geometries.flatMap(collectLineStrings);
+  }
+  return [];
+}
+
+function linealGeometryLength(geometry: LineString | MultiLineString): number {
+  return collectLineStrings(geometry).reduce((total, line) => total + lineLength(line), 0);
+}
+
+function roundLinealGeometry(geometry: LineString | MultiLineString): LineString | MultiLineString {
+  if (geometry.type === "LineString") {
+    return { ...geometry, coordinates: geometry.coordinates.map(roundPosition) };
+  }
+  return {
+    ...geometry,
+    coordinates: geometry.coordinates.map((line) => line.map(roundPosition)),
+  };
 }
 
 function extendLineToBounds(line: Position[], bounds: [number, number, number, number]): Position[] {

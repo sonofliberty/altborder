@@ -3,7 +3,12 @@ import { geoNaturalEarth1 } from "d3-geo";
 import mapDataFixture from "../public/data/map-data.json";
 import type { Geometry } from "geojson";
 import type { Feature, FeatureCollection } from "geojson";
-import { buildDivideTerritories, separateCountryIsland, splitCountryGeometry } from "./geometrySplit";
+import {
+  buildCustomBoundaryEdges,
+  buildDivideTerritories,
+  separateCountryIsland,
+  splitCountryGeometry,
+} from "./geometrySplit";
 import type { MapData, RegionRecord } from "./types";
 
 describe("splitCountryGeometry", () => {
@@ -264,6 +269,28 @@ describe("splitCountryGeometry", () => {
         ),
       ).toHaveLength(1);
     }
+  });
+});
+
+describe("buildCustomBoundaryEdges", () => {
+  it("creates one shared edge for a custom divide and its neighbor", () => {
+    const edges = buildCustomBoundaryEdges(
+      [region("custom", square(0, 0, 5, 10)), region("neighbor", square(5, 0, 10, 10))],
+      new Set(["custom"]),
+    );
+
+    expect(edges).toHaveLength(1);
+    expect(edges[0].regionIds).toEqual(["custom", "neighbor"]);
+    expect(edges[0].geometry.type).toBe("LineString");
+  });
+
+  it("does not rebuild edges that do not touch a custom region", () => {
+    expect(
+      buildCustomBoundaryEdges(
+        [region("left", square(0, 0, 5, 10)), region("right", square(5, 0, 10, 10))],
+        new Set(["missing"]),
+      ),
+    ).toEqual([]);
   });
 });
 

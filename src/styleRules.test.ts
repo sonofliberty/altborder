@@ -6,36 +6,29 @@ const { readFileSync } = require("node:fs");
 const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 
 describe("map style rules", () => {
-  it("makes region borders visible on hover", () => {
-    expect(styles).toContain("stroke-opacity: 0;");
-    expect(styles).toMatch(
-      /\.region-layer:has\(\.region:hover\) \.region-border,\s*\.region-layer:has\(\.region-editable:hover\) \.region-border \{[^}]*stroke-opacity: 1;/,
-    );
+  it("shows administrative borders only for the active edited country", () => {
+    expect(styles).toMatch(/\.administrative-border-line \{[^}]*stroke-opacity: 0;[^}]*stroke-width: 0\.4;/);
+    expect(styles).toMatch(/\.map-admin-borders-close \.administrative-border-line \{[^}]*stroke-opacity: 0;/);
+    expect(styles).toMatch(/\.map-admin-borders-detail \.administrative-border-line \{[^}]*stroke-opacity: 0;[^}]*stroke-width: 0\.55;/);
+    expect(styles).toMatch(/\.administrative-border-line\.administrative-border-active \{[^}]*stroke-opacity: 0\.56;/);
   });
 
-  it("strengthens subdivision borders as the map zooms in", () => {
-    expect(styles).toMatch(/\.subdivision-border-line \{[^}]*stroke-width: 0\.3;/);
-    expect(styles).toMatch(/\.map-admin-borders-close \.subdivision-border-line \{[^}]*stroke-width: 0\.52;/);
-    expect(styles).toMatch(/\.map-admin-borders-detail \.subdivision-border-line \{[^}]*stroke-width: 0\.72;/);
+  it("uses crisp non-scaling country and coastline strokes", () => {
+    expect(styles).toMatch(/\.country-border-line \{[^}]*stroke-width: 0\.9;/);
+    expect(styles).toMatch(/\.coastline-line \{[^}]*stroke-width: 0\.65;/);
+    expect(styles).toMatch(/\.coastline-line,[^}]*stroke-linecap: butt;/);
+    expect(styles).toMatch(/\.coastline-line,[^}]*vector-effect: non-scaling-stroke;/);
   });
 
-  it("keeps fallback region borders visible at close admin-border zooms", () => {
-    expect(styles).toMatch(/\.region-border \{[^}]*stroke-opacity: 0;/);
-    expect(styles).toMatch(/\.map-admin-borders-close \.region-border \{[^}]*stroke-opacity: 0\.52;/);
-    expect(styles).toMatch(/\.map-admin-borders-detail \.region-border \{[^}]*stroke-opacity: 0\.68;/);
-  });
-
-  it("renders selected regions with a non-interactive tint and contrast outline", () => {
+  it("renders selected regions with a non-interactive tint and one outline", () => {
     expect(styles).toMatch(/\.selected-region-overlays,[^}]*pointer-events: none;/);
     expect(styles).toMatch(/\.selected-region-tint \{[^}]*fill: rgba\(255, 231, 128, 0\.24\);/);
-    expect(styles).toMatch(/\.selected-region-outline-halo \{[^}]*stroke-width: 3\.9;/);
-    expect(styles).toMatch(/\.selected-region-outline-inner \{[^}]*stroke-width: 1\.55;/);
+    expect(styles).toMatch(/\.selected-region-outline \{[^}]*stroke-width: 1\.5;/);
   });
 
-  it("renders selected countries with a non-interactive tint and contrast outline", () => {
+  it("renders selected countries with a non-interactive tint and one outline", () => {
     expect(styles).toMatch(/\.selected-country-overlay,[^}]*pointer-events: none;/);
     expect(styles).toMatch(/\.selected-country-tint \{[^}]*fill: rgba\(255, 231, 128, 0\.12\);/);
-    expect(styles).toMatch(/\.selected-country-outline-halo \{[^}]*stroke-width: 4\.8;/);
-    expect(styles).toMatch(/\.selected-country-outline-inner \{[^}]*stroke-width: 1\.7;/);
+    expect(styles).toMatch(/\.selected-country-outline \{[^}]*stroke-width: 1\.6;/);
   });
 });

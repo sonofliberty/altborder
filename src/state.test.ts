@@ -649,6 +649,6 @@ function makeMapData(): MapData {
       },
     ],
     regions: [region, betaRegion1, betaRegion2, gammaRegion],
-    subdivisionBorders: [],
+    boundaryEdges: [],
   };
 }

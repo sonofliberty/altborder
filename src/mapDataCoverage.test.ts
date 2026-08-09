@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { geoArea } from "d3-geo";
 import mapDataFixture from "../public/data/map-data.json";
 import colorScheme from "./color-scheme.json";
 import { buildSelectedRegionAdjacency } from "./regionAdjacency";
@@ -105,6 +106,13 @@ describe("country flag coverage", () => {
 });
 
 describe("generated ADM1 coverage", () => {
+  it("keeps every base country smaller than half the sphere", () => {
+    const data = mapDataFixture as MapData;
+    for (const country of data.baseCountries) {
+      expect(geoArea(country.geometry), country.entityId).toBeLessThan(2 * Math.PI);
+    }
+  });
+
   it("includes requested countries with generated ADM1 coverage", () => {
     const data = mapDataFixture as MapData;
 
@@ -142,40 +150,61 @@ describe("generated ADM1 coverage", () => {
     expect(hasLongHorizontalExteriorSegment(sakha.geometry)).toBe(false);
   });
 
-  it("generates shared subdivision border linework for multi-region countries", () => {
+  it("generates complete shared boundary linework", () => {
     const data = mapDataFixture as MapData;
     const regionIds = new Set(data.regions.map((region) => region.id));
-    const baseOwnerByRegionId = new Map<string, string>();
-    for (const country of data.countries) {
-      for (const regionId of country.regionIds) {
-        baseOwnerByRegionId.set(regionId, country.id);
+    const edgeIds = new Set<string>();
+    const segmentKeys = new Set<string>();
+    const duplicateEdgeIds: string[] = [];
+    const duplicateSegments: string[] = [];
+    const invalidEdges: string[] = [];
+    const polarCoastlineClosures: string[] = [];
+
+    expect(data.version).toBe(2);
+    expect(data.boundaryEdges.filter((edge) => edge.id.startsWith("internal:")).length).toBeGreaterThan(3100);
+    expect(data.boundaryEdges.filter((edge) => edge.id.startsWith("country:")).length).toBeGreaterThan(200);
+    expect(data.boundaryEdges.filter((edge) => edge.id.startsWith("coast:")).length).toBeGreaterThan(200);
+    expect(data.boundaryEdges.some((edge) => edge.regionIds.includes("BRA-BR-RR"))).toBe(true);
+
+    for (const edge of data.boundaryEdges) {
+      const [firstRegionId, secondRegionId] = edge.regionIds;
+      if (edgeIds.has(edge.id)) duplicateEdgeIds.push(edge.id);
+      edgeIds.add(edge.id);
+      if (
+        !regionIds.has(firstRegionId) ||
+        (secondRegionId !== null && !regionIds.has(secondRegionId)) ||
+        !["LineString", "MultiLineString"].includes(edge.geometry.type) ||
+        !linealPartsHaveLength(edge.geometry) ||
+        (secondRegionId !== null && edge.regionIds.join(":") !== [...edge.regionIds].sort().join(":"))
+      ) {
+        invalidEdges.push(edge.id);
+      }
+      const lines = edge.geometry.type === "LineString" ? [edge.geometry.coordinates] : edge.geometry.coordinates;
+      for (const line of lines) {
+        for (let index = 1; index < line.length; index += 1) {
+          const previous = line[index - 1];
+          const position = line[index];
+          const key = boundarySegmentKey(previous, position);
+          if (segmentKeys.has(key)) duplicateSegments.push(`${edge.id}:${key}`);
+          segmentKeys.add(key);
+          if (
+            secondRegionId === null &&
+            Math.min(previous[1], position[1]) > 60 &&
+            ((Math.abs(previous[0] - position[0]) > 5 &&
+              Math.abs(previous[1] - position[1]) < 0.1) ||
+              (Math.abs(previous[0] - position[0]) > 1.5 &&
+                Math.abs(previous[1] - position[1]) < 0.011))
+          ) {
+            polarCoastlineClosures.push(`${edge.id}:${key}`);
+          }
+        }
       }
     }
 
-    expect(data.subdivisionBorders.length).toBeGreaterThan(3000);
-    expect(data.subdivisionBorders.filter((border) => border.ownerId === "DEU").length).toBeGreaterThan(20);
-    expect(data.subdivisionBorders.filter((border) => border.ownerId === "FRA").length).toBeGreaterThan(15);
-    expect(data.subdivisionBorders.filter((border) => border.ownerId === "POL").length).toBeGreaterThan(20);
-    expect(data.subdivisionBorders.filter((border) => border.ownerId === "ROU").length).toBeGreaterThan(80);
-    expect(data.subdivisionBorders.filter((border) => border.ownerId === "RUS").length).toBeGreaterThan(150);
-    expect(data.subdivisionBorders.filter((border) => border.ownerId === "USA").length).toBeGreaterThan(90);
-    expect(data.subdivisionBorders.filter((border) => border.ownerId === "BRA").length).toBeGreaterThan(40);
-    expect(
-      data.subdivisionBorders.filter((border) => border.ownerId === "BRA" && border.regionIds.includes("BRA-BR-RR")),
-    ).toHaveLength(2);
-    expect(data.subdivisionBorders.filter((border) => border.ownerId === "CAN")).toEqual([]);
-
-    for (const border of data.subdivisionBorders) {
-      const [firstRegionId, secondRegionId] = border.regionIds;
-      expect(regionIds.has(firstRegionId), border.id).toBe(true);
-      expect(regionIds.has(secondRegionId), border.id).toBe(true);
-      expect(baseOwnerByRegionId.get(firstRegionId), border.id).toBe(border.ownerId);
-      expect(baseOwnerByRegionId.get(secondRegionId), border.id).toBe(border.ownerId);
-      expect(["LineString", "MultiLineString"], border.id).toContain(border.geometry.type);
-      expect(linealPartsHaveLength(border.geometry), border.id).toBe(true);
-      expect(border.regionIds, border.id).toEqual([...border.regionIds].sort());
-      expect(border.id, border.id).toBe(`${border.ownerId}:${firstRegionId}:${secondRegionId}`);
-    }
+    expect(duplicateEdgeIds).toEqual([]);
+    expect(duplicateSegments).toEqual([]);
+    expect(invalidEdges).toEqual([]);
+    expect(polarCoastlineClosures).toEqual([]);
   });
 
   it("repairs mojibake in generated administrative region names", () => {
@@ -374,7 +403,7 @@ function hasLongHorizontalExteriorSegment(geometry: Polygon | MultiPolygon): boo
   });
 }
 
-function linealPartsHaveLength(geometry: MapData["subdivisionBorders"][number]["geometry"]): boolean {
+function linealPartsHaveLength(geometry: MapData["boundaryEdges"][number]["geometry"]): boolean {
   const lines = geometry.type === "LineString" ? [geometry.coordinates] : geometry.coordinates;
   return lines.every((line) => line.length >= 2 && lineLength(line) > 1e-6);
 }
@@ -384,6 +413,12 @@ function lineLength(line: Position[]): number {
     const previous = line[index];
     return total + Math.hypot(point[0] - previous[0], point[1] - previous[1]);
   }, 0);
+}
+
+function boundarySegmentKey(first: Position, second: Position): string {
+  const firstKey = `${first[0]},${first[1]}`;
+  const secondKey = `${second[0]},${second[1]}`;
+  return firstKey < secondKey ? `${firstKey}|${secondKey}` : `${secondKey}|${firstKey}`;
 }
 
 function ringSignedArea(ring: Position[]): number {

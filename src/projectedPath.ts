@@ -12,6 +12,7 @@ export type ProjectedPathData = {
 type ProjectedPathOptions = {
   coordinatePrecision?: number;
   seamBreakDistance?: number;
+  preferD3Fill?: boolean;
   preferManualFill?: boolean;
 };
 
@@ -54,7 +55,8 @@ export function projectGeometryToPathData(
   if (!d3PathData) return null;
   const d3Bounds = pathGenerator.bounds(geometry);
   const pathData =
-    options.preferManualFill || shouldUseManualFillPath(d3PathData, d3Bounds, projectedStroke.bounds)
+    options.preferManualFill ||
+    (!options.preferD3Fill && shouldUseManualFillPath(d3PathData, d3Bounds, projectedStroke.bounds))
       ? projectedStroke.pathData
       : d3PathData;
   if (!pathData) return null;

@@ -87,7 +87,7 @@ The committed map bundle lives at `public/data/map-data.json`. It currently cont
 
 - 237 country records
 - 1,964 editable region records
-- precomputed subdivision border geometry
+- precomputed coastline, country-border, and administrative edge geometry
 
 Attribution from the app:
 
@@ -123,7 +123,7 @@ src/labelLayout.ts             Country label fitting
 src/countryLabelGeometry.ts    Label geometry preparation
 src/geometrySplit.ts           Divide-country geometry operations
 src/projectedPath.ts           SVG path projection helpers
-src/subdivisionBorders.ts      Internal border rendering helpers
+src/boundaryEdges.ts           Shared-edge classification and path batching
 src/map*.ts                    Map culling, labels, zoom, and visual rules
 src/styles.css                 App styling
 public/data/map-data.json      Bundled map dataset

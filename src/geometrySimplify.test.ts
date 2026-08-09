@@ -73,12 +73,12 @@ describe("geometry simplification", () => {
     expect(withoutHoles.coordinates[0]).not.toBe(geometry.coordinates[0]);
   });
 
-  it("removes Santa Cruz's source interior rings for transfer rendering", () => {
+  it("keeps Santa Cruz transfer geometry free of interior rings", () => {
     const data = mapDataFixture as MapData;
     const santaCruz = data.regions.find((region) => region.id === "BOL-BO-S");
     if (!santaCruz) throw new Error("Missing Santa Cruz test data");
 
-    expect(countPolygonHoles(santaCruz.geometry)).toBeGreaterThan(0);
+    expect(countPolygonHoles(santaCruz.geometry)).toBe(0);
     expect(countPolygonHoles(removePolygonalGeometryHoles(santaCruz.geometry))).toBe(0);
   });
 
