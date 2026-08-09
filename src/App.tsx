@@ -18,12 +18,19 @@ import { geoNaturalEarth1 } from "d3-geo";
 import type { FeatureCollection, Geometry, Position } from "geojson";
 import type { GeoProjection } from "d3-geo";
 import type {
+  CountryFlag,
   EditMode,
   EditorSnapshot,
   HistoryState,
   MapData,
   RegionRecord,
 } from "./types";
+import {
+  getCountryFlag,
+  getCountryFlagUrl,
+  makeFlagOptions,
+  neutralCountryFlag,
+} from "./countryFlags";
 import {
   applyScenarioPayload,
   cloneSnapshot,
@@ -318,6 +325,8 @@ export default function App() {
     if (!data) return new Map();
     return new Map(data.countries.map((country) => [country.id, country]));
   }, [data]);
+
+  const flagOptions = useMemo(() => makeFlagOptions(data?.countries ?? []), [data]);
 
   const baseCountryByEntityId = useMemo(() => {
     if (!data) return new Map();
@@ -1649,6 +1658,7 @@ export default function App() {
         id: newEntityId,
         name,
         color,
+        flag: { ...neutralCountryFlag },
         regionIds: [newRegionId],
         isCustom: true,
       };
@@ -1694,6 +1704,7 @@ export default function App() {
         id: newEntityId,
         name,
         color: getFallbackCountryColor(name),
+        flag: { ...neutralCountryFlag },
         regionIds,
         isCustom: true,
       };
@@ -1738,6 +1749,24 @@ export default function App() {
         },
       };
     });
+  }
+
+  function updateSelectedFlag(flag: CountryFlag) {
+    const entityId = selectedEntityId;
+    if (!entityId || readOnly) return;
+    commit((draft) => {
+      const entity = draft.entities[entityId];
+      if (!entity) return draft;
+      draft.entities[entityId] = { ...entity, flag: { ...flag } };
+      return draft;
+    });
+  }
+
+  function resetSelectedFlag() {
+    const entityId = selectedEntityId;
+    if (!entityId || readOnly) return;
+    const baseEntity = baseEntityById.get(entityId);
+    updateSelectedFlag(baseEntity ? getCountryFlag(baseEntity) : neutralCountryFlag);
   }
 
   async function makeShare() {
@@ -2351,9 +2380,29 @@ export default function App() {
                     key={label.id}
                     transform={`translate(${label.x} ${label.y}) rotate(${label.angle})`}
                   >
+                    <image
+                      className="country-flag"
+                      href={getCountryFlagUrl(getCountryFlag(entities?.[label.id]))}
+                      x={-label.contentWidth / 2}
+                      y={-label.flagHeight / 2}
+                      width={label.flagWidth}
+                      height={label.flagHeight}
+                      preserveAspectRatio="xMidYMid meet"
+                      aria-hidden="true"
+                    />
+                    <rect
+                      className="country-flag-border"
+                      x={-label.contentWidth / 2}
+                      y={-label.flagHeight / 2}
+                      width={label.flagWidth}
+                      height={label.flagHeight}
+                      rx={label.fontSize * 0.06}
+                      strokeWidth={label.fontSize * 0.06}
+                      aria-hidden="true"
+                    />
                     <text
                       className="country-label"
-                      x={0}
+                      x={-label.contentWidth / 2 + label.flagWidth + label.flagGap + label.textLength / 2}
                       y={0}
                       fontSize={label.fontSize}
                       textLength={label.textLength}
@@ -2403,6 +2452,12 @@ export default function App() {
           onSelectEntity={changeSelectedEntity}
           onUpdateEntityName={updateSelectedName}
           onUpdateEntityColor={updateSelectedColor}
+          flagOptions={flagOptions}
+          defaultEntityFlag={selectedEntity && baseEntityById.has(selectedEntity.id)
+            ? getCountryFlag(baseEntityById.get(selectedEntity.id))
+            : neutralCountryFlag}
+          onUpdateEntityFlag={updateSelectedFlag}
+          onResetEntityFlag={resetSelectedFlag}
           onFinishMetadataEdit={finishMetadataEdit}
           inspectFocusedRegion={inspectFocusedRegionRow}
           inspectRegionRows={inspectRegionRows}

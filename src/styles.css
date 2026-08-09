@@ -520,7 +520,11 @@ textarea {
   transition: opacity 90ms ease;
 }
 
-.map.is-moving .country-labels text,
+.country-labels > g {
+  transition: opacity 90ms ease;
+}
+
+.map.is-moving .country-labels > g,
 .map.is-moving .region-labels text {
   opacity: 0;
 }
@@ -535,6 +539,16 @@ textarea {
   stroke: rgba(245, 248, 243, 0.86);
   stroke-linejoin: round;
   stroke-width: 0.12em;
+}
+
+.country-flag,
+.country-flag-border {
+  pointer-events: none;
+}
+
+.country-flag-border {
+  fill: none;
+  stroke: rgba(25, 38, 33, 0.58);
 }
 
 .region-labels text {
@@ -757,6 +771,32 @@ textarea {
   width: 34px;
 }
 
+.country-summary-markers {
+  display: grid;
+  gap: 4px;
+  width: 44px;
+}
+
+.country-summary-flag,
+.flag-preview {
+  background: #ffffff;
+  border: 1px solid rgba(16, 22, 20, 0.24);
+  border-radius: 4px;
+  display: block;
+  object-fit: contain;
+}
+
+.country-summary-flag {
+  height: 27px;
+  width: 36px;
+}
+
+.country-summary-markers .country-swatch {
+  border-radius: 3px;
+  height: 7px;
+  width: 36px;
+}
+
 .country-summary-text {
   display: grid;
   gap: 2px;
@@ -782,6 +822,81 @@ textarea {
   display: grid;
   gap: 10px;
   padding-top: 2px;
+}
+
+.flag-editor {
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+
+.flag-preview-row {
+  align-items: center;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 8px;
+}
+
+.flag-preview {
+  height: 48px;
+  width: 64px;
+}
+
+.flag-preview-row > div {
+  display: grid;
+  gap: 2px;
+}
+
+.flag-preview-row strong {
+  color: var(--color-text-strong);
+  font-size: 13px;
+}
+
+.flag-preview-row small {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.flag-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button-like {
+  align-items: center;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  color: var(--color-text);
+  cursor: pointer;
+  display: inline-flex;
+  gap: 7px;
+  justify-content: center;
+  padding: 0 11px;
+}
+
+.button-like.disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
+}
+
+.button-like input[type="file"] {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
+.flag-upload-hint {
+  align-items: center;
+  display: flex;
+  gap: 5px;
 }
 
 .compact-context-card {

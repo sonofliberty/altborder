@@ -5,14 +5,25 @@ import {
   Check,
   Eye,
   GitMerge,
+  Image,
+  RotateCcw,
   Search,
   Split,
+  Upload,
   X,
 } from "lucide-react";
 import type { CountrySearchOption } from "./countrySearch";
 import { filterCountryOptions } from "./countrySearch";
 import { customCountryAccentColor } from "./colorRuntime";
-import type { CountryEntity, EditMode } from "./types";
+import type { CountryEntity, CountryFlag, EditMode } from "./types";
+import {
+  builtinCountryFlag,
+  countryFlagEquals,
+  getCountryFlag,
+  getCountryFlagUrl,
+  normalizeFlagUpload,
+  type FlagOption,
+} from "./countryFlags";
 
 type RegionPanelRow = {
   id: string;
@@ -30,6 +41,10 @@ type EditorSidePanelProps = {
   onSelectEntity: (entityId: string) => void;
   onUpdateEntityName: (name: string) => void;
   onUpdateEntityColor: (color: string) => void;
+  flagOptions: FlagOption[];
+  defaultEntityFlag: CountryFlag;
+  onUpdateEntityFlag: (flag: CountryFlag) => void;
+  onResetEntityFlag: () => void;
   onFinishMetadataEdit: () => void;
   inspectFocusedRegion?: RegionPanelRow;
   inspectRegionRows: RegionPanelRow[];
@@ -97,6 +112,10 @@ function InspectPanel(props: EditorSidePanelProps) {
         onSelectEntity={props.onSelectEntity}
         onUpdateEntityName={props.onUpdateEntityName}
         onUpdateEntityColor={props.onUpdateEntityColor}
+        flagOptions={props.flagOptions}
+        defaultEntityFlag={props.defaultEntityFlag}
+        onUpdateEntityFlag={props.onUpdateEntityFlag}
+        onResetEntityFlag={props.onResetEntityFlag}
         onFinishMetadataEdit={props.onFinishMetadataEdit}
         emptyDescription="Click a country on the map or search below to start exploring."
       />
@@ -258,6 +277,10 @@ function DividePanel(props: EditorSidePanelProps) {
         onSelectEntity={props.onSelectEntity}
         onUpdateEntityName={props.onUpdateEntityName}
         onUpdateEntityColor={props.onUpdateEntityColor}
+        flagOptions={props.flagOptions}
+        defaultEntityFlag={props.defaultEntityFlag}
+        onUpdateEntityFlag={props.onUpdateEntityFlag}
+        onResetEntityFlag={props.onResetEntityFlag}
         onFinishMetadataEdit={props.onFinishMetadataEdit}
         emptyDescription="Choose the country you want to divide."
       />
@@ -373,6 +396,10 @@ function CountryContext({
   onSelectEntity,
   onUpdateEntityName,
   onUpdateEntityColor,
+  flagOptions,
+  defaultEntityFlag,
+  onUpdateEntityFlag,
+  onResetEntityFlag,
   onFinishMetadataEdit,
   emptyDescription,
   showEditingFields = true,
@@ -384,6 +411,10 @@ function CountryContext({
   onSelectEntity: (entityId: string) => void;
   onUpdateEntityName: (name: string) => void;
   onUpdateEntityColor: (color: string) => void;
+  flagOptions: FlagOption[];
+  defaultEntityFlag: CountryFlag;
+  onUpdateEntityFlag: (flag: CountryFlag) => void;
+  onResetEntityFlag: () => void;
   onFinishMetadataEdit: () => void;
   emptyDescription: string;
   showEditingFields?: boolean;
@@ -436,6 +467,15 @@ function CountryContext({
               onBlur={onFinishMetadataEdit}
             />
           </label>
+
+          <FlagEditor
+            entity={selectedEntity}
+            options={flagOptions}
+            defaultFlag={defaultEntityFlag}
+            disabled={readOnly}
+            onChange={onUpdateEntityFlag}
+            onReset={onResetEntityFlag}
+          />
         </div>
       ) : null}
     </section>
@@ -446,13 +486,101 @@ function CountrySummary({ entity }: { entity: CountryEntity }) {
   const regionCount = entity.regionIds.length;
   return (
     <div className="country-summary">
-      <span className="country-swatch" style={{ backgroundColor: entity.color }} aria-hidden="true" />
+      <div className="country-summary-markers" aria-hidden="true">
+        <img className="country-summary-flag" src={getCountryFlagUrl(getCountryFlag(entity))} alt="" />
+        <span className="country-swatch" style={{ backgroundColor: entity.color }} />
+      </div>
       <div className="country-summary-text">
         <strong>{entity.name}</strong>
         <span>
           {entity.isCustom ? "Custom country" : "Base country"} · {regionCount.toLocaleString()} {regionCount === 1 ? "region" : "regions"}
         </span>
       </div>
+    </div>
+  );
+}
+
+function FlagEditor({
+  entity,
+  options,
+  defaultFlag,
+  disabled,
+  onChange,
+  onReset,
+}: {
+  entity: CountryEntity;
+  options: FlagOption[];
+  defaultFlag: CountryFlag;
+  disabled: boolean;
+  onChange: (flag: CountryFlag) => void;
+  onReset: () => void;
+}) {
+  const currentFlag = getCountryFlag(entity);
+  const [uploadError, setUploadError] = useState("");
+
+  useEffect(() => setUploadError(""), [entity.id]);
+
+  return (
+    <div className="field flag-editor">
+      <span>Flag</span>
+      <div className="flag-preview-row">
+        <img className="flag-preview" src={getCountryFlagUrl(currentFlag)} alt={`${entity.name} flag`} />
+        <div>
+          <strong>{currentFlag.kind === "custom" ? "Custom image" : "Country flag"}</strong>
+          <small>{currentFlag.kind === "builtin" ? currentFlag.id.toUpperCase() : "128 × 96 WebP"}</small>
+        </div>
+      </div>
+
+      <CountrySearchSelect
+        label="Choose a flag"
+        value={currentFlag.kind === "builtin" && currentFlag.id !== "neutral" ? currentFlag.id : ""}
+        options={options}
+        onChange={(flagId) => {
+          if (!flagId) return;
+          setUploadError("");
+          onChange(builtinCountryFlag(flagId));
+        }}
+        disabled={disabled}
+        placeholder="Search flags"
+        clearable={false}
+      />
+
+      <div className="flag-actions">
+        <label className={disabled ? "button-like compact disabled" : "button-like compact"}>
+          <Upload size={15} aria-hidden="true" /> Upload image
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+            disabled={disabled}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (!file) return;
+              setUploadError("");
+              void normalizeFlagUpload(file)
+                .then(onChange)
+                .catch((error: unknown) => {
+                  setUploadError(error instanceof Error ? error.message : "The image could not be processed.");
+                });
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          className="compact"
+          disabled={disabled || countryFlagEquals(currentFlag, defaultFlag)}
+          onClick={() => {
+            setUploadError("");
+            onReset();
+          }}
+        >
+          <RotateCcw size={15} aria-hidden="true" /> Reset
+        </button>
+      </div>
+      {uploadError ? <div className="tool-error">{uploadError}</div> : null}
+      <p className="hint flag-upload-hint">
+        <Image size={13} aria-hidden="true" /> PNG, JPEG, WebP, or SVG. Maximum 2 MiB.
+      </p>
     </div>
   );
 }
@@ -465,6 +593,7 @@ function CountrySearchSelect({
   disabled = false,
   placeholder,
   resetAfterChange = false,
+  clearable = true,
 }: {
   label: string;
   value: string;
@@ -473,6 +602,7 @@ function CountrySearchSelect({
   disabled?: boolean;
   placeholder: string;
   resetAfterChange?: boolean;
+  clearable?: boolean;
 }) {
   const listboxId = useId();
   const labelId = useId();
@@ -532,7 +662,7 @@ function CountrySearchSelect({
             }
           }}
         />
-        {value && !disabled ? (
+        {clearable && value && !disabled ? (
           <button
             type="button"
             className="country-search-clear"

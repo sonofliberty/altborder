@@ -396,6 +396,83 @@ describe("scenario custom regions", () => {
   });
 });
 
+describe("country flags", () => {
+  it("serializes and restores a changed bundled flag", () => {
+    const data = makeMapData();
+    const snapshot = createInitialSnapshot(data);
+    snapshot.entities.AAA.flag = { kind: "builtin", id: "bb" };
+
+    const payload = createScenarioPayload(data, snapshot);
+    const restored = applyScenarioPayload(data, payload);
+
+    expect(payload.entityChanges.AAA.flag).toEqual({ kind: "builtin", id: "bb" });
+    expect(restored.entities.AAA.flag).toEqual({ kind: "builtin", id: "bb" });
+  });
+
+  it("serializes and restores a custom flag image", () => {
+    const data = makeMapData();
+    const snapshot = createInitialSnapshot(data);
+    snapshot.entities.AAA.flag = { kind: "custom", dataUrl: "data:image/webp;base64,AAAA" };
+
+    const payload = createScenarioPayload(data, snapshot);
+    const restored = applyScenarioPayload(data, payload);
+
+    expect(restored.entities.AAA.flag).toEqual({
+      kind: "custom",
+      dataUrl: "data:image/webp;base64,AAAA",
+    });
+  });
+
+  it("loads old base and custom entities without flag data", () => {
+    const data = makeMapData();
+    const restored = applyScenarioPayload(data, {
+      version: 1,
+      title: "Old flags",
+      customCounter: 2,
+      entityChanges: {
+        AAA: {
+          id: "AAA",
+          name: "Alpha renamed",
+          color: "#4F76A8",
+          regionIds: ["AAA_ALL"],
+        },
+        CUSTOM_001: {
+          id: "CUSTOM_001",
+          name: "Old custom",
+          color: "#A85F4F",
+          regionIds: ["BBB_1"],
+          isCustom: true,
+        },
+      },
+      regionOwnerChanges: [["BBB_1", "CUSTOM_001"]],
+    });
+
+    expect(restored.entities.AAA.flag).toEqual({ kind: "builtin", id: "aa" });
+    expect(restored.entities.CUSTOM_001.flag).toEqual({ kind: "builtin", id: "neutral" });
+  });
+
+  it("replaces unknown bundled flag IDs with the entity default", () => {
+    const data = makeMapData();
+    const restored = applyScenarioPayload(data, {
+      version: 1,
+      title: "Unknown flag",
+      customCounter: 1,
+      entityChanges: {
+        AAA: {
+          id: "AAA",
+          name: "Alpha",
+          color: "#4F76A8",
+          flag: { kind: "builtin", id: "missing-flag" },
+          regionIds: ["AAA_ALL"],
+        },
+      },
+      regionOwnerChanges: [],
+    });
+
+    expect(restored.entities.AAA.flag).toEqual({ kind: "builtin", id: "aa" });
+  });
+});
+
 describe("region transfers", () => {
   it("updates only moved region owners and affected entity region lists", () => {
     const data = makeMapData();
@@ -433,6 +510,7 @@ describe("region transfers", () => {
       color: "#A85F4F",
       regionIds: ["BBB_1"],
       isCustom: true,
+      flag: { kind: "builtin", id: "neutral" },
     });
     expect(result?.snapshot.entities.BBB.regionIds).toEqual(["BBB_2"]);
     expect(result?.snapshot.customCounter).toBe(2);
@@ -552,18 +630,21 @@ function makeMapData(): MapData {
         id: "AAA",
         name: "Alpha",
         color: "#4F76A8",
+        flag: { kind: "builtin", id: "aa" },
         regionIds: [region.id],
       },
       {
         id: "BBB",
         name: "Beta",
         color: "#6F9A5C",
+        flag: { kind: "builtin", id: "bb" },
         regionIds: [betaRegion1.id, betaRegion2.id],
       },
       {
         id: "CCC",
         name: "Gamma",
         color: "#B75D58",
+        flag: { kind: "builtin", id: "cc" },
         regionIds: [gammaRegion.id],
       },
     ],

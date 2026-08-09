@@ -2,12 +2,17 @@ import type { Geometry, LineString, MultiLineString } from "geojson";
 
 export type EditMode = "inspect" | "transfer" | "divide" | "merge";
 
+export type CountryFlag =
+  | { kind: "builtin"; id: string }
+  | { kind: "custom"; dataUrl: string };
+
 export type CountryEntity = {
   id: string;
   name: string;
   color: string;
   regionIds: string[];
   isCustom?: boolean;
+  flag?: CountryFlag;
 };
 
 export type RegionRecord = {

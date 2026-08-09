@@ -76,6 +76,33 @@ const requestedAdm1Countries = [
   "ARE",
   "YEM",
 ];
+const flagAssetPaths = new Set(Object.keys(import.meta.glob("../public/flags/4x3/*.svg")));
+
+describe("country flag coverage", () => {
+  it("assigns a bundled flag asset to every base country", () => {
+    const data = mapDataFixture as MapData;
+
+    expect(data.countries).toHaveLength(237);
+    for (const country of data.countries) {
+      expect(country.flag?.kind, country.id).toBe("builtin");
+      if (country.flag?.kind !== "builtin") continue;
+      expect(
+        flagAssetPaths.has(`../public/flags/4x3/${country.flag.id}.svg`),
+        `${country.id}:${country.flag.id}`,
+      ).toBe(true);
+    }
+    expect(flagAssetPaths.has("../public/flags/4x3/neutral.svg")).toBe(true);
+  });
+
+  it("uses explicit flag mappings for special map entities", () => {
+    const data = mapDataFixture as MapData;
+    const flags = new Map(data.countries.map((country) => [country.id, country.flag]));
+
+    expect(flags.get("XKX")).toEqual({ kind: "builtin", id: "xk" });
+    expect(flags.get("NE-N-Cyprus")).toEqual({ kind: "builtin", id: "northern-cyprus" });
+    expect(flags.get("NE-Somaliland")).toEqual({ kind: "builtin", id: "somaliland" });
+  });
+});
 
 describe("generated ADM1 coverage", () => {
   it("includes requested countries with generated ADM1 coverage", () => {

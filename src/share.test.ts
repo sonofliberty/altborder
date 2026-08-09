@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { decodeSharePayload, encodeSharePayload, hashRequestsEdit, readShareFromHash } from "./share";
 import type { ScenarioPayload } from "./types";
+import { maxCustomFlagDataUrlLength } from "./countryFlags";
 
 describe("share helpers", () => {
   it("round-trips scenario payloads through lazy compression", async () => {
@@ -13,6 +14,7 @@ describe("share helpers", () => {
           id: "CUSTOM_001",
           name: "Newland",
           color: "#A85F4F",
+          flag: { kind: "custom", dataUrl: "data:image/webp;base64,AAAA" },
           regionIds: ["CUSTOM_001-TERRITORY"],
           isCustom: true,
         },
@@ -96,6 +98,36 @@ describe("share helpers", () => {
       ok: false,
       error: "The shared map link is invalid.",
     });
+  });
+
+  it("rejects remote, malformed, and oversized custom flag images", async () => {
+    for (const flag of [
+      { kind: "custom", dataUrl: "https://example.com/flag.webp" },
+      { kind: "custom", dataUrl: "data:image/png;base64,AAAA" },
+      { kind: "custom", dataUrl: `data:image/webp;base64,${"A".repeat(maxCustomFlagDataUrlLength)}` },
+    ]) {
+      const encoded = await encodeSharePayload({
+        version: 1,
+        title: "Broken flag",
+        customCounter: 1,
+        entityChanges: {
+          CUSTOM_001: {
+            id: "CUSTOM_001",
+            name: "Broken",
+            color: "#A85F4F",
+            flag,
+            regionIds: [],
+            isCustom: true,
+          },
+        },
+        regionOwnerChanges: [],
+      } as unknown as ScenarioPayload);
+
+      await expect(decodeSharePayload(encoded)).resolves.toEqual({
+        ok: false,
+        error: "The shared map link is invalid.",
+      });
+    }
   });
 
   it("rejects entity records whose id does not match their payload key", async () => {

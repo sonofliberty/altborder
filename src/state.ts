@@ -1,4 +1,10 @@
 import type { CountryEntity, EditorSnapshot, MapData, RegionRecord, ScenarioPayload } from "./types";
+import {
+  countryFlagEquals,
+  getCountryFlag,
+  isCountryFlag,
+  neutralCountryFlag,
+} from "./countryFlags";
 
 export function createInitialSnapshot(data: MapData): EditorSnapshot {
   const regionOwners: Record<string, string> = {};
@@ -25,7 +31,11 @@ export function cloneSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
     entities: Object.fromEntries(
       Object.entries(snapshot.entities).map(([id, entity]) => [
         id,
-        { ...entity, regionIds: [...entity.regionIds] },
+        {
+          ...entity,
+          flag: entity.flag ? { ...entity.flag } : undefined,
+          regionIds: [...entity.regionIds],
+        },
       ]),
     ),
     regionOwners: { ...snapshot.regionOwners },
@@ -179,6 +189,7 @@ export function separateRegionAsCountry(
     id: newEntityId,
     name: trimmedName,
     color,
+    flag: { ...neutralCountryFlag },
     regionIds: [regionId],
     isCustom: true,
   };
@@ -219,6 +230,7 @@ export function createScenarioPayload(data: MapData, snapshot: EditorSnapshot): 
       !baseEntity ||
       baseEntity.name !== entity.name ||
       baseEntity.color !== entity.color ||
+      !countryFlagEquals(baseEntity.flag, entity.flag) ||
       entity.isCustom
     ) {
       entityChanges[id] = entity;
@@ -254,10 +266,18 @@ export function applyScenarioPayload(data: MapData, payload: ScenarioPayload): E
     entities: {
       ...base.entities,
       ...Object.fromEntries(
-        Object.entries(payload.entityChanges || {}).map(([id, entity]) => [
-          id,
-          { ...entity, regionIds: [...(entity.regionIds || [])] },
-        ]),
+        Object.entries(payload.entityChanges || {}).map(([id, entity]) => {
+          const baseEntity = getOwnValue(base.entities, id);
+          return [
+            id,
+            {
+              ...baseEntity,
+              ...entity,
+              flag: entity.flag ? { ...entity.flag } : baseEntity?.flag ? { ...baseEntity.flag } : undefined,
+              regionIds: [...(entity.regionIds || [])],
+            },
+          ];
+        }),
       ),
     },
     regionOwners: { ...base.regionOwners },
@@ -265,6 +285,7 @@ export function applyScenarioPayload(data: MapData, payload: ScenarioPayload): E
     customRegions: {},
   };
   normalizeEntityCustomFlags(base, next.entities);
+  normalizeEntityFlags(base, next.entities);
 
   for (const region of payload.customRegions || []) {
     if (hasOwnKey(base.regionOwners, region.id)) continue;
@@ -323,6 +344,7 @@ function pruneEmptyCustomEntities(entities: Record<string, CountryEntity>): void
 function createSerializableSnapshot(base: EditorSnapshot, snapshot: EditorSnapshot): EditorSnapshot {
   const next = cloneSnapshot(snapshot);
   normalizeEntityCustomFlags(base, next.entities);
+  normalizeEntityFlags(base, next.entities);
 
   for (const [regionId, ownerId] of Object.entries(next.regionOwners)) {
     const isBaseRegion = hasOwnKey(base.regionOwners, regionId);
@@ -362,6 +384,29 @@ function normalizeEntityCustomFlags(
     if (!entity.isCustom) continue;
     entities[entityId] = { ...entity };
     delete entities[entityId].isCustom;
+  }
+}
+
+function normalizeEntityFlags(
+  base: EditorSnapshot,
+  entities: Record<string, CountryEntity>,
+): void {
+  const allowedBuiltinIds = new Set(["neutral"]);
+  for (const entity of Object.values(base.entities)) {
+    const flag = getCountryFlag(entity);
+    if (flag.kind === "builtin") allowedBuiltinIds.add(flag.id);
+  }
+
+  for (const [entityId, entity] of Object.entries(entities)) {
+    const baseFlag = getOwnValue(base.entities, entityId)?.flag;
+    const fallbackFlag = baseFlag && isCountryFlag(baseFlag) ? baseFlag : neutralCountryFlag;
+    const flag = entity.flag;
+    if (
+      !isCountryFlag(flag) ||
+      (flag.kind === "builtin" && !allowedBuiltinIds.has(flag.id))
+    ) {
+      entities[entityId] = { ...entity, flag: { ...fallbackFlag } };
+    }
   }
 }
 

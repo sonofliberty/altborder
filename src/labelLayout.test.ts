@@ -120,6 +120,21 @@ describe("layoutCountryLabel", () => {
     expect(long!.fontSize).toBeLessThan(short!.fontSize);
   });
 
+  it("includes the flag and gap in the fitted label footprint", () => {
+    const label = layoutCountryLabel({
+      id: "flagged",
+      name: "Flagged",
+      geometries: [square(0, 0, 100, 50)],
+      project: identityProject,
+    });
+
+    expect(label).not.toBeNull();
+    expect(label!.contentWidth).toBeCloseTo(label!.flagWidth + label!.flagGap + label!.textLength);
+    expect(label!.flagHeight).toBeCloseTo(label!.fontSize * 0.8);
+    expect(label!.flagWidth / label!.flagHeight).toBeCloseTo(4 / 3);
+    expect(label!.width).toBeGreaterThan(label!.textLength);
+  });
+
   it("falls back to a small label for skinny countries", () => {
     const geometry = skinnyPolygon();
     const label = layoutCountryLabel({

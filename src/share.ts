@@ -1,5 +1,6 @@
 import type { ScenarioPayload } from "./types";
 import { isHexColor } from "./colorRuntime";
+import { isCountryFlag } from "./countryFlags";
 
 export type DecodedShare =
   | { ok: true; payload: ScenarioPayload }
@@ -206,7 +207,8 @@ function isCountryEntity(value: unknown): value is { id: string } {
     isHexColor(value.color) &&
     Array.isArray(value.regionIds) &&
     value.regionIds.every(isNonBlankString) &&
-    optionalBoolean(value.isCustom)
+    optionalBoolean(value.isCustom) &&
+    (value.flag === undefined || isCountryFlag(value.flag))
   );
 }
 

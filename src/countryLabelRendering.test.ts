@@ -21,6 +21,16 @@ describe("country label rendering", () => {
     expect(appSource).not.toContain("publishedLabelCount");
     expect(appSource).toContain("flushLabels();");
   });
+
+  it("renders a flag before each country name", () => {
+    const flagIndex = appSource.indexOf('className="country-flag"');
+    const labelIndex = appSource.indexOf('className="country-label"');
+
+    expect(flagIndex).toBeGreaterThan(-1);
+    expect(labelIndex).toBeGreaterThan(flagIndex);
+    expect(appSource).toContain("getCountryFlagUrl(getCountryFlag(entities?.[label.id]))");
+    expect(appSource).toContain("-label.contentWidth / 2 + label.flagWidth + label.flagGap");
+  });
 });
 
 describe("country underlay rendering", () => {

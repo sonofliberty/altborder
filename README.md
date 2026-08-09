@@ -9,6 +9,7 @@ The app is intentionally a lightweight visual editor, not a GIS tool. Administra
 - Full-screen SVG world map with pan and zoom.
 - Inspect mode for country and region details.
 - Rename and recolor countries or custom entities.
+- Show bundled country flags on map labels and replace them with a bundled or uploaded flag.
 - Transfer regions between countries.
 - Divide countries into new custom countries.
 - Merge multiple countries into one entity.
@@ -100,6 +101,8 @@ pnpm prepare:data
 
 This runs `scripts/build-map-data.mjs`, which downloads and caches geoBoundaries data under `.cache/geoboundaries`, combines it with fallback country geometry, simplifies it, and writes the app-ready JSON bundle.
 
+Country flag SVG files come from the MIT-licensed `flag-icons` package, with documented local additions for special map entities. Run `pnpm prepare:flags` to refresh the required assets and country flag IDs without rebuilding geometry.
+
 ## Sharing Model
 
 AltBorder does not need a backend for normal sharing. The app serializes scenario diffs, compresses them, and stores them in the URL hash:
@@ -125,6 +128,7 @@ src/map*.ts                    Map culling, labels, zoom, and visual rules
 src/styles.css                 App styling
 public/data/map-data.json      Bundled map dataset
 scripts/build-map-data.mjs     Map data preparation
+scripts/sync-flag-assets.mjs    Country flag mapping and asset preparation
 scripts/deploy-pages.mjs       GitHub Pages deployment
 ```
 
