@@ -66,6 +66,7 @@ type EditorSidePanelProps = {
   divideCanSwap: boolean;
   divideHasDraft: boolean;
   divideError: string;
+  divideIsCalculating: boolean;
   newCountryName: string;
   newCountryColor: string;
   onSwapDivideSides: () => void;
@@ -298,6 +299,7 @@ function DividePanel(props: EditorSidePanelProps) {
               </button>
             </div>
             <p className="hint">Draw a cut or click a separate island. Use Swap to choose the new side.</p>
+            {props.divideIsCalculating ? <div className="tool-status">Calculating border...</div> : null}
             {props.divideError ? <div className="tool-error">{props.divideError}</div> : null}
             <label className="field">
               <span>Name</span>

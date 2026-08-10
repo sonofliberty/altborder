@@ -77,6 +77,12 @@ describe("country underlay rendering", () => {
     expect(appSource).toContain("getProjectedPathOptions(false, true)");
     expect(appSource).toContain("combineProjectedPathData(");
   });
+
+  it("renders merged custom countries as compound paths without a polygon union", () => {
+    expect(appSource).toContain("!baseEntityById.has(entityId) && renderGeometries.length > 1");
+    expect(appSource).toContain("sealInternalSeams: true");
+    expect(appSource).toContain("preserveGeometryCaches: true");
+  });
 });
 
 describe("region border rendering", () => {

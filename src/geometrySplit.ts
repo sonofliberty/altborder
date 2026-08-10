@@ -61,38 +61,37 @@ export function buildCustomBoundaryEdges(
 
   const indexedRegions = activeRegions.flatMap((region) => {
     if (!isPolygonalGeometry(region.geometry)) return [];
-    try {
-      const polygon = readGeometry(region.geometry);
-      return [{
-        id: region.id,
-        boundary: polygon.getBoundary(),
-        bounds: boundsForGeometry(polygon),
-        isCustom: customRegionIds.has(region.id),
-      }];
-    } catch {
-      return [];
-    }
+    return [{
+      id: region.id,
+      geometry: region.geometry,
+      bounds: boundsForPolygonalGeometry(region.geometry),
+      isCustom: customRegionIds.has(region.id),
+    }];
   });
+  const customRegions = indexedRegions.filter((region) => region.isCustom);
   const edges: BoundaryEdgeRecord[] = [];
+  const processedPairs = new Set<string>();
 
-  for (let firstIndex = 0; firstIndex < indexedRegions.length; firstIndex += 1) {
-    for (let secondIndex = firstIndex + 1; secondIndex < indexedRegions.length; secondIndex += 1) {
-      const firstCandidate = indexedRegions[firstIndex];
-      const secondCandidate = indexedRegions[secondIndex];
-      if (!firstCandidate.isCustom && !secondCandidate.isCustom) continue;
-      if (!boundsOverlapWithTolerance(firstCandidate.bounds, secondCandidate.bounds, customBoundaryMatchTolerance)) {
+  for (const customRegion of customRegions) {
+    let customBoundary: JstsGeometry | null = null;
+    for (const candidate of indexedRegions) {
+      if (candidate.id === customRegion.id) continue;
+      const regionIds = [customRegion.id, candidate.id].sort() as [string, string];
+      const pairKey = `${regionIds[0]}:${regionIds[1]}`;
+      if (processedPairs.has(pairKey)) continue;
+      processedPairs.add(pairKey);
+      if (!boundsOverlapWithTolerance(customRegion.bounds, candidate.bounds, customBoundaryMatchTolerance)) {
         continue;
       }
 
-      const first = firstCandidate.isCustom ? firstCandidate : secondCandidate;
-      const second = firstCandidate.isCustom ? secondCandidate : firstCandidate;
       try {
-        const matchArea = BufferOp.bufferOp(second.boundary, customBoundaryMatchTolerance) as JstsGeometry;
-        const intersection = OverlayOp.intersection(first.boundary, matchArea) as JstsGeometry;
+        customBoundary ??= readGeometry(customRegion.geometry).getBoundary();
+        const candidateBoundary = readGeometry(candidate.geometry).getBoundary();
+        const matchArea = BufferOp.bufferOp(candidateBoundary, customBoundaryMatchTolerance) as JstsGeometry;
+        const intersection = OverlayOp.intersection(customBoundary, matchArea) as JstsGeometry;
         if (intersection.isEmpty()) continue;
         const geometry = collectLinealGeometry(rawWriteGeometry(intersection));
         if (!geometry || linealGeometryLength(geometry) <= minimumCustomBoundaryLength) continue;
-        const regionIds = [first.id, second.id].sort() as [string, string];
         edges.push({
           id: `custom:${regionIds[0]}:${regionIds[1]}`,
           regionIds,
@@ -591,6 +590,15 @@ function boundsForCoordinates(coordinates: Position[]): [number, number, number,
     bounds[3] = Math.max(bounds[3], position[1]);
   }
   return bounds;
+}
+
+function boundsForPolygonalGeometry(geometry: Geometry): [number, number, number, number] {
+  const positions = geometry.type === "Polygon"
+    ? geometry.coordinates.flat()
+    : geometry.type === "MultiPolygon"
+      ? geometry.coordinates.flat(2)
+      : [];
+  return boundsForCoordinates(positions);
 }
 
 function boundsOverlap(a: [number, number, number, number], b: [number, number, number, number]): boolean {

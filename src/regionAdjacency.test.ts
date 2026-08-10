@@ -1,79 +1,66 @@
 import { describe, expect, it } from "vitest";
-import type { CountryEntity, RegionRecord } from "./types";
+import mapDataFixture from "../public/data/map-data.json";
+import type { BoundaryEdgeRecord, CountryEntity } from "./types";
 import { buildSelectedRegionAdjacency } from "./regionAdjacency";
 import { getNeighborTargetEntityIds, orderTransferTargetEntities } from "./transferContext";
 
 describe("buildRegionAdjacency", () => {
   it("connects regions that share a border edge", () => {
     const adjacency = buildRegionAdjacency([
-      region("left", square(0, 0, 1, 1)),
-      region("right", square(1, 0, 2, 1)),
+      edge("left", "right"),
     ]);
 
     expect(adjacency.get("left")?.has("right")).toBe(true);
     expect(adjacency.get("right")?.has("left")).toBe(true);
   });
 
-  it("does not connect regions that only touch at a corner", () => {
+  it("does not connect regions without a shared boundary edge", () => {
     const adjacency = buildRegionAdjacency([
-      region("southwest", square(0, 0, 1, 1)),
-      region("northeast", square(1, 1, 2, 2)),
-    ]);
+      edge("southwest", "west"),
+      edge("northeast", "east"),
+    ], ["southwest", "northeast"]);
 
     expect(adjacency.get("southwest")?.has("northeast")).toBe(false);
     expect(adjacency.get("northeast")?.has("southwest")).toBe(false);
   });
 
-  it("does not connect non-touching regions outside tolerance", () => {
-    const adjacency = buildRegionAdjacency(
-      [region("left", square(0, 0, 1, 1)), region("right", square(1.1, 0, 2.1, 1))],
-      0.01,
-    );
+  it("does not treat a coastline as a region neighbor", () => {
+    const adjacency = buildRegionAdjacency([edge("island", null)], ["island"]);
 
-    expect(adjacency.get("left")?.has("right")).toBe(false);
+    expect(adjacency.get("island")).toEqual(new Set());
   });
 
-  it("connects regions separated by a tiny geometry gap", () => {
-    const adjacency = buildRegionAdjacency(
-      [region("left", square(0, 0, 1, 1)), region("right", square(1.0004, 0, 2.0004, 1))],
-      0.001,
+  it("finds both Finland and Norway next to Murmansk Oblast", () => {
+    const mapData = mapDataFixture as unknown as {
+      boundaryEdges: BoundaryEdgeRecord[];
+      regions: Array<{ id: string; name: string }>;
+      countries: CountryEntity[];
+    };
+    const murmanskId = mapData.regions.find((region) => region.name === "Murmansk Oblast")?.id;
+    expect(murmanskId).toBe("RUS-RU-MUR");
+    if (!murmanskId) throw new Error("Murmansk Oblast is missing from the map data.");
+
+    const adjacency = buildSelectedRegionAdjacency(mapData.boundaryEdges, [murmanskId]);
+    const regionOwners = Object.fromEntries(
+      mapData.countries.flatMap((country) => country.regionIds.map((regionId) => [regionId, country.id])),
     );
+    const neighborEntityIds = getNeighborTargetEntityIds({
+      selectedRegionIds: [murmanskId],
+      selectedEntityId: "RUS",
+      regionAdjacency: adjacency,
+      regionOwners,
+    });
 
-    expect(adjacency.get("left")?.has("right")).toBe(true);
-  });
-
-  it("does not connect boundaries that only touch tolerance at one end", () => {
-    const adjacency = buildRegionAdjacency(
-      [
-        region("left", square(0, 0, 1, 10)),
-        region("slanted", {
-          type: "Polygon",
-          coordinates: [
-            [
-              [1.0004, 0],
-              [2, 0],
-              [2, 10],
-              [1.1, 10],
-              [1.0004, 0],
-            ],
-          ],
-        }),
-      ],
-      0.001,
-    );
-
-    expect(adjacency.get("left")?.has("slanted")).toBe(false);
+    expect(neighborEntityIds).toEqual(new Set(["FIN", "NOR"]));
   });
 });
 
 describe("transfer target ordering", () => {
   it("puts neighboring target countries before other countries", () => {
     const adjacency = buildRegionAdjacency([
-      region("germany_border", square(0, 0, 1, 1)),
-      region("france_border", square(-1, 0, 0, 1)),
-      region("netherlands_border", square(0, 1, 1, 2)),
-      region("italy_interior", square(5, 5, 6, 6)),
-    ]);
+      edge("germany_border", "france_border"),
+      edge("germany_border", "netherlands_border"),
+    ], ["germany_border", "france_border", "netherlands_border", "italy_interior"]);
     const neighborEntityIds = getNeighborTargetEntityIds({
       selectedRegionIds: ["germany_border"],
       selectedEntityId: "DEU",
@@ -97,12 +84,10 @@ describe("transfer target ordering", () => {
 
   it("unions neighboring countries from multiple selected regions without duplicates", () => {
     const adjacency = buildRegionAdjacency([
-      region("germany_west", square(0, 0, 1, 1)),
-      region("germany_north", square(1, 0, 2, 1)),
-      region("france_border", square(-1, 0, 0, 1)),
-      region("denmark_border", square(1, 1, 2, 2)),
-      region("netherlands_corner", square(2, 1, 3, 2)),
-    ]);
+      edge("germany_west", "france_border"),
+      edge("germany_west", "germany_north"),
+      edge("germany_north", "denmark_border"),
+    ], ["germany_west", "germany_north"]);
     const neighborEntityIds = getNeighborTargetEntityIds({
       selectedRegionIds: ["germany_west", "germany_north"],
       selectedEntityId: "DEU",
@@ -142,40 +127,22 @@ describe("transfer target ordering", () => {
   });
 });
 
-function region(id: string, geometry: RegionRecord["geometry"]): RegionRecord {
+function edge(firstRegionId: string, secondRegionId: string | null): BoundaryEdgeRecord {
   return {
-    id,
-    name: id,
-    ownerId: id,
-    type: "Test region",
-    geometry,
+    id: `${firstRegionId}:${secondRegionId ?? "ocean"}`,
+    regionIds: [firstRegionId, secondRegionId],
+    geometry: {
+      type: "LineString",
+      coordinates: [[0, 0], [1, 1]],
+    },
   };
 }
 
 function buildRegionAdjacency(
-  regions: RegionRecord[],
-  tolerance?: number,
+  edges: BoundaryEdgeRecord[],
+  selectedRegionIds: string[] = [...new Set(edges.flatMap(({ regionIds }) => regionIds.filter((id): id is string => id !== null)))],
 ): Map<string, Set<string>> {
-  return buildSelectedRegionAdjacency(
-    regions,
-    regions.map((region) => region.id),
-    tolerance,
-  );
-}
-
-function square(minX: number, minY: number, maxX: number, maxY: number): RegionRecord["geometry"] {
-  return {
-    type: "Polygon",
-    coordinates: [
-      [
-        [minX, minY],
-        [maxX, minY],
-        [maxX, maxY],
-        [minX, maxY],
-        [minX, minY],
-      ],
-    ],
-  };
+  return buildSelectedRegionAdjacency(edges, selectedRegionIds);
 }
 
 function countries(...entries: Array<[id: string, name: string]>): CountryEntity[] {

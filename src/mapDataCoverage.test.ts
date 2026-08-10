@@ -2,9 +2,8 @@ import { describe, expect, it } from "vitest";
 import { geoArea } from "d3-geo";
 import mapDataFixture from "../public/data/map-data.json";
 import colorScheme from "./color-scheme.json";
-import { buildSelectedRegionAdjacency } from "./regionAdjacency";
-import type { Geometry, MultiPolygon, Polygon, Position } from "geojson";
-import type { MapData, RegionRecord } from "./types";
+import type { MultiPolygon, Polygon, Position } from "geojson";
+import type { MapData } from "./types";
 
 const requestedAdm1Countries = [
   "GBR",
@@ -225,9 +224,7 @@ describe("generated ADM1 coverage", () => {
     const fallbackCountryIds = new Set(
       data.countries.filter((country) => countryUsesFallbackColor(country.id, country.name)).map((country) => country.id),
     );
-    const adjacency = buildRegionAdjacency(
-      countryBoundaryRecords(data).filter((country) => countriesById.has(country.ownerId)),
-    );
+    const adjacency = buildCountryAdjacency(data);
     const conflicts = [];
 
     for (const countryId of fallbackCountryIds) {
@@ -265,7 +262,7 @@ describe("generated ADM1 coverage", () => {
     const data = mapDataFixture as MapData;
     const canada = data.countries.find((country) => country.id === "CAN");
     const canadaRegion = data.regions.find((region) => region.id === "CAN-ALL");
-    const adjacency = buildRegionAdjacency(countryBoundaryRecords(data));
+    const adjacency = buildCountryAdjacency(data);
 
     expect(canada?.name).toBe("Canada");
     expect(canada?.regionIds).toEqual(["CAN-ALL"]);
@@ -324,41 +321,22 @@ function normalizeCountryColorName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
-function buildRegionAdjacency(regions: RegionRecord[]): Map<string, Set<string>> {
-  return buildSelectedRegionAdjacency(
-    regions,
-    regions.map((region) => region.id),
+function buildCountryAdjacency(data: MapData): Map<string, Set<string>> {
+  const regionOwners = new Map(
+    data.countries.flatMap((country) => country.regionIds.map((regionId) => [regionId, country.id] as const)),
   );
-}
+  const adjacency = new Map(data.countries.map((country) => [country.id, new Set<string>()]));
 
-function countryBoundaryRecords(data: MapData) {
-  const baseCountryIds = new Set(data.baseCountries.map((country) => country.entityId));
-  const countriesById = new Map(data.countries.map((country) => [country.id, country]));
-  const records = data.baseCountries.map((country) => {
-    const entity = countriesById.get(country.entityId);
-    return {
-      id: country.entityId,
-      name: entity?.name ?? country.entityId,
-      ownerId: country.entityId,
-      type: "Country boundary",
-      geometry: country.geometry as Geometry,
-    };
-  });
-
-  for (const country of data.countries) {
-    if (baseCountryIds.has(country.id) || country.regionIds.length !== 1) continue;
-    const region = data.regions.find((entry) => entry.id === country.regionIds[0]);
-    if (!region) continue;
-    records.push({
-      id: country.id,
-      name: country.name,
-      ownerId: country.id,
-      type: "Fallback country boundary",
-      geometry: region.geometry as Geometry,
-    });
+  for (const { regionIds: [firstRegionId, secondRegionId] } of data.boundaryEdges) {
+    if (secondRegionId === null) continue;
+    const firstOwnerId = regionOwners.get(firstRegionId);
+    const secondOwnerId = regionOwners.get(secondRegionId);
+    if (!firstOwnerId || !secondOwnerId || firstOwnerId === secondOwnerId) continue;
+    adjacency.get(firstOwnerId)?.add(secondOwnerId);
+    adjacency.get(secondOwnerId)?.add(firstOwnerId);
   }
 
-  return records;
+  return adjacency;
 }
 
 function expectNonCountryRegion(data: MapData, name: string, ownerId: string, regionId: string): void {

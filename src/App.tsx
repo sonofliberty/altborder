@@ -53,7 +53,11 @@ import {
   makeShareUrl,
   readShareFromHash,
 } from "./share";
-import type { CountrySplit } from "./geometrySplit";
+import type {
+  DivideWorkerResult,
+  GeometryWorkerRequest,
+  GeometryWorkerResponse,
+} from "./geometryWorker";
 import type { FittedCountryLabel } from "./labelLayout";
 import { countryLabelMinScreenFontSize } from "./labelConstants";
 import {
@@ -73,6 +77,7 @@ import {
   orderTransferTargetEntities,
 } from "./transferContext";
 import { batchBoundaryPaths, type ProjectedBoundaryEdge } from "./boundaryEdges";
+import { buildSelectedRegionAdjacency } from "./regionAdjacency";
 import { EditorSidePanel } from "./EditorSidePanel";
 import {
   geometryToSvgPath,
@@ -108,6 +113,10 @@ const simplifiedCountryLayerMaxZoom = 1.35;
 const wheelZoomMaxDelta = 80;
 const wheelZoomSensitivity = 0.001;
 const countryFlagImageRasterScale = 16;
+const emptyDivideWorkerResult: DivideWorkerResult = {
+  split: { ok: false, reason: "" },
+  territories: null,
+};
 
 type ZoomState = {
   x: number;
@@ -165,6 +174,7 @@ export default function App() {
   const [isDrawingDivideLine, setIsDrawingDivideLine] = useState(false);
   const [divideNewPieceIndex, setDivideNewPieceIndex] = useState<0 | 1 | null>(null);
   const [divideError, setDivideError] = useState("");
+  const [divideIsCalculating, setDivideIsCalculating] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
   const [share, setShare] = useState<ShareState | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -177,7 +187,7 @@ export default function App() {
   const [inspectFocusedRegionId, setInspectFocusedRegionId] = useState("");
   const [transferFocusedRegionId, setTransferFocusedRegionId] = useState("");
   const [neighborTargetEntityIds, setNeighborTargetEntityIds] = useState<Set<string>>(new Set());
-  const [geometrySplitModule, setGeometrySplitModule] = useState<GeometrySplitModule | null>(null);
+  const [divideWorkerResult, setDivideWorkerResult] = useState<DivideWorkerResult>(emptyDivideWorkerResult);
   const mapSvgRef = useRef<SVGSVGElement | null>(null);
   const mapContentRef = useRef<SVGGElement | null>(null);
   const zoomRef = useRef<ZoomState>({ x: 0, y: 0, k: 1 });
@@ -200,6 +210,7 @@ export default function App() {
   const baseProjectedRegionCacheRef = useRef(new Map<string, ProjectedPathData>());
   const baseProjectedRegionDetailStrokeCacheRef = useRef(new Map<string, string>());
   const metadataEditKeyRef = useRef<string | null>(null);
+  const geometryWorkerRequestIdRef = useRef(0);
 
   useEffect(() => {
     baseProjectedRegionCacheRef.current.clear();
@@ -295,15 +306,26 @@ export default function App() {
 
     let cancelled = false;
     const activeRegions = effectiveRegions.filter((region) => Boolean(regionOwners[region.id]));
-    const customRegionIds = new Set(customRegionRecords.map((region) => region.id));
-    void import("./geometrySplit").then(({ buildCustomBoundaryEdges }) => {
-      if (!cancelled) {
-        setCustomBoundaryEdges(buildCustomBoundaryEdges(activeRegions, customRegionIds));
-      }
-    });
+    const worker = new Worker(new URL("./geometryWorker.ts", import.meta.url), { type: "module" });
+    const requestId = geometryWorkerRequestIdRef.current + 1;
+    geometryWorkerRequestIdRef.current = requestId;
+    const handleMessage = (event: MessageEvent<GeometryWorkerResponse>) => {
+      if (cancelled || event.data.id !== requestId || event.data.kind !== "custom-boundaries") return;
+      setCustomBoundaryEdges(event.data.edges);
+    };
+    const request: GeometryWorkerRequest = {
+      id: requestId,
+      kind: "custom-boundaries",
+      activeRegions,
+      customRegionIds: customRegionRecords.map((region) => region.id),
+    };
+    worker.addEventListener("message", handleMessage);
+    worker.postMessage(request);
 
     return () => {
       cancelled = true;
+      worker.removeEventListener("message", handleMessage);
+      worker.terminate();
     };
   }, [customRegionRecords, effectiveRegions, regionOwners]);
 
@@ -662,6 +684,30 @@ export default function App() {
             continue;
           }
 
+          const renderGeometries = renderGeometriesByEntityId.get(entityId) ?? [];
+          if (!baseEntityById.has(entityId) && renderGeometries.length > 1) {
+            const composed = combineProjectedPathData(
+              renderGeometries.map((geometry) =>
+                projectGeometryToPathData(
+                  geometry,
+                  projection,
+                  getProjectedPathOptions(false, true),
+                ),
+              ),
+            );
+            if (composed) {
+              const underlay = {
+                id: entityId,
+                pathData: composed.pathData,
+                bounds: composed.bounds,
+                sealInternalSeams: true,
+              };
+              countryUnderlayCacheRef.current.set(cacheKey, underlay);
+              nextUnderlays.push(underlay);
+            }
+            continue;
+          }
+
           const geometry = await (async () => {
             if (
               shouldUseStableBaseRenderGeometry(entityId, regionIds, baseEntityById, baseCountryByEntityId)
@@ -683,16 +729,15 @@ export default function App() {
               });
             }
 
-            const geometries = renderGeometriesByEntityId.get(entityId) ?? [];
-            if (geometries.length <= 1) return geometries[0];
+            if (renderGeometries.length <= 1) return renderGeometries[0];
 
             if (shouldSkipRenderGapClosing(entityId, regionIds, baseOwnerByRegionId)) {
               unionGeoJsonGeometries ??= (await import("./geometrySplit")).unionGeoJsonGeometries;
-              return unionGeoJsonGeometries(geometries);
+              return unionGeoJsonGeometries(renderGeometries);
             }
             unionGeoJsonGeometriesClosingGaps ??= (await import("./geometrySplit")).unionGeoJsonGeometriesClosingGaps;
             return unionGeoJsonGeometriesClosingGaps(
-              geometries,
+              renderGeometries,
               ownsTransferredRegions(entityId, regionIds, baseOwnerByRegionId)
                 ? acquiredRegionRenderGapTolerance
                 : countryRenderGapTolerance,
@@ -764,21 +809,6 @@ export default function App() {
     regionIdsByEntityId,
     renderGeometriesByEntityId,
   ]);
-
-  useEffect(() => {
-    if (mode !== "divide" || geometrySplitModule) return;
-
-    let cancelled = false;
-    void import("./geometrySplit").then((module) => {
-      if (!cancelled) {
-        setGeometrySplitModule(module);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [geometrySplitModule, mode]);
 
   useEffect(() => {
     if (!data || !entities) {
@@ -1035,28 +1065,18 @@ export default function App() {
       return;
     }
 
-    let cancelled = false;
     const selectedRegionIds = [...selectedRegions];
-    const regionOwnersSnapshot = regionOwners;
-
-    void import("./regionAdjacency").then(({ buildSelectedRegionAdjacency }) => {
-      if (cancelled) return;
-      const regionAdjacency = buildSelectedRegionAdjacency(effectiveRegions, selectedRegionIds);
-      const nextNeighborTargetEntityIds = getNeighborTargetEntityIds({
-        selectedRegionIds,
-        selectedEntityId,
-        regionAdjacency,
-        regionOwners: regionOwnersSnapshot,
-      });
-      if (!cancelled) {
-        setNeighborTargetEntityIds(nextNeighborTargetEntityIds);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [effectiveRegions, mode, regionOwners, selectedEntityId, selectedRegions]);
+    const regionAdjacency = buildSelectedRegionAdjacency(
+      [...(data?.boundaryEdges ?? []), ...customBoundaryEdges],
+      selectedRegionIds,
+    );
+    setNeighborTargetEntityIds(getNeighborTargetEntityIds({
+      selectedRegionIds,
+      selectedEntityId,
+      regionAdjacency,
+      regionOwners,
+    }));
+  }, [customBoundaryEdges, data?.boundaryEdges, mode, regionOwners, selectedEntityId, selectedRegions]);
 
   const mergeSelectedEntities = useMemo(() => {
     if (!entities) return [];
@@ -1151,34 +1171,57 @@ export default function App() {
       });
   }, [divideLine, projection]);
 
-  const divideSplit = useMemo<CountrySplit>(() => {
-    if (mode !== "divide" || isDrawingDivideLine) {
-      return { ok: false, reason: "" };
+  useEffect(() => {
+    if (
+      mode !== "divide" ||
+      isDrawingDivideLine ||
+      (!divideIslandPoint && divideLineCoordinates.length < 2)
+    ) {
+      setDivideWorkerResult(emptyDivideWorkerResult);
+      setDivideIsCalculating(false);
+      return;
     }
-    if (!geometrySplitModule) {
-      return { ok: false, reason: "" };
-    }
-    if (divideIslandPoint) {
-      return geometrySplitModule.separateCountryIsland(selectedEntitySplitRegions, divideIslandPoint);
-    }
-    if (divideLineCoordinates.length < 2) {
-      return { ok: false, reason: "" };
-    }
-    return geometrySplitModule.splitCountryGeometry(selectedEntitySplitRegions, divideLineCoordinates);
+
+    let cancelled = false;
+    const worker = new Worker(new URL("./geometryWorker.ts", import.meta.url), { type: "module" });
+    const requestId = geometryWorkerRequestIdRef.current + 1;
+    geometryWorkerRequestIdRef.current = requestId;
+    setDivideWorkerResult(emptyDivideWorkerResult);
+    setDivideIsCalculating(true);
+    const handleMessage = (event: MessageEvent<GeometryWorkerResponse>) => {
+      if (cancelled || event.data.id !== requestId || event.data.kind !== "divide") return;
+      setDivideWorkerResult(event.data.result);
+      setDivideIsCalculating(false);
+    };
+    const request: GeometryWorkerRequest = {
+      id: requestId,
+      kind: "divide",
+      regions: selectedEntitySplitRegions,
+      cutLine: divideLineCoordinates,
+      islandPoint: divideIslandPoint,
+    };
+    worker.addEventListener("message", handleMessage);
+    worker.postMessage(request);
+
+    return () => {
+      cancelled = true;
+      worker.removeEventListener("message", handleMessage);
+      worker.terminate();
+    };
   }, [
     divideIslandPoint,
     divideLineCoordinates,
-    geometrySplitModule,
     isDrawingDivideLine,
     mode,
     selectedEntitySplitRegions,
   ]);
 
+  const divideSplit = divideWorkerResult.split;
   const activeDivideNewPieceIndex =
     divideSplit.ok ? divideNewPieceIndex ?? divideSplit.defaultNewPieceIndex : null;
   const divideTerritories =
-    divideSplit.ok && activeDivideNewPieceIndex !== null && geometrySplitModule
-      ? geometrySplitModule.buildDivideTerritories(divideSplit, activeDivideNewPieceIndex)
+    divideSplit.ok && activeDivideNewPieceIndex !== null
+      ? divideWorkerResult.territories?.[activeDivideNewPieceIndex] ?? null
       : null;
   const divideExistingPath = divideTerritories
     ? geometryToSvgPath(divideTerritories.existingGeometry, projection, getProjectedPathOptions())
@@ -1247,13 +1290,18 @@ export default function App() {
     }
   }, [mode, selectedEntityId, selectedRegions, snapshot, transferFocusedRegionId]);
 
-  function commit(mutator: (draft: EditorSnapshot) => EditorSnapshot | void) {
+  function commit(
+    mutator: (draft: EditorSnapshot) => EditorSnapshot | void,
+    options: { preserveGeometryCaches?: boolean } = {},
+  ) {
     if (!history || readOnly) return;
     finishMetadataEdit();
     const draft = cloneSnapshot(history.present);
     const result = mutator(draft) ?? draft;
     const next = updateEntityRegions(result);
-    clearGeometryRenderCaches();
+    if (!options.preserveGeometryCaches) {
+      clearGeometryRenderCaches();
+    }
     setShare(null);
     setHistory({
       present: next,
@@ -1682,7 +1730,7 @@ export default function App() {
       draft.regionOwners[existingRegionId] = selectedEntity.id;
       draft.regionOwners[newRegionId] = newEntityId;
       return draft;
-    });
+    }, { preserveGeometryCaches: true });
 
     setSelectedEntityId(newEntityId);
     setSelectedRegions(new Set());
@@ -1715,7 +1763,7 @@ export default function App() {
         draft.regionOwners[regionId] = newEntityId;
       }
       return draft;
-    });
+    }, { preserveGeometryCaches: true });
 
     setSelectedEntityId(newEntityId);
     setMergeSelection(new Set());
@@ -1762,7 +1810,7 @@ export default function App() {
       if (!entity) return draft;
       draft.entities[entityId] = { ...entity, flag: { ...flag } };
       return draft;
-    });
+    }, { preserveGeometryCaches: true });
   }
 
   function resetSelectedFlag() {
@@ -2144,6 +2192,13 @@ export default function App() {
       {boundaryPaths.coastlinePath ? (
         <path className="coastline-line" d={boundaryPaths.coastlinePath} fill="none" />
       ) : null}
+      {boundaryPaths.administrativePath ? (
+        <path
+          className="administrative-border-line"
+          d={boundaryPaths.administrativePath}
+          fill="none"
+        />
+      ) : null}
       {boundaryPaths.activeAdministrativePath ? (
         <path
           className="administrative-border-line administrative-border-active"
@@ -2446,6 +2501,7 @@ export default function App() {
           divideCanSwap={divideSplit.ok}
           divideHasDraft={divideLine.length > 0 || Boolean(divideIslandPoint)}
           divideError={visibleDivideError}
+          divideIsCalculating={divideIsCalculating}
           newCountryName={newCountryName}
           newCountryColor={newCountryColor}
           onSwapDivideSides={swapDivideSides}

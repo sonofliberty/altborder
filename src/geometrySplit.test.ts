@@ -292,6 +292,16 @@ describe("buildCustomBoundaryEdges", () => {
       ),
     ).toEqual([]);
   });
+
+  it("builds one edge when both touching regions are custom", () => {
+    const edges = buildCustomBoundaryEdges(
+      [region("left", square(0, 0, 5, 10)), region("right", square(5, 0, 10, 10))],
+      new Set(["left", "right"]),
+    );
+
+    expect(edges).toHaveLength(1);
+    expect(edges[0].regionIds).toEqual(["left", "right"]);
+  });
 });
 
 function region(id: string, geometry: Geometry): RegionRecord {

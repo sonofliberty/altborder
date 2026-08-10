@@ -362,17 +362,18 @@ textarea {
   fill: none;
   stroke-linecap: butt;
   stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
   vector-effect: non-scaling-stroke;
 }
 
 .coastline-line {
-  stroke: rgba(4, 7, 7, 0.52);
-  stroke-width: 0.65;
+  stroke: rgba(4, 7, 7, 0.44);
+  stroke-width: 0.5;
 }
 
 .country-border-line {
-  stroke: rgba(4, 7, 7, 0.76);
-  stroke-width: 0.9;
+  stroke: rgba(4, 7, 7, 0.68);
+  stroke-width: 0.72;
 }
 
 .region {
@@ -385,27 +386,27 @@ textarea {
 
 .administrative-border-line {
   pointer-events: none;
-  stroke: rgba(6, 9, 8, 0.38);
+  stroke: rgba(6, 9, 8, 0.52);
   stroke-opacity: 0;
-  stroke-width: 0.4;
+  stroke-width: 0.3;
   transition:
     stroke-opacity 120ms ease,
     stroke-width 120ms ease;
 }
 
 .map-admin-borders-close .administrative-border-line {
-  stroke-opacity: 0;
-  stroke-width: 0.4;
+  stroke-opacity: 0.26;
+  stroke-width: 0.38;
 }
 
 .map-admin-borders-detail .administrative-border-line {
-  stroke-opacity: 0;
-  stroke-width: 0.55;
+  stroke-opacity: 0.44;
+  stroke-width: 0.48;
 }
 
 .administrative-border-line.administrative-border-active {
   stroke-opacity: 0.56;
-  stroke-width: 0.4;
+  stroke-width: 0.48;
 }
 
 .selected-region-overlays,
@@ -437,11 +438,11 @@ textarea {
 }
 
 .selected-country-outline {
-  stroke-width: 1.6;
+  stroke-width: 1.25;
 }
 
 .selected-region-outline {
-  stroke-width: 1.5;
+  stroke-width: 1.2;
 }
 
 .divide-preview {
@@ -1099,6 +1100,11 @@ textarea {
   font-size: 12px;
   line-height: 1.35;
   padding: 7px 9px;
+}
+
+.tool-status {
+  color: var(--color-muted);
+  font-size: 12px;
 }
 
 .wide {

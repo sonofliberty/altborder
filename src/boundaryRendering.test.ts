@@ -6,14 +6,12 @@ const { readFileSync } = require("node:fs");
 const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
 
 describe("shared boundary rendering", () => {
-  it("renders one path for each permanent boundary style and one active administrative path", () => {
+  it("renders one shared path for each boundary style", () => {
     expect(appSource.match(/className="coastline-line"/g)).toHaveLength(1);
     expect(appSource.match(/className="country-border-line"/g)).toHaveLength(1);
+    expect(appSource.match(/className="administrative-border-line"/g)).toHaveLength(1);
     expect(appSource.match(/administrative-border-line administrative-border-active/g)).toHaveLength(1);
-    expect(appSource).toContain(
-      'className="administrative-border-line administrative-border-active"',
-    );
-    expect(appSource).not.toContain('d={boundaryPaths.administrativePath}');
+    expect(appSource).toContain('d={boundaryPaths.administrativePath}');
   });
 
   it("does not render country unions or region perimeters as permanent borders", () => {
@@ -30,7 +28,7 @@ describe("shared boundary rendering", () => {
     );
   });
 
-  it("does not show administrative borders in Inspect mode", () => {
+  it("limits the stronger administrative path to region editing", () => {
     expect(appSource).toContain('mode === "transfer" || mode === "divide"');
     expect(appSource).not.toContain(
       'mode === "inspect" || mode === "transfer" || mode === "divide"',
