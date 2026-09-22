@@ -14,6 +14,7 @@ import {
   Share2,
   Undo2,
   Redo2,
+  X,
 } from "lucide-react";
 import { geoGraticule, geoNaturalEarth1, geoPath } from "d3-geo";
 import type { FeatureCollection, Geometry, Position } from "geojson";
@@ -80,6 +81,7 @@ import {
 import { batchBoundaryPaths, type ProjectedBoundaryEdge } from "./boundaryEdges";
 import { buildSelectedRegionAdjacency } from "./regionAdjacency";
 import { EditorSidePanel } from "./EditorSidePanel";
+import { decodePackedMapData } from "./mapDataPacking";
 import {
   geometryToSvgPath,
   projectGeometryToPathData,
@@ -182,6 +184,8 @@ export default function App() {
   const [brushEnabled, setBrushEnabled] = useState(false);
   const [isBrushDown, setIsBrushDown] = useState(false);
   const [divideLine, setDivideLine] = useState<SvgPoint[]>([]);
+  const [keyboardCutActive, setKeyboardCutActive] = useState(false);
+  const [keyboardCutCursor, setKeyboardCutCursor] = useState<SvgPoint | null>(null);
   const [divideIslandPoint, setDivideIslandPoint] = useState<Position | null>(null);
   const [isDrawingDivideLine, setIsDrawingDivideLine] = useState(false);
   const [divideNewPieceIndex, setDivideNewPieceIndex] = useState<0 | 1 | null>(null);
@@ -190,6 +194,7 @@ export default function App() {
   const [readOnly, setReadOnly] = useState(false);
   const [isPresenting, setIsPresenting] = useState(false);
   const [share, setShare] = useState<ShareState | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [loadError, setLoadError] = useState("");
   const [transferConfirmation, setTransferConfirmation] = useState<TransferConfirmation | null>(null);
   const [zoom, setZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
@@ -206,6 +211,9 @@ export default function App() {
   const mapContentRef = useRef<SVGGElement | null>(null);
   const oceanLabelRefs = useRef<(SVGTextElement | null)[]>([]);
   const presentationToggleRef = useRef<HTMLButtonElement | null>(null);
+  const shareTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const shareDialogRef = useRef<HTMLDialogElement | null>(null);
+  const shareUrlRef = useRef<HTMLInputElement | null>(null);
   const zoomRef = useRef<ZoomState>({ x: 0, y: 0, k: 1 });
   const pendingZoomFrameRef = useRef<number | null>(null);
   const zoomAnimationFrameRef = useRef<number | null>(null);
@@ -271,6 +279,12 @@ export default function App() {
   }, [transferConfirmation]);
 
   useEffect(() => {
+    if (!share || isPresenting || !shareDialogRef.current || shareDialogRef.current.open) return;
+    shareDialogRef.current.showModal();
+    shareUrlRef.current?.focus();
+  }, [isPresenting, share]);
+
+  useEffect(() => {
     if (!isPresenting) return;
     const handlePresentationKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
@@ -287,11 +301,11 @@ export default function App() {
 
     async function load() {
       try {
-        const response = await fetch(`${import.meta.env.BASE_URL}data/map-data.json`);
+        const response = await fetch(`${import.meta.env.BASE_URL}data/map-data.packed.json`);
         if (!response.ok) {
           throw new Error(`${response.status} ${response.statusText}`);
         }
-        const mapData = (await response.json()) as MapData;
+        const mapData = decodePackedMapData(await response.json());
         const encoded = readShareFromHash(window.location.hash);
         let initial = createInitialSnapshot(mapData);
         let shouldReadOnly = false;
@@ -1284,7 +1298,11 @@ export default function App() {
   const divideNewPath = divideTerritories
     ? geometryToSvgPath(divideTerritories.newGeometry, projection, getProjectedPathOptions())
     : "";
-  const divideLinePath = svgLineToPath(divideLine);
+  const divideLinePath = svgLineToPath(
+    keyboardCutActive && keyboardCutCursor && divideLine.length > 0
+      ? [...divideLine, keyboardCutCursor]
+      : divideLine,
+  );
   const visibleDivideError = divideError || (!divideSplit.ok ? divideSplit.reason : "");
   useEffect(() => {
     if (!snapshot) return;
@@ -1481,6 +1499,8 @@ export default function App() {
 
   function clearDivideDraft() {
     setDivideLine([]);
+    setKeyboardCutActive(false);
+    setKeyboardCutCursor(null);
     setDivideIslandPoint(null);
     setDivideNewPieceIndex(null);
     setDivideError("");
@@ -1716,6 +1736,87 @@ export default function App() {
     setIsBrushDown(false);
   }
 
+  function toggleTransferRegion(regionId: string) {
+    if (readOnly || !selectedEntityRegionIds.includes(regionId)) return;
+    setSelectedRegions((current) => {
+      const next = new Set(current);
+      if (next.has(regionId)) next.delete(regionId);
+      else next.add(regionId);
+      return next;
+    });
+    setTransferFocusedRegionId(regionId);
+    zoomToRegion(regionId);
+  }
+
+  function startKeyboardCut() {
+    if (readOnly || mode !== "divide" || !selectedEntityId) return;
+    clearDivideDraft();
+    const currentZoom = zoomRef.current;
+    setKeyboardCutCursor({
+      x: (viewportWidth / 2 - currentZoom.x) / currentZoom.k,
+      y: (viewportHeight / 2 - currentZoom.y) / currentZoom.k,
+    });
+    setKeyboardCutActive(true);
+    setIsDrawingDivideLine(true);
+    window.requestAnimationFrame(() => mapSvgRef.current?.focus());
+  }
+
+  function finishKeyboardCut() {
+    if (!keyboardCutActive || divideLine.length < 2) return;
+    setKeyboardCutActive(false);
+    setKeyboardCutCursor(null);
+    setIsDrawingDivideLine(false);
+    window.requestAnimationFrame(() => document.getElementById("keyboard-cut-start")?.focus());
+  }
+
+  function cancelKeyboardCut() {
+    clearDivideDraft();
+    window.requestAnimationFrame(() => document.getElementById("keyboard-cut-start")?.focus());
+  }
+
+  function handleMapKeyDown(event: React.KeyboardEvent<SVGSVGElement>) {
+    if (!keyboardCutActive || !keyboardCutCursor) return;
+    if (event.key.startsWith("Arrow")) {
+      event.preventDefault();
+      const svg = mapSvgRef.current;
+      const viewScale = svg
+        ? Math.min(svg.clientWidth / viewportWidth, svg.clientHeight / viewportHeight)
+        : 1;
+      const currentZoom = zoomRef.current;
+      const step = (event.shiftKey ? 32 : 10) / Math.max(viewScale * currentZoom.k, 0.01);
+      const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
+      const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
+      const minX = -currentZoom.x / currentZoom.k;
+      const maxX = (viewportWidth - currentZoom.x) / currentZoom.k;
+      const minY = -currentZoom.y / currentZoom.k;
+      const maxY = (viewportHeight - currentZoom.y) / currentZoom.k;
+      setKeyboardCutCursor({
+        x: clamp(keyboardCutCursor.x + dx, minX, maxX),
+        y: clamp(keyboardCutCursor.y + dy, minY, maxY),
+      });
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      setDivideLine((current) => [...current, keyboardCutCursor]);
+      return;
+    }
+    if (event.key === "Backspace") {
+      event.preventDefault();
+      setDivideLine((current) => current.slice(0, -1));
+      return;
+    }
+    if (event.key.toLowerCase() === "f") {
+      event.preventDefault();
+      finishKeyboardCut();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelKeyboardCut();
+    }
+  }
+
   function swapDivideSides() {
     setDivideNewPieceIndex((current) => {
       const active = current ?? (divideSplit.ok ? divideSplit.defaultNewPieceIndex : 0);
@@ -1940,6 +2041,7 @@ export default function App() {
     if (!data || !snapshot) return;
     const encoded = await encodeSharePayload(createScenarioPayload(data, snapshot));
     const url = makeShareUrl(encoded);
+    setCopyFeedback(null);
     setShare({
       url,
       editableUrl: makeEditableUrl(encoded),
@@ -1947,9 +2049,17 @@ export default function App() {
     });
   }
 
-  function copyShareUrl() {
+  async function copyShareUrl() {
     if (!share) return;
-    void navigator.clipboard.writeText(share.url);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard access is unavailable.");
+      await navigator.clipboard.writeText(share.url);
+      setCopyFeedback({ kind: "success", message: "Link copied." });
+    } catch {
+      shareUrlRef.current?.focus();
+      shareUrlRef.current?.select();
+      setCopyFeedback({ kind: "error", message: "Could not copy the link. Select and copy the link above." });
+    }
   }
 
   function startFreshAfterLoadError() {
@@ -2053,6 +2163,7 @@ export default function App() {
     }
 
     if (mode === "divide" && !readOnly) {
+      if (keyboardCutActive) clearDivideDraft();
       const ownerId = regionId && snapshot ? snapshot.regionOwners[regionId] : "";
       if (!selectedEntityId && ownerId) {
         setSelectedEntityId(ownerId);
@@ -2480,7 +2591,7 @@ export default function App() {
             </details>
           ) : null}
           {!isPresenting ? (
-            <button className="primary" onClick={makeShare}>
+            <button ref={shareTriggerRef} className="primary" onClick={makeShare}>
               <Share2 size={16} /> Share
             </button>
           ) : null}
@@ -2504,8 +2615,11 @@ export default function App() {
               brushEnabled && activeModeUsesRegions && !isPresenting ? "brush-map" : "",
               mode === "divide" && !readOnly && !isPresenting ? "divide-map" : "",
             ].join(" ")}
-            role="img"
-            aria-label={isPresenting || readOnly ? "World map" : "Editable world map"}
+            role={keyboardCutActive ? "application" : "img"}
+            aria-label={keyboardCutActive ? "Keyboard cut map" : isPresenting || readOnly ? "World map" : "Editable world map"}
+            aria-describedby={keyboardCutActive ? "keyboard-cut-help" : undefined}
+            tabIndex={keyboardCutActive ? 0 : undefined}
+            onKeyDown={handleMapKeyDown}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -2559,6 +2673,15 @@ export default function App() {
               ) : null}
               {!isPresenting && divideLinePath ? (
                 <path className="divide-line" d={divideLinePath} aria-hidden="true" />
+              ) : null}
+              {!isPresenting && keyboardCutActive && keyboardCutCursor ? (
+                <circle
+                  className="keyboard-cut-cursor"
+                  cx={keyboardCutCursor.x}
+                  cy={keyboardCutCursor.y}
+                  r={7 / zoom.k}
+                  aria-hidden="true"
+                />
               ) : null}
               <g className="country-labels">
                 {countryLabels.map((label) => (
@@ -2670,6 +2793,8 @@ export default function App() {
           onSelectAllTransferRegions={selectAllTransferRegions}
           onClearTransferSelection={clearTransferSelection}
           selectedTransferRegions={selectedTransferRegions}
+          transferRegionRows={inspectRegionRows}
+          onToggleTransferRegion={toggleTransferRegion}
           focusedTransferRegion={focusedTransferRegion}
           onFocusTransferRegion={focusTransferRegion}
           onSeparateRegion={separateRegion}
@@ -2690,6 +2815,11 @@ export default function App() {
           onChangeNewCountryColor={setNewCountryColor}
           canCreateDividedCountry={Boolean(divideSplit.ok && newCountryName.trim())}
           onCreateDividedCountry={createCountryFromDivide}
+          keyboardCutActive={keyboardCutActive}
+          keyboardCutPointCount={divideLine.length}
+          onStartKeyboardCut={startKeyboardCut}
+          onFinishKeyboardCut={finishKeyboardCut}
+          onCancelKeyboardCut={cancelKeyboardCut}
           mergeAvailableOptions={mergeAvailableOptions}
           mergeSelectedEntities={mergeSelectedEntities}
           mergeName={mergeName}
@@ -2705,18 +2835,51 @@ export default function App() {
       </section>
 
       {share && !isPresenting ? (
-        <div className="dialog-backdrop" role="presentation" onClick={() => setShare(null)}>
-          <section className="share-dialog" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <div>
-              <h2>Share map</h2>
-              <p>Shared links open read-only by default. Use Remix/Edit to make a copy.</p>
+        <dialog
+          ref={shareDialogRef}
+          className="share-dialog"
+          aria-labelledby="share-dialog-title"
+          onClose={() => {
+            setShare(null);
+            shareTriggerRef.current?.focus();
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Tab") return;
+            const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("button, input, a[href]"));
+            if (focusable.length === 0) return;
+            event.preventDefault();
+            const currentIndex = focusable.indexOf(document.activeElement as HTMLElement);
+            const nextIndex = event.shiftKey
+              ? (currentIndex - 1 + focusable.length) % focusable.length
+              : (currentIndex + 1) % focusable.length;
+            focusable[nextIndex].focus();
+          }}
+          onClick={(event) => {
+            if (event.target !== event.currentTarget) return;
+            const bounds = event.currentTarget.getBoundingClientRect();
+            if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) {
+              event.currentTarget.close();
+            }
+          }}
+        >
+            <div className="share-dialog-header">
+              <div>
+                <h2 id="share-dialog-title">Share map</h2>
+                <p>Shared links open read-only by default. Use Remix/Edit to make a copy.</p>
+              </div>
+              <button className="icon-button" aria-label="Close Share dialog" onClick={() => shareDialogRef.current?.close()}>
+                <X size={17} aria-hidden="true" />
+              </button>
             </div>
-            <input readOnly value={share.url} onFocus={(event) => event.currentTarget.select()} />
+            <label className="field">
+              <span>Share link</span>
+              <input ref={shareUrlRef} readOnly value={share.url} onFocus={(event) => event.currentTarget.select()} />
+            </label>
             <div className={`url-size ${share.size.level}`}>
               URL size: {share.size.bytes.toLocaleString()} bytes
             </div>
             <div className="dialog-actions">
-              <button onClick={copyShareUrl}>
+              <button className="primary" onClick={() => void copyShareUrl()}>
                 <Copy size={16} /> Copy link
               </button>
               <a href={share.url} target="_blank" rel="noreferrer">
@@ -2726,8 +2889,12 @@ export default function App() {
                 <PaintBucket size={16} /> Editable
               </a>
             </div>
-          </section>
-        </div>
+            {copyFeedback ? (
+              <p className={copyFeedback.kind === "error" ? "copy-feedback error" : "copy-feedback"} role={copyFeedback.kind === "error" ? "alert" : "status"}>
+                {copyFeedback.message}
+              </p>
+            ) : null}
+        </dialog>
       ) : null}
     </main>
   );

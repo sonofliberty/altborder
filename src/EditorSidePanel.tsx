@@ -56,6 +56,8 @@ type EditorSidePanelProps = {
   onSelectAllTransferRegions: () => void;
   onClearTransferSelection: () => void;
   selectedTransferRegions: RegionPanelRow[];
+  transferRegionRows: RegionPanelRow[];
+  onToggleTransferRegion: (regionId: string) => void;
   focusedTransferRegion?: RegionPanelRow;
   onFocusTransferRegion: (regionId: string) => void;
   onSeparateRegion: (regionId: string) => void;
@@ -76,6 +78,11 @@ type EditorSidePanelProps = {
   onChangeNewCountryColor: (color: string) => void;
   canCreateDividedCountry: boolean;
   onCreateDividedCountry: () => void;
+  keyboardCutActive: boolean;
+  keyboardCutPointCount: number;
+  onStartKeyboardCut: () => void;
+  onFinishKeyboardCut: () => void;
+  onCancelKeyboardCut: () => void;
   mergeAvailableOptions: CountrySearchOption[];
   mergeSelectedEntities: CountrySearchOption[];
   mergeName: string;
@@ -194,6 +201,7 @@ function TransferPanel(props: EditorSidePanelProps) {
               <button
                 className={props.brushEnabled ? "active compact" : "compact"}
                 disabled={props.readOnly}
+                aria-pressed={props.brushEnabled}
                 onClick={props.onToggleBrush}
               >
                 <Brush size={15} /> Brush
@@ -209,6 +217,13 @@ function TransferPanel(props: EditorSidePanelProps) {
                 Clear
               </button>
             </div>
+
+            <TransferRegionPicker
+              regions={props.transferRegionRows}
+              selectedRegions={props.selectedTransferRegions}
+              readOnly={props.readOnly}
+              onToggle={props.onToggleTransferRegion}
+            />
 
             {props.focusedTransferRegion ? (
               <RegionSummary
@@ -286,6 +301,28 @@ function DividePanel(props: EditorSidePanelProps) {
       {props.selectedEntity ? (
         <div className="tool-card">
           <div className="section-heading">New country</div>
+          {!props.readOnly ? (
+            <div className="keyboard-cut-controls">
+              <button id="keyboard-cut-start" className="compact" onClick={props.onStartKeyboardCut}>
+                {props.keyboardCutActive ? "Restart keyboard cut" : "Cut with keyboard"}
+              </button>
+              {props.keyboardCutActive ? (
+                <>
+                  <p id="keyboard-cut-help" className="hint" role="status">
+                    Use arrow keys to move the marker. Hold Shift to move faster. Press Enter to add a point.
+                    Add points on both sides of the country, then press F to finish. Backspace removes a point.
+                    Escape cancels. {props.keyboardCutPointCount} {props.keyboardCutPointCount === 1 ? "point" : "points"} placed.
+                  </p>
+                  <div className="switch-row">
+                    <button className="compact" disabled={props.keyboardCutPointCount < 2} onClick={props.onFinishKeyboardCut}>
+                      Finish cut
+                    </button>
+                    <button className="compact" onClick={props.onCancelKeyboardCut}>Cancel</button>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : null}
           {props.divideHasDraft ? (
           <>
             <div className="switch-row">
@@ -335,6 +372,50 @@ function DividePanel(props: EditorSidePanelProps) {
         </div>
       ) : null}
     </>
+  );
+}
+
+function TransferRegionPicker({
+  regions,
+  selectedRegions,
+  readOnly,
+  onToggle,
+}: {
+  regions: RegionPanelRow[];
+  selectedRegions: RegionPanelRow[];
+  readOnly: boolean;
+  onToggle: (regionId: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const selectedIds = useMemo(() => new Set(selectedRegions.map((region) => region.id)), [selectedRegions]);
+  const matches = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase();
+    return needle ? regions.filter((region) => region.displayName.toLocaleLowerCase().includes(needle)) : regions;
+  }, [query, regions]);
+
+  return (
+    <details className="region-picker">
+      <summary>Choose regions by name</summary>
+      <div className="region-picker-body">
+        <label className="field">
+          <span>Find region</span>
+          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} />
+        </label>
+        <div className="region-picker-list" role="group" aria-label="Source regions">
+          {matches.length > 0 ? matches.map((region) => (
+            <label key={region.id} className="region-picker-row">
+              <input
+                type="checkbox"
+                checked={selectedIds.has(region.id)}
+                disabled={readOnly}
+                onChange={() => onToggle(region.id)}
+              />
+              <span>{region.displayName}</span>
+            </label>
+          )) : <p className="hint">No matching regions.</p>}
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -432,7 +513,7 @@ function CountryContext({
             <h2>Your version of the world</h2>
             <p>
               {showEditingFields
-                ? "Select a country on the map, or search below."
+                ? "Select a country on the map, or search by name."
                 : "Choose a country, then draw its new border."}
             </p>
           </div>
