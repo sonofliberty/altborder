@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowLeftRight,
   Brush,
@@ -33,6 +33,7 @@ type RegionPanelRow = {
 
 type EditorSidePanelProps = {
   mode: EditMode;
+  onChangeMode: (mode: EditMode) => void;
   readOnly: boolean;
   attribution: string;
   entityOptions: CountrySearchOption[];
@@ -90,14 +91,19 @@ type EditorSidePanelProps = {
 export function EditorSidePanel(props: EditorSidePanelProps) {
   return (
     <aside className="side-panel">
-      <PanelHeader mode={props.mode} readOnly={props.readOnly} />
+      <PanelNav mode={props.mode} readOnly={props.readOnly} onChangeMode={props.onChangeMode} />
 
-      {props.mode === "inspect" ? <InspectPanel {...props} /> : null}
-      {props.mode === "transfer" ? <TransferPanel {...props} /> : null}
-      {props.mode === "divide" ? <DividePanel {...props} /> : null}
-      {props.mode === "merge" ? <MergePanel {...props} /> : null}
+      <div key={props.mode} className="panel-mode-content" role="tabpanel" id="editor-mode-panel" aria-labelledby={`editor-mode-${props.mode}`}>
+        {props.mode === "inspect" ? <InspectPanel {...props} /> : null}
+        {props.mode === "transfer" ? <TransferPanel {...props} /> : null}
+        {props.mode === "divide" ? <DividePanel {...props} /> : null}
+        {props.mode === "merge" ? <MergePanel {...props} /> : null}
+      </div>
 
-      <div className="attribution">{props.attribution}</div>
+      <details className="panel-about">
+        <summary>About map data</summary>
+        <p>{props.attribution}</p>
+      </details>
     </aside>
   );
 }
@@ -118,13 +124,10 @@ function InspectPanel(props: EditorSidePanelProps) {
         onUpdateEntityFlag={props.onUpdateEntityFlag}
         onResetEntityFlag={props.onResetEntityFlag}
         onFinishMetadataEdit={props.onFinishMetadataEdit}
-        emptyDescription="Click a country on the map or search below to start exploring."
       />
 
       {props.selectedEntity ? (
         <section className="context-section">
-          <div className="section-heading">Region</div>
-
           {props.inspectFocusedRegion ? (
             <RegionSummary title="Focused region" name={props.inspectFocusedRegion.displayName}>
               <label className="field">
@@ -137,16 +140,20 @@ function InspectPanel(props: EditorSidePanelProps) {
                 />
               </label>
             </RegionSummary>
-          ) : (
-            <p className="hint">Choose a region to inspect it or give it a custom name.</p>
-          )}
+          ) : null}
 
           {props.inspectRegionRows.length > 0 ? (
-            <RegionList
-              regions={props.inspectRegionRows}
-              focusedRegionId={props.inspectFocusedRegion?.id ?? ""}
-              onSelect={props.onFocusInspectRegion}
-            />
+            <details className="region-browser">
+              <summary>
+                <span>Regions</span>
+                <small>{props.inspectRegionRows.length}</small>
+              </summary>
+              <RegionList
+                regions={props.inspectRegionRows}
+                focusedRegionId={props.inspectFocusedRegion?.id ?? ""}
+                onSelect={props.onFocusInspectRegion}
+              />
+            </details>
           ) : (
             <div className="empty-state">This country has no editable regions.</div>
           )}
@@ -161,31 +168,28 @@ function TransferPanel(props: EditorSidePanelProps) {
 
   return (
     <>
-      <section className="workflow-step">
-        <StepHeading number={1} title="Choose a source country" complete={Boolean(props.selectedEntity)} />
-        <CountrySearchSelect
-          label="Source country"
-          value={props.selectedEntityId}
-          options={props.entityOptions}
-          onChange={props.onSelectEntity}
-          disabled={props.readOnly}
-          placeholder="Search countries"
-        />
+      <section className="context-section compact-context-card">
+        <div className="section-heading">Source country</div>
         {props.selectedEntity ? (
-          <CountrySummary entity={props.selectedEntity} />
+          <CountrySummary key={props.selectedEntity.id} entity={props.selectedEntity} onClear={() => props.onSelectEntity("")} />
         ) : (
-          <p className="hint">Pick a country here or click one on the map.</p>
+          <CountrySearchSelect
+            label="Country"
+            value={props.selectedEntityId}
+            options={props.entityOptions}
+            onChange={props.onSelectEntity}
+            disabled={props.readOnly}
+            placeholder="Search countries"
+          />
         )}
       </section>
 
-      <section className={props.selectedEntity ? "workflow-step" : "workflow-step is-disabled"}>
-        <StepHeading number={2} title="Select regions" complete={selectedCount > 0} />
-        {props.selectedEntity ? (
-          <>
-            <div className="selection-status">
-              <strong>{selectedCount}</strong>
-              <span>{selectedCount === 1 ? "region selected" : "regions selected"}</span>
-            </div>
+      {props.selectedEntity ? (
+        <section className="workflow-step">
+          <div className="section-title-row">
+            <div className="section-heading">Regions</div>
+            <span>{selectedCount} selected</span>
+          </div>
             <div className="switch-row">
               <button
                 className={props.brushEnabled ? "active compact" : "compact"}
@@ -222,7 +226,7 @@ function TransferPanel(props: EditorSidePanelProps) {
                 </div>
               </RegionSummary>
             ) : (
-              <p className="hint">Click regions on the map, use Brush, or select all.</p>
+              <p className="hint">Select regions on the map.</p>
             )}
 
             {selectedCount > 1 ? (
@@ -233,18 +237,14 @@ function TransferPanel(props: EditorSidePanelProps) {
                 className="transfer-region-list"
               />
             ) : null}
-          </>
-        ) : (
-          <p className="hint">Choose a source country to unlock region selection.</p>
-        )}
-      </section>
+        </section>
+      ) : null}
 
-      <section className={selectedCount > 0 ? "workflow-step" : "workflow-step is-disabled"}>
-        <StepHeading number={3} title="Choose a destination" complete={Boolean(props.targetEntityId)} />
-        {selectedCount > 0 ? (
-          <>
+      {selectedCount > 0 ? (
+        <section className="workflow-step transfer-destination">
+            <div className="section-heading">Destination</div>
             <CountrySearchSelect
-              label="Destination country"
+              label="Country"
               value={props.targetEntityId}
               options={props.transferTargetOptions}
               onChange={props.onSelectTransferTarget}
@@ -258,11 +258,8 @@ function TransferPanel(props: EditorSidePanelProps) {
             >
               <Check size={16} /> Transfer {selectedCount} {selectedCount === 1 ? "region" : "regions"}
             </button>
-          </>
-        ) : (
-          <p className="hint">Select at least one region before choosing its destination.</p>
-        )}
-      </section>
+        </section>
+      ) : null}
     </>
   );
 }
@@ -283,12 +280,13 @@ function DividePanel(props: EditorSidePanelProps) {
         onUpdateEntityFlag={props.onUpdateEntityFlag}
         onResetEntityFlag={props.onResetEntityFlag}
         onFinishMetadataEdit={props.onFinishMetadataEdit}
-        emptyDescription="Choose the country you want to divide."
+        showEditingFields={false}
       />
 
-      <div className={props.selectedEntity ? "tool-card" : "tool-card is-disabled"}>
-        <div className="section-heading">New country</div>
-        {props.selectedEntity ? (
+      {props.selectedEntity ? (
+        <div className="tool-card">
+          <div className="section-heading">New country</div>
+          {props.divideHasDraft ? (
           <>
             <div className="switch-row">
               <button className="compact" disabled={props.readOnly || !props.divideCanSwap} onClick={props.onSwapDivideSides}>
@@ -298,40 +296,44 @@ function DividePanel(props: EditorSidePanelProps) {
                 Clear
               </button>
             </div>
-            <p className="hint">Draw a cut or click a separate island. Use Swap to choose the new side.</p>
             {props.divideIsCalculating ? <div className="tool-status">Calculating border...</div> : null}
             {props.divideError ? <div className="tool-error">{props.divideError}</div> : null}
-            <label className="field">
-              <span>Name</span>
-              <input
-                value={props.newCountryName}
-                disabled={props.readOnly}
-                onChange={(event) => props.onChangeNewCountryName(event.target.value)}
-                placeholder="Required"
-              />
-            </label>
-            <label className="field color-field">
-              <span>Color</span>
-              <input
-                type="color"
-                value={props.newCountryColor}
-                disabled={props.readOnly}
-                onInput={(event) => props.onChangeNewCountryColor(event.currentTarget.value)}
-                onChange={(event) => props.onChangeNewCountryColor(event.target.value)}
-              />
-            </label>
-            <button
-              className="primary wide"
-              disabled={props.readOnly || !props.canCreateDividedCountry}
-              onClick={props.onCreateDividedCountry}
-            >
-              <Split size={16} /> Create country
-            </button>
+            {props.divideCanSwap ? (
+              <>
+                <label className="field">
+                  <span>Name</span>
+                  <input
+                    value={props.newCountryName}
+                    disabled={props.readOnly}
+                    onChange={(event) => props.onChangeNewCountryName(event.target.value)}
+                    placeholder="Required"
+                  />
+                </label>
+                <label className="field color-field">
+                  <span>Color</span>
+                  <input
+                    type="color"
+                    value={props.newCountryColor}
+                    disabled={props.readOnly}
+                    onInput={(event) => props.onChangeNewCountryColor(event.currentTarget.value)}
+                    onChange={(event) => props.onChangeNewCountryColor(event.target.value)}
+                  />
+                </label>
+                <button
+                  className="primary wide"
+                  disabled={props.readOnly || !props.canCreateDividedCountry}
+                  onClick={props.onCreateDividedCountry}
+                >
+                  <Split size={16} /> Create country
+                </button>
+              </>
+            ) : null}
           </>
         ) : (
-          <p className="hint">Choose a country first, then draw directly on the map.</p>
+          <p className="hint">Draw a cut across the country, or click a separate island.</p>
         )}
-      </div>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -341,7 +343,6 @@ function MergePanel(props: EditorSidePanelProps) {
     <>
       <section className="context-section country-context">
         <div className="section-heading">Add countries</div>
-        <p className="hint">Search here or click countries on the map. Click again to remove one.</p>
         <CountrySearchSelect
           label="Country to add"
           value=""
@@ -353,39 +354,40 @@ function MergePanel(props: EditorSidePanelProps) {
         />
       </section>
 
-      <div className="tool-card">
-        <div className="section-heading">Selected countries</div>
-        {props.mergeSelectedEntities.length > 0 ? (
+      {props.mergeSelectedEntities.length > 0 ? (
+        <div className="tool-card">
+          <div className="section-title-row">
+            <div className="section-heading">Selected countries</div>
+            <span>{props.mergeSelectedEntities.length}</span>
+          </div>
           <CountryList
             entities={props.mergeSelectedEntities}
             onSelect={props.onZoomToMergeEntity}
             onRemove={props.onRemoveMergeEntity}
           />
-        ) : (
-          <div className="empty-state">Click two or more countries on the map.</div>
-        )}
-        <div className="switch-row">
-          <button
-            className="compact"
-            disabled={props.mergeSelectedEntities.length === 0}
-            onClick={props.onClearMergeSelection}
-          >
-            Clear
-          </button>
+          <div className="switch-row">
+            <button className="compact" onClick={props.onClearMergeSelection}>Clear</button>
+          </div>
+          {props.canMerge ? (
+            <>
+              <label className="field">
+                <span>Name</span>
+                <input
+                  value={props.mergeName}
+                  disabled={props.readOnly}
+                  onChange={(event) => props.onChangeMergeName(event.target.value)}
+                  placeholder="Generated if blank"
+                />
+              </label>
+              <button className="primary wide" disabled={props.readOnly} onClick={props.onMerge}>
+                <GitMerge size={16} /> Merge selected
+              </button>
+            </>
+          ) : (
+            <p className="hint">Select one more country.</p>
+          )}
         </div>
-        <label className="field">
-          <span>Name</span>
-          <input
-            value={props.mergeName}
-            disabled={props.readOnly}
-            onChange={(event) => props.onChangeMergeName(event.target.value)}
-            placeholder="Generated if blank"
-          />
-        </label>
-        <button className="primary wide" disabled={props.readOnly || !props.canMerge} onClick={props.onMerge}>
-          <GitMerge size={16} /> Merge selected
-        </button>
-      </div>
+      ) : null}
     </>
   );
 }
@@ -403,7 +405,6 @@ function CountryContext({
   onUpdateEntityFlag,
   onResetEntityFlag,
   onFinishMetadataEdit,
-  emptyDescription,
   showEditingFields = true,
 }: {
   entityOptions: CountrySearchOption[];
@@ -418,36 +419,41 @@ function CountryContext({
   onUpdateEntityFlag: (flag: CountryFlag) => void;
   onResetEntityFlag: () => void;
   onFinishMetadataEdit: () => void;
-  emptyDescription: string;
   showEditingFields?: boolean;
 }) {
   return (
     <section className="context-section country-context">
-      <div className="section-heading">Country</div>
-
       {selectedEntity ? (
-        <CountrySummary entity={selectedEntity} />
+        <CountrySummary key={selectedEntity.id} entity={selectedEntity} onClear={() => onSelectEntity("")} />
       ) : (
-        <div className="welcome-card">
-          <Search size={20} aria-hidden="true" />
-          <div>
-            <strong>Choose a country</strong>
-            <p>{emptyDescription}</p>
+        <>
+          <div className="country-intro">
+            <span className="country-intro-kicker">The atlas is yours</span>
+            <h2>Your version of the world</h2>
+            <p>
+              {showEditingFields
+                ? "Select a country on the map, or search below."
+                : "Choose a country, then draw its new border."}
+            </p>
           </div>
-        </div>
+          <CountrySearchSelect
+            label="Country"
+            value={selectedEntityId}
+            options={entityOptions}
+            onChange={onSelectEntity}
+            disabled={readOnly && !selectedEntity}
+            placeholder="Search countries"
+          />
+        </>
       )}
 
-      <CountrySearchSelect
-        label="Selected country"
-        value={selectedEntityId}
-        options={entityOptions}
-        onChange={onSelectEntity}
-        disabled={readOnly && !selectedEntity}
-        placeholder="Search countries"
-      />
-
       {selectedEntity && showEditingFields ? (
-        <div className="country-edit-fields">
+        <details className="country-appearance">
+          <summary>
+            <span>Appearance</span>
+            <small>Edit name, color, and flag</small>
+          </summary>
+          <div className="country-edit-fields">
           <label className="field">
             <span>Name</span>
             <input
@@ -478,26 +484,33 @@ function CountryContext({
             onChange={onUpdateEntityFlag}
             onReset={onResetEntityFlag}
           />
-        </div>
+          </div>
+        </details>
       ) : null}
     </section>
   );
 }
 
-function CountrySummary({ entity }: { entity: CountryEntity }) {
+function CountrySummary({ entity, onClear }: { entity: CountryEntity; onClear?: () => void }) {
   const regionCount = entity.regionIds.length;
   return (
     <div className="country-summary">
       <div className="country-summary-markers" aria-hidden="true">
         <img className="country-summary-flag" src={getCountryFlagUrl(getCountryFlag(entity))} alt="" />
-        <span className="country-swatch" style={{ backgroundColor: entity.color }} />
       </div>
       <div className="country-summary-text">
-        <strong>{entity.name}</strong>
-        <span>
-          {entity.isCustom ? "Custom country" : "Base country"} · {regionCount.toLocaleString()} {regionCount === 1 ? "region" : "regions"}
-        </span>
+        <span className="country-summary-kicker">{entity.isCustom ? "Custom country" : "Selected country"}</span>
+        <h2 className="country-summary-name">{entity.name}</h2>
+        <div className="country-summary-meta">
+          <span className="country-swatch" style={{ backgroundColor: entity.color }} aria-hidden="true" />
+          <span>{regionCount.toLocaleString()} {regionCount === 1 ? "region" : "regions"}</span>
+        </div>
       </div>
+      {onClear ? (
+        <button className="country-summary-clear" onClick={onClear} title="Change country" aria-label="Change country">
+          <X size={15} />
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -608,9 +621,11 @@ function CountrySearchSelect({
 }) {
   const listboxId = useId();
   const labelId = useId();
+  const listboxRef = useRef<HTMLDivElement | null>(null);
   const selectedOption = options.find((option) => option.id === value);
   const [query, setQuery] = useState(selectedOption?.name ?? "");
   const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
     setQuery(selectedOption?.name ?? "");
@@ -620,6 +635,11 @@ function CountrySearchSelect({
     () => filterCountryOptions(options, query, value),
     [options, query, value],
   );
+
+  useEffect(() => {
+    if (!open) return;
+    listboxRef.current?.querySelectorAll<HTMLElement>('[role="option"]')[activeIndex]?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open, query]);
 
   return (
     <div
@@ -638,28 +658,42 @@ function CountrySearchSelect({
           aria-autocomplete="list"
           aria-controls={listboxId}
           aria-expanded={open}
+          aria-activedescendant={open && filteredOptions.length > 0 ? `${listboxId}-${activeIndex}` : undefined}
           autoComplete="off"
           value={query}
           disabled={disabled}
           placeholder={placeholder}
           onFocus={(event) => {
             event.currentTarget.select();
+            setActiveIndex(0);
             setOpen(true);
           }}
           onChange={(event) => {
             setQuery(event.target.value);
+            setActiveIndex(0);
             setOpen(true);
           }}
           onKeyDown={(event) => {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              setOpen(true);
+              if (open && filteredOptions.length > 0) {
+                setActiveIndex((index) => (index + (event.key === "ArrowDown" ? 1 : -1) + filteredOptions.length) % filteredOptions.length);
+              }
+              return;
+            }
             if (event.key === "Escape") {
+              event.preventDefault();
               setOpen(false);
               setQuery(selectedOption?.name ?? "");
+              return;
             }
-            if (event.key === "Enter" && filteredOptions.length === 1) {
+            if (event.key === "Enter" && filteredOptions.length > 0 && (open || filteredOptions.length === 1)) {
               event.preventDefault();
-              const [option] = filteredOptions;
+              const option = filteredOptions[Math.min(activeIndex, filteredOptions.length - 1)];
               onChange(option.id);
               setQuery(resetAfterChange ? "" : option.name);
+              setActiveIndex(0);
               setOpen(false);
             }
           }}
@@ -674,6 +708,7 @@ function CountrySearchSelect({
             onClick={() => {
               onChange("");
               setQuery("");
+              setActiveIndex(0);
               setOpen(true);
             }}
           >
@@ -683,19 +718,23 @@ function CountrySearchSelect({
       </div>
 
       {open && !disabled ? (
-        <div className="country-search-results" id={listboxId} role="listbox">
+        <div ref={listboxRef} className="country-search-results" id={listboxId} role="listbox">
           {filteredOptions.length > 0 ? (
-            filteredOptions.map((option) => (
+            filteredOptions.map((option, index) => (
               <button
                 type="button"
                 role="option"
+                tabIndex={-1}
+                id={`${listboxId}-${index}`}
                 aria-selected={option.id === value}
                 key={option.id}
-                className={option.id === value ? "active" : ""}
+                className={index === activeIndex ? "keyboard-active" : option.id === value ? "active" : ""}
                 onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => {
                   onChange(option.id);
                   setQuery(resetAfterChange ? "" : option.name);
+                  setActiveIndex(0);
                   setOpen(false);
                 }}
               >
@@ -708,15 +747,6 @@ function CountrySearchSelect({
           )}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function StepHeading({ number, title, complete }: { number: number; title: string; complete: boolean }) {
-  return (
-    <div className="step-heading">
-      <span className={complete ? "step-number complete" : "step-number"}>{complete ? <Check size={13} /> : number}</span>
-      <strong>{title}</strong>
     </div>
   );
 }
@@ -757,15 +787,15 @@ function RegionList({
   return (
     <div className={["region-list", className].filter(Boolean).join(" ")} role="list">
       {regions.map((region) => (
-        <button
-          key={region.id}
-          className={focusedRegionId === region.id ? "region-row active" : "region-row"}
-          onClick={() => onSelect(region.id)}
-          role="listitem"
-        >
-          <span>{region.displayName}</span>
-          <small>{region.type}</small>
-        </button>
+        <div key={region.id} role="listitem">
+          <button
+            className={focusedRegionId === region.id ? "region-row active" : "region-row"}
+            onClick={() => onSelect(region.id)}
+          >
+            <span>{region.displayName}</span>
+            <small>{region.type}</small>
+          </button>
+        </div>
       ))}
     </div>
   );
@@ -783,43 +813,65 @@ function CountryList({
   return (
     <div className="region-list country-list" role="list">
       {entities.map((entity) => (
-        <button key={entity.id} className="region-row" onClick={() => onSelect(entity.id)} role="listitem">
-          <span>{entity.name}</span>
-          <small
-            onClick={(event) => {
-              event.stopPropagation();
-              onRemove(entity.id);
-            }}
-          >
-            Remove
-          </small>
-        </button>
+        <div key={entity.id} className="country-list-item" role="listitem">
+          <button className="region-row" onClick={() => onSelect(entity.id)}>
+            <span>{entity.name}</span>
+          </button>
+          <button className="country-list-remove" aria-label={`Remove ${entity.name}`} onClick={() => onRemove(entity.id)}>
+            <X size={15} aria-hidden="true" />
+          </button>
+        </div>
       ))}
     </div>
   );
 }
 
-function PanelHeader({ mode, readOnly }: { mode: EditMode; readOnly: boolean }) {
+function PanelNav({
+  mode,
+  readOnly,
+  onChangeMode,
+}: {
+  mode: EditMode;
+  readOnly: boolean;
+  onChangeMode: (mode: EditMode) => void;
+}) {
+  const modes: Array<{ id: EditMode; label: string }> = [
+    { id: "inspect", label: "Inspect" },
+    { id: "transfer", label: "Transfer" },
+    { id: "divide", label: "Divide" },
+    { id: "merge", label: "Merge" },
+  ];
+
   return (
-    <div className="panel-header">
-      <div>
-        <span>{readOnly ? "Viewer" : "Editor"}</span>
-        <h1>{modeLabel(mode)}</h1>
+    <div className="panel-nav">
+      <div className="mode-tabs" role="tablist" aria-label="Editor mode">
+        {modes.map((entry, index) => (
+          <button
+            key={entry.id}
+            id={`editor-mode-${entry.id}`}
+            role="tab"
+            aria-selected={mode === entry.id}
+            aria-controls="editor-mode-panel"
+            tabIndex={mode === entry.id ? 0 : -1}
+            className={mode === entry.id ? "active" : ""}
+            onClick={() => onChangeMode(entry.id)}
+            onKeyDown={(event) => {
+              let nextIndex = index;
+              if (event.key === "ArrowRight") nextIndex = (index + 1) % modes.length;
+              else if (event.key === "ArrowLeft") nextIndex = (index - 1 + modes.length) % modes.length;
+              else if (event.key === "Home") nextIndex = 0;
+              else if (event.key === "End") nextIndex = modes.length - 1;
+              else return;
+              event.preventDefault();
+              onChangeMode(modes[nextIndex].id);
+              event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[nextIndex]?.focus();
+            }}
+          >
+            {entry.label}
+          </button>
+        ))}
       </div>
-      {readOnly ? <Eye size={20} /> : null}
+      {readOnly ? <span className="viewer-badge"><Eye size={14} /> View only</span> : null}
     </div>
   );
-}
-
-function modeLabel(mode: EditMode) {
-  switch (mode) {
-    case "inspect":
-      return "Inspect";
-    case "transfer":
-      return "Transfer regions";
-    case "divide":
-      return "Divide country";
-    case "merge":
-      return "Merge countries";
-  }
 }

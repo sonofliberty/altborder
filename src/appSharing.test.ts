@@ -34,18 +34,46 @@ describe("editor side panel", () => {
   it("stays available before a country is selected", () => {
     expect(appSource).toContain("<EditorSidePanel");
     expect(appSource).not.toContain("selectedEntity || inspectFocusedRegion");
-    expect(panelSource).toContain("Click a country on the map or search below to start exploring.");
     expect(panelSource).toContain("<CountrySearchSelect");
+    expect(panelSource).toContain('label="Country"');
+    expect(panelSource).not.toContain('className="welcome-card"');
   });
 
-  it("shows the transfer workflow in source, region, destination order", () => {
-    const sourceStep = panelSource.indexOf('title="Choose a source country"');
-    const regionStep = panelSource.indexOf('title="Select regions"');
-    const destinationStep = panelSource.indexOf('title="Choose a destination"');
+  it("shows only available transfer sections in source, region, destination order", () => {
+    const sourceStep = panelSource.indexOf(">Source country</div>");
+    const regionStep = panelSource.indexOf(">Regions</div>");
+    const destinationStep = panelSource.indexOf(">Destination</div>");
 
     expect(sourceStep).toBeGreaterThan(-1);
     expect(regionStep).toBeGreaterThan(sourceStep);
     expect(destinationStep).toBeGreaterThan(regionStep);
+    expect(panelSource).toContain("{props.selectedEntity ? (");
+    expect(panelSource).toContain("{selectedCount > 0 ? (");
+  });
+
+  it("uses one mode tab row instead of a separate map toolbar", () => {
+    expect(panelSource).toContain('className="mode-tabs"');
+    expect(appSource).not.toContain('className="toolbar"');
+  });
+
+  it("keeps detailed country controls collapsed until they are needed", () => {
+    expect(panelSource).toContain('className="country-appearance"');
+    expect(panelSource).toContain('className="region-browser"');
+    expect(panelSource).toContain("{props.divideHasDraft ? (");
+    expect(panelSource).toContain("{props.mergeSelectedEntities.length > 0 ? (");
+  });
+
+  it("animates mode and country changes without keeping duplicate panels mounted", () => {
+    expect(panelSource).toContain('<div key={props.mode} className="panel-mode-content" role="tabpanel"');
+    expect(panelSource).toContain("key={selectedEntity.id}");
+    expect(appSource).toContain("function animateZoomTo(nextZoom: ZoomState, duration = 380)");
+    expect(appSource).toContain('window.matchMedia("(prefers-reduced-motion: reduce)").matches');
+  });
+
+  it("shows brief transfer completion feedback", () => {
+    expect(appSource).toContain("setTransferConfirmation({");
+    expect(appSource).toContain('className="transfer-confirmation" role="status"');
+    expect(appSource).not.toContain("zoomToEntity(nextSelectedEntityId);");
   });
 });
 

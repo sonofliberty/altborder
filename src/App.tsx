@@ -1,20 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Check,
   Copy,
   Eye,
-  GitMerge,
   Globe2,
+  Maximize2,
+  Minimize2,
   Minus,
-  MousePointer2,
+  MoreHorizontal,
   PaintBucket,
   Plus,
   RotateCcw,
   Share2,
-  Split,
   Undo2,
   Redo2,
 } from "lucide-react";
-import { geoNaturalEarth1 } from "d3-geo";
+import { geoGraticule, geoNaturalEarth1, geoPath } from "d3-geo";
 import type { FeatureCollection, Geometry, Position } from "geojson";
 import type { GeoProjection } from "d3-geo";
 import type {
@@ -113,6 +114,12 @@ const simplifiedCountryLayerMaxZoom = 1.35;
 const wheelZoomMaxDelta = 80;
 const wheelZoomSensitivity = 0.001;
 const countryFlagImageRasterScale = 16;
+const oceanLabels = [
+  { name: "Pacific Ocean", coordinates: [-132, 0] as [number, number] },
+  { name: "North Atlantic", coordinates: [-38, 23] as [number, number] },
+  { name: "South Atlantic", coordinates: [-22, -35] as [number, number] },
+  { name: "Indian Ocean", coordinates: [75, -28] as [number, number] },
+];
 const emptyDivideWorkerResult: DivideWorkerResult = {
   split: { ok: false, reason: "" },
   territories: null,
@@ -133,6 +140,11 @@ type ShareState = {
   url: string;
   editableUrl: string;
   size: ReturnType<typeof describeUrlSize>;
+};
+
+type TransferConfirmation = {
+  id: number;
+  message: string;
 };
 
 type SimpleMapLabel = {
@@ -176,8 +188,10 @@ export default function App() {
   const [divideError, setDivideError] = useState("");
   const [divideIsCalculating, setDivideIsCalculating] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
+  const [isPresenting, setIsPresenting] = useState(false);
   const [share, setShare] = useState<ShareState | null>(null);
   const [loadError, setLoadError] = useState("");
+  const [transferConfirmation, setTransferConfirmation] = useState<TransferConfirmation | null>(null);
   const [zoom, setZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
   const [settledZoom, setSettledZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
   const [isMapMoving, setIsMapMoving] = useState(false);
@@ -190,8 +204,11 @@ export default function App() {
   const [divideWorkerResult, setDivideWorkerResult] = useState<DivideWorkerResult>(emptyDivideWorkerResult);
   const mapSvgRef = useRef<SVGSVGElement | null>(null);
   const mapContentRef = useRef<SVGGElement | null>(null);
+  const oceanLabelRefs = useRef<(SVGTextElement | null)[]>([]);
+  const presentationToggleRef = useRef<HTMLButtonElement | null>(null);
   const zoomRef = useRef<ZoomState>({ x: 0, y: 0, k: 1 });
   const pendingZoomFrameRef = useRef<number | null>(null);
+  const zoomAnimationFrameRef = useRef<number | null>(null);
   const mapMovingTimerRef = useRef<number | null>(null);
   const isMapMovingRef = useRef(false);
   const panRef = useRef<{
@@ -224,6 +241,9 @@ export default function App() {
 
   const applyZoomToDom = useCallback((nextZoom: ZoomState) => {
     mapContentRef.current?.setAttribute("transform", formatZoomTransform(nextZoom));
+    for (const label of oceanLabelRefs.current) {
+      label?.setAttribute("transform", `scale(${1 / nextZoom.k})`);
+    }
   }, []);
 
   useEffect(() => {
@@ -235,11 +255,32 @@ export default function App() {
       if (pendingZoomFrameRef.current !== null) {
         window.cancelAnimationFrame(pendingZoomFrameRef.current);
       }
+      if (zoomAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(zoomAnimationFrameRef.current);
+      }
       if (mapMovingTimerRef.current !== null) {
         window.clearTimeout(mapMovingTimerRef.current);
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!transferConfirmation) return;
+    const timer = window.setTimeout(() => setTransferConfirmation(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [transferConfirmation]);
+
+  useEffect(() => {
+    if (!isPresenting) return;
+    const handlePresentationKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      setIsPresenting(false);
+      presentationToggleRef.current?.focus();
+    };
+    window.addEventListener("keydown", handlePresentationKeyDown);
+    return () => window.removeEventListener("keydown", handlePresentationKeyDown);
+  }, [isPresenting]);
 
   useEffect(() => {
     let cancelled = false;
@@ -417,6 +458,19 @@ export default function App() {
       collection,
     );
   }, [data]);
+
+  const graticuleGeometry = useMemo(() => geoGraticule().step([20, 20])(), []);
+  const graticulePath = useMemo(
+    () => data ? geoPath(projection)(graticuleGeometry) ?? "" : "",
+    [data, graticuleGeometry, projection],
+  );
+  const projectedOceanLabels = useMemo(() => {
+    if (!data) return [];
+    return oceanLabels.flatMap((label) => {
+      const point = projection(label.coordinates);
+      return point ? [{ name: label.name, x: point[0], y: point[1] }] : [];
+    });
+  }, [data, projection]);
 
   useEffect(() => {
     baseProjectedRegionCacheRef.current.clear();
@@ -1117,7 +1171,7 @@ export default function App() {
     !inspectFocusedRegionId;
 
   const addRegionByBrush = useCallback((regionId: string) => {
-    if (!snapshot || readOnly || !brushEnabled || !isBrushDown || !activeModeUsesRegions) return;
+    if (!snapshot || readOnly || isPresenting || !brushEnabled || !isBrushDown || !activeModeUsesRegions) return;
     const ownerId = snapshot.regionOwners[regionId];
     if (!ownerId) return;
     if (!selectedEntityId) {
@@ -1134,6 +1188,7 @@ export default function App() {
     activeModeUsesRegions,
     brushEnabled,
     isBrushDown,
+    isPresenting,
     readOnly,
     selectedEntityId,
     snapshot,
@@ -1333,6 +1388,16 @@ export default function App() {
     metadataEditKeyRef.current = null;
   }
 
+  function togglePresentation() {
+    finishMetadataEdit();
+    setIsBrushDown(false);
+    setIsDrawingDivideLine(false);
+    divideDrawRef.current = null;
+    panRef.current = null;
+    setShare(null);
+    setIsPresenting((current) => !current);
+  }
+
   function updateScenarioTitle(title: string) {
     commitMetadata("scenario-title", (current) => {
       if (current.title === title) return current;
@@ -1431,12 +1496,58 @@ export default function App() {
     setTargetEntityId("");
     setMergeSelection(new Set());
     clearDivideDraft();
+    if (entityId) zoomToEntity(entityId);
   }
 
   function applyZoom(nextZoom: ZoomState) {
     zoomRef.current = nextZoom;
+    applyZoomToDom(nextZoom);
     setZoom(nextZoom);
     setSettledZoom(nextZoom);
+  }
+
+  function cancelZoomAnimation() {
+    if (zoomAnimationFrameRef.current === null) return;
+    window.cancelAnimationFrame(zoomAnimationFrameRef.current);
+    zoomAnimationFrameRef.current = null;
+  }
+
+  function animateZoomTo(nextZoom: ZoomState, duration = 380) {
+    cancelZoomAnimation();
+    syncZoomStateNow();
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      applyZoom(nextZoom);
+      return;
+    }
+
+    const startZoom = { ...zoomRef.current };
+    const startTime = window.performance.now();
+    markMapMoving();
+
+    const step = (time: number) => {
+      const progress = Math.min(1, (time - startTime) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const scaleRatio = nextZoom.k / Math.max(startZoom.k, 0.001);
+      const frameZoom = {
+        x: startZoom.x + (nextZoom.x - startZoom.x) * eased,
+        y: startZoom.y + (nextZoom.y - startZoom.y) * eased,
+        k: startZoom.k * Math.pow(scaleRatio, eased),
+      };
+      zoomRef.current = frameZoom;
+      applyZoomToDom(frameZoom);
+
+      if (progress < 1) {
+        zoomAnimationFrameRef.current = window.requestAnimationFrame(step);
+        return;
+      }
+
+      zoomAnimationFrameRef.current = null;
+      zoomRef.current = nextZoom;
+      applyZoomToDom(nextZoom);
+      settleMapMoving(0);
+    };
+
+    zoomAnimationFrameRef.current = window.requestAnimationFrame(step);
   }
 
   function zoomBy(factor: number) {
@@ -1456,7 +1567,7 @@ export default function App() {
     if (!region) return;
     const bounds = projectedGeometryBounds(region.geometry, projection);
     if (!bounds) return;
-    applyZoom(zoomToBounds(bounds, 54));
+    animateZoomTo(zoomToBounds(bounds, 54));
   }
 
   function zoomToEntity(entityId: string) {
@@ -1464,7 +1575,7 @@ export default function App() {
     const geometries = renderGeometriesByEntityId.get(entityId) ?? [];
     const bounds = projectedGeometriesBounds(geometries, projection);
     if (!bounds) return;
-    applyZoom(zoomToBounds(bounds, 44));
+    animateZoomTo(zoomToBounds(bounds, 44));
   }
 
   function focusInspectRegion(regionId: string) {
@@ -1655,6 +1766,7 @@ export default function App() {
     finishMetadataEdit();
     const regionIds = [...selectedRegions];
     const nextSelectedEntityId = targetEntityId;
+    const destinationName = entities[nextSelectedEntityId]?.name ?? nextSelectedEntityId;
     setShare(null);
     clearGeometryRenderCaches();
     setHistory((currentHistory) => {
@@ -1673,6 +1785,10 @@ export default function App() {
     setTransferFocusedRegionId("");
     setSelectedEntityId(nextSelectedEntityId);
     setTargetEntityId("");
+    setTransferConfirmation({
+      id: Date.now(),
+      message: `Moved ${regionIds.length} ${regionIds.length === 1 ? "region" : "regions"} to ${destinationName}`,
+    });
   }
 
   function createCountryFromDivide() {
@@ -1853,6 +1969,7 @@ export default function App() {
   }
 
   function queueZoomUpdate(nextZoom: ZoomState) {
+    cancelZoomAnimation();
     zoomRef.current = nextZoom;
     if (pendingZoomFrameRef.current !== null) {
       return;
@@ -1900,7 +2017,7 @@ export default function App() {
   }
 
   function handlePointerDown(event: React.PointerEvent<SVGSVGElement>) {
-    if (event.button === 1) {
+    if (event.button === 1 || (isPresenting && event.button === 0)) {
       event.preventDefault();
       panRef.current = {
         x: event.clientX,
@@ -2171,14 +2288,15 @@ export default function App() {
       ? projectedBoundaryEdges.filter((edge) => boundsIntersect(edge.bounds, settledViewportBounds))
       : projectedBoundaryEdges;
     const activeAdministrativeEntityId =
-      selectedEntityId && (mode === "transfer" || mode === "divide")
+      !isPresenting && selectedEntityId && (mode === "transfer" || mode === "divide")
         ? selectedEntityId
         : undefined;
     return batchBoundaryPaths(visibleEdges, regionOwners, {
       activeAdministrativeEntityId,
-      selectedEntityId: selectedEntityId || undefined,
+      selectedEntityId: isPresenting ? undefined : selectedEntityId || undefined,
     });
   }, [
+    isPresenting,
     mode,
     projectedBoundaryEdges,
     regionOwners,
@@ -2188,7 +2306,11 @@ export default function App() {
   ]);
 
   const boundaryElements = boundaryPaths ? (
-    <g className="boundary-lines" aria-hidden="true">
+    <g
+      className="boundary-lines"
+      style={{ color: selectedEntity?.color ?? customCountryAccentColor }}
+      aria-hidden="true"
+    >
       {boundaryPaths.coastlinePath ? (
         <path className="coastline-line" d={boundaryPaths.coastlinePath} fill="none" />
       ) : null}
@@ -2210,7 +2332,19 @@ export default function App() {
         <path className="country-border-line" d={boundaryPaths.countryPath} fill="none" />
       ) : null}
       {boundaryPaths.selectedCountryPath ? (
-        <path className="selected-country-outline" d={boundaryPaths.selectedCountryPath} fill="none" />
+        <g key={selectedEntityId} className="selected-country-boundary-highlight">
+          <path
+            className="selected-country-aura selected-country-aura-outer"
+            d={boundaryPaths.selectedCountryPath}
+            fill="none"
+          />
+          <path
+            className="selected-country-aura selected-country-aura-inner"
+            d={boundaryPaths.selectedCountryPath}
+            fill="none"
+          />
+          <path className="selected-country-outline" d={boundaryPaths.selectedCountryPath} fill="none" />
+        </g>
       ) : null}
     </g>
   ) : null;
@@ -2243,7 +2377,13 @@ export default function App() {
     if (!underlay) return null;
 
     return (
-      <g className="selected-country-overlay" data-entity-id={selectedEntityId} aria-hidden="true">
+      <g
+        key={selectedEntityId}
+        className="selected-country-overlay"
+        data-entity-id={selectedEntityId}
+        style={{ color: selectedEntity?.color ?? customCountryAccentColor }}
+        aria-hidden="true"
+      >
         <path
           className="selected-country-tint"
           d={underlay.pathData}
@@ -2252,7 +2392,7 @@ export default function App() {
         />
       </g>
     );
-  }, [countryUnderlayById, selectedEntityId]);
+  }, [countryUnderlayById, selectedEntity?.color, selectedEntityId]);
 
   if (loadError && !data) {
     return (
@@ -2278,19 +2418,22 @@ export default function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell${isPresenting ? " is-presenting" : ""}`}>
       <header className="topbar">
         <div className="topbar-main">
           <div className="brand">
             <Globe2 aria-hidden="true" />
-            <strong>AltBorder</strong>
+            <span className="brand-wordmark">
+              <strong>AltBorder</strong>
+              <span className="brand-tagline">History is optional.</span>
+            </span>
           </div>
           <label className="title-field">
-            <span>Scenario</span>
-            {readOnly ? (
+            {readOnly || isPresenting ? (
               <strong className="scenario-title-text">{snapshot.title || "Untitled Border Experiment"}</strong>
             ) : (
               <input
+                aria-label="Scenario"
                 value={snapshot.title}
                 onChange={(event) => updateScenarioTitle(event.target.value)}
                 onBlur={finishMetadataEdit}
@@ -2299,7 +2442,18 @@ export default function App() {
           </label>
         </div>
         <div className="topbar-actions">
-          {readOnly ? (
+          <button
+            ref={presentationToggleRef}
+            className="presentation-toggle"
+            onClick={togglePresentation}
+            aria-pressed={isPresenting}
+            aria-label={isPresenting ? readOnly ? "Exit presentation" : "Back to editor" : "Present map"}
+            title={isPresenting ? "Exit presentation (Escape)" : "Present map"}
+          >
+            {isPresenting ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            <span>{isPresenting ? readOnly ? "Exit presentation" : "Back to editor" : "Present map"}</span>
+          </button>
+          {!isPresenting && (readOnly ? (
             <button className="primary" onClick={remix}>
               <PaintBucket size={16} /> Remix/Edit
             </button>
@@ -2311,47 +2465,31 @@ export default function App() {
               <button className="icon-button" onClick={redo} disabled={history!.future.length === 0} title="Redo">
                 <Redo2 size={16} />
               </button>
-              <button className="icon-button" onClick={resetMap} title="Reset map">
-                <RotateCcw size={16} />
-              </button>
             </div>
-          )}
-          <button className="primary" onClick={makeShare}>
-            <Share2 size={16} /> Share
-          </button>
+          ))}
+          {!readOnly && !isPresenting ? (
+            <details className="topbar-menu">
+              <summary title="More actions" aria-label="More actions">
+                <MoreHorizontal size={18} />
+              </summary>
+              <div className="topbar-menu-popover">
+                <button onClick={resetMap}>
+                  <RotateCcw size={16} /> Reset map
+                </button>
+              </div>
+            </details>
+          ) : null}
+          {!isPresenting ? (
+            <button className="primary" onClick={makeShare}>
+              <Share2 size={16} /> Share
+            </button>
+          ) : null}
         </div>
       </header>
 
       <section className="workspace">
-        <aside className="toolbar" aria-label="Map tools">
-          <ToolButton
-            active={mode === "inspect"}
-            icon={<MousePointer2 size={18} />}
-            label="Inspect"
-            onClick={() => selectMode("inspect")}
-          />
-          <ToolButton
-            active={mode === "transfer"}
-            icon={<PaintBucket size={18} />}
-            label="Transfer"
-            onClick={() => selectMode("transfer")}
-          />
-          <ToolButton
-            active={mode === "divide"}
-            icon={<Split size={18} />}
-            label="Divide"
-            onClick={() => selectMode("divide")}
-          />
-          <ToolButton
-            active={mode === "merge"}
-            icon={<GitMerge size={18} />}
-            label="Merge"
-            onClick={() => selectMode("merge")}
-          />
-        </aside>
-
-        <section className="map-stage" aria-label="World map editor">
-          {loadError ? (
+        <section className="map-stage" aria-label={isPresenting ? "World map presentation" : "World map editor"}>
+          {loadError && !isPresenting ? (
             <div className="inline-error">
               <span>{loadError}</span>
               <button onClick={startFreshAfterLoadError}>Start fresh</button>
@@ -2363,11 +2501,11 @@ export default function App() {
             className={[
               "map",
               administrativeBorderZoomClass,
-              brushEnabled && activeModeUsesRegions ? "brush-map" : "",
-              mode === "divide" && !readOnly ? "divide-map" : "",
+              brushEnabled && activeModeUsesRegions && !isPresenting ? "brush-map" : "",
+              mode === "divide" && !readOnly && !isPresenting ? "divide-map" : "",
             ].join(" ")}
             role="img"
-            aria-label="Editable world map"
+            aria-label={isPresenting || readOnly ? "World map" : "Editable world map"}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -2377,22 +2515,49 @@ export default function App() {
           >
             <rect width={viewportWidth} height={viewportHeight} className="ocean" />
             <g ref={mapContentRef} transform={formatZoomTransform(zoom)}>
+              <path
+                className="atlas-graticule"
+                d={graticulePath}
+                fill="none"
+                vectorEffect="non-scaling-stroke"
+                pointerEvents="none"
+                aria-hidden="true"
+              />
+              <g className="ocean-label-layer" pointerEvents="none" aria-hidden="true">
+                {projectedOceanLabels.map((label, index) => (
+                  <g key={label.name} transform={`translate(${label.x} ${label.y})`}>
+                    <text
+                      ref={(element) => { oceanLabelRefs.current[index] = element; }}
+                      className="ocean-label"
+                      transform={`scale(${1 / zoom.k})`}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                    >
+                      {label.name}
+                    </text>
+                  </g>
+                ))}
+              </g>
               <g aria-hidden="true">
                 {countryUnderlayElements}
               </g>
-              {selectedCountryOverlayElement}
+              {!isPresenting && selectedCountryOverlayElement}
               {boundaryElements}
-              {regionInteractionElements}
-              <g className="selected-region-overlays" aria-hidden="true">
-                {selectedRegionOverlayElements}
+              <g pointerEvents={isPresenting ? "none" : undefined}>
+                {regionInteractionElements}
               </g>
-              {divideTerritories ? (
+              {!isPresenting ? (
+                <g className="selected-region-overlays" aria-hidden="true">
+                  {selectedRegionOverlayElements}
+                </g>
+              ) : null}
+              {!isPresenting && divideTerritories ? (
                 <g className="divide-preview" aria-hidden="true">
                   <path className="divide-existing-preview" d={divideExistingPath} />
                   <path className="divide-new-preview" d={divideNewPath} fill={newCountryColor} />
                 </g>
               ) : null}
-              {divideLinePath ? (
+              {!isPresenting && divideLinePath ? (
                 <path className="divide-line" d={divideLinePath} aria-hidden="true" />
               ) : null}
               <g className="country-labels">
@@ -2427,6 +2592,7 @@ export default function App() {
                       x={-label.contentWidth / 2 + label.flagWidth + label.flagGap + label.textLength / 2}
                       y={0}
                       fontSize={label.fontSize}
+                      letterSpacing={label.letterSpacing}
                       textLength={label.textLength}
                       lengthAdjust="spacingAndGlyphs"
                       textAnchor="middle"
@@ -2437,7 +2603,7 @@ export default function App() {
                   </g>
                 ))}
               </g>
-              <g className="region-labels">
+              <g className="region-labels" display={isPresenting ? "none" : undefined}>
                 {regionLabels.map((label) => (
                   <text
                     key={label.id}
@@ -2462,10 +2628,24 @@ export default function App() {
               <Globe2 size={17} />
             </button>
           </div>
+          {isPresenting ? (
+            <div className="presentation-caption" aria-hidden="true">
+              <strong className="presentation-caption-brand">AltBorder</strong>
+              <span>History is optional.</span>
+            </div>
+          ) : null}
+          {transferConfirmation && !isPresenting ? (
+            <div key={transferConfirmation.id} className="transfer-confirmation" role="status">
+              <span aria-hidden="true"><Check size={16} /></span>
+              {transferConfirmation.message}
+            </div>
+          ) : null}
         </section>
 
-        <EditorSidePanel
+        {!isPresenting ? (
+          <EditorSidePanel
           mode={mode}
+          onChangeMode={selectMode}
           readOnly={readOnly}
           attribution={data.attribution}
           entityOptions={entityOptions}
@@ -2520,10 +2700,11 @@ export default function App() {
           onChangeMergeName={setMergeName}
           canMerge={mergeSelection.size >= 2}
           onMerge={mergeCountries}
-        />
+          />
+        ) : null}
       </section>
 
-      {share ? (
+      {share && !isPresenting ? (
         <div className="dialog-backdrop" role="presentation" onClick={() => setShare(null)}>
           <section className="share-dialog" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <div>
@@ -2549,24 +2730,6 @@ export default function App() {
         </div>
       ) : null}
     </main>
-  );
-}
-
-function ToolButton({
-  active,
-  icon,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button className={active ? "active" : ""} onClick={onClick} title={label} aria-label={label}>
-      {icon}
-    </button>
   );
 }
 

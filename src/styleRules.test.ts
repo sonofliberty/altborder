@@ -27,9 +27,23 @@ describe("map style rules", () => {
     expect(styles).toMatch(/\.selected-region-outline \{[^}]*stroke-width: 1\.2;/);
   });
 
-  it("renders selected countries with a non-interactive tint and one outline", () => {
+  it("renders selected countries with a color-matched tint, aura, and crisp outline", () => {
     expect(styles).toMatch(/\.selected-country-overlay,[^}]*pointer-events: none;/);
-    expect(styles).toMatch(/\.selected-country-tint \{[^}]*fill: rgba\(255, 231, 128, 0\.12\);/);
-    expect(styles).toMatch(/\.selected-country-outline \{[^}]*stroke-width: 1\.25;/);
+    expect(styles).toMatch(/\.selected-country-tint \{[^}]*fill: currentColor;[^}]*fill-opacity: 0\.09;/);
+    expect(styles).toMatch(/\.selected-country-aura-outer \{[^}]*stroke-opacity: 0\.16;[^}]*stroke-width: 10;/);
+    expect(styles).toMatch(/\.selected-country-aura-inner \{[^}]*stroke-opacity: 0\.34;[^}]*stroke-width: 5;/);
+    expect(styles).toMatch(/\.selected-country-outline \{[^}]*stroke: color-mix\(in srgb, currentColor 76%, #ffffff\);[^}]*stroke-width: 1\.35;/);
+  });
+
+  it("uses a light label outline with a soft shadow", () => {
+    expect(styles).toMatch(/\.country-label \{[^}]*filter: drop-shadow\(0 0\.04em 0\.08em rgba\(3, 10, 9, 0\.3\)\);/);
+    expect(styles).toMatch(/\.country-label \{[^}]*stroke-width: 0\.055em;/);
+  });
+
+  it("uses short interface motion with a reduced-motion fallback", () => {
+    expect(styles).toMatch(/\.panel-mode-content \{[^}]*animation: panel-mode-in 180ms/);
+    expect(styles).toMatch(/\.country-summary \{[^}]*animation: country-summary-in 220ms/);
+    expect(styles).toMatch(/\.transfer-confirmation \{[^}]*animation: transfer-confirmation-life 2200ms/);
+    expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
   });
 });

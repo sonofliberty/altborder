@@ -8,6 +8,7 @@ describe("country label rendering", () => {
     expect(appSource).not.toContain("country-label-fill");
     expect(appSource).not.toContain("country-label-clip");
     expect(appSource).not.toContain("<clipPath");
+    expect(appSource).toContain("letterSpacing={label.letterSpacing}");
   });
 
   it("keeps country label visibility independent from selected country state", () => {
@@ -46,11 +47,14 @@ describe("country underlay rendering", () => {
 
   it("renders a selected country overlay from the projected country underlay", () => {
     expect(appSource).toContain("selectedCountryOverlayElement");
-    expect(appSource).toContain('className="selected-country-overlay" data-entity-id={selectedEntityId} aria-hidden="true"');
+    expect(appSource).toContain('className="selected-country-overlay"');
+    expect(appSource).toContain("data-entity-id={selectedEntityId}");
     expect(appSource).toContain('className="selected-country-tint"');
+    expect(appSource).toContain('className="selected-country-aura selected-country-aura-outer"');
+    expect(appSource).toContain('className="selected-country-aura selected-country-aura-inner"');
     expect(appSource).toContain('className="selected-country-outline"');
     expect(appSource).not.toContain("selected-country-outline-halo");
-    expect(appSource).not.toContain("selected-country-outline-inner");
+    expect(appSource).toContain("style={{ color: selectedEntity?.color ?? customCountryAccentColor }}");
   });
 
   it("clears derived geometry caches when custom region geometry changes", () => {

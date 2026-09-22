@@ -14,6 +14,7 @@ export type FittedCountryLabel = {
   x: number;
   y: number;
   fontSize: number;
+  letterSpacing: number;
   textLength: number;
   contentWidth: number;
   flagWidth: number;
@@ -81,6 +82,7 @@ export function layoutCountryLabel(input: CountryLabelInput): FittedCountryLabel
     x: label.x,
     y: label.y,
     fontSize: label.fontSize,
+    letterSpacing: label.letterSpacing,
     textLength: label.textLength,
     contentWidth: label.contentWidth,
     flagWidth: label.flagWidth,
@@ -97,7 +99,7 @@ function fitLabel(
   displayName: string,
   cluster: PolygonCluster,
   candidates: Point[],
-): Pick<FittedCountryLabel, "x" | "y" | "fontSize" | "textLength" | "contentWidth" | "flagWidth" | "flagHeight" | "flagGap" | "width" | "height" | "angle"> | null {
+): Pick<FittedCountryLabel, "x" | "y" | "fontSize" | "letterSpacing" | "textLength" | "contentWidth" | "flagWidth" | "flagHeight" | "flagGap" | "width" | "height" | "angle"> | null {
   const boundsWidth = cluster.bounds.maxX - cluster.bounds.minX;
   const boundsHeight = cluster.bounds.maxY - cluster.bounds.minY;
   const contentWidthRatio =
@@ -110,7 +112,10 @@ function fitLabel(
   for (const angle of labelAngles) {
     let fontSize = maxFontSize;
     while (fontSize >= minMapFontSize) {
-      const textLength = displayName.length * countryLabelCharWidthRatio * fontSize;
+      const letterSpacing = countryLabelLetterSpacing(fontSize);
+      const textLength =
+        displayName.length * countryLabelCharWidthRatio * fontSize +
+        Math.max(0, displayName.length - 1) * letterSpacing;
       const flagWidth = fontSize * countryFlagWidthRatio;
       const flagHeight = fontSize * countryFlagHeightRatio;
       const flagGap = fontSize * countryFlagGapRatio;
@@ -123,6 +128,7 @@ function fitLabel(
             x: point[0],
             y: point[1],
             fontSize,
+            letterSpacing,
             textLength,
             contentWidth,
             flagWidth,
@@ -139,6 +145,13 @@ function fitLabel(
   }
 
   return null;
+}
+
+function countryLabelLetterSpacing(fontSize: number): number {
+  const minimumRatio = 0.012;
+  const maximumRatio = 0.085;
+  const sizeProgress = Math.max(0, Math.min(1, (fontSize - 2) / 18));
+  return fontSize * (minimumRatio + (maximumRatio - minimumRatio) * sizeProgress);
 }
 
 function projectGeometryPolygons(geometry: Geometry, project: ProjectPoint): ProjectedPolygon[] {

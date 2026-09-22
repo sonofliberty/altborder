@@ -25,6 +25,9 @@ describe("layoutCountryLabel", () => {
     expect(small).not.toBeNull();
     expect(large).not.toBeNull();
     expect(large!.fontSize).toBeGreaterThan(small!.fontSize);
+    expect(large!.letterSpacing / large!.fontSize).toBeGreaterThan(
+      small!.letterSpacing / small!.fontSize,
+    );
     expect(large!.priority).toBeGreaterThan(small!.priority);
   });
 
@@ -130,6 +133,7 @@ describe("layoutCountryLabel", () => {
 
     expect(label).not.toBeNull();
     expect(label!.contentWidth).toBeCloseTo(label!.flagWidth + label!.flagGap + label!.textLength);
+    expect(label!.letterSpacing).toBeGreaterThan(0);
     expect(label!.flagHeight).toBeCloseTo(label!.fontSize * 0.8);
     expect(label!.flagWidth / label!.flagHeight).toBeCloseTo(4 / 3);
     expect(label!.width).toBeGreaterThan(label!.textLength);
