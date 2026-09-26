@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   Check,
   Copy,
@@ -67,7 +67,7 @@ import {
   getCountryLabelMinScreenFontSize,
 } from "./mapLabelDisplay";
 import { zoomToBounds, type ProjectedBounds } from "./mapZoom";
-import { getAdministrativeBorderZoomClass } from "./mapVisualStyle";
+import { getAdministrativeBorderZoomClass, getCountryBorderStrokeWidth } from "./mapVisualStyle";
 import { boundsIntersect, projectedViewportBounds, shouldCullPaths } from "./mapCulling";
 import { findRegionAtProjectedPoint } from "./geometryHitTest";
 import { customCountryAccentColor, getFallbackCountryColor } from "./colorRuntime";
@@ -149,6 +149,14 @@ type TransferConfirmation = {
   message: string;
 };
 
+type MapChangeAnimation = {
+  id: number;
+  pieces: { path: string; fromColor: string; toColor: string }[];
+  reveal:
+    | { kind: "edge"; path: string; extent: number }
+    | { kind: "point"; x: number; y: number; extent: number };
+};
+
 type SimpleMapLabel = {
   id: string;
   name: string;
@@ -197,6 +205,7 @@ export default function App() {
   const [copyFeedback, setCopyFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [loadError, setLoadError] = useState("");
   const [transferConfirmation, setTransferConfirmation] = useState<TransferConfirmation | null>(null);
+  const [mapChange, setMapChange] = useState<MapChangeAnimation | null>(null);
   const [zoom, setZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
   const [settledZoom, setSettledZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
   const [isMapMoving, setIsMapMoving] = useState(false);
@@ -211,6 +220,7 @@ export default function App() {
   const mapContentRef = useRef<SVGGElement | null>(null);
   const oceanLabelRefs = useRef<(SVGTextElement | null)[]>([]);
   const presentationToggleRef = useRef<HTMLButtonElement | null>(null);
+  const actionsMenuRef = useRef<HTMLDetailsElement | null>(null);
   const shareTriggerRef = useRef<HTMLButtonElement | null>(null);
   const shareDialogRef = useRef<HTMLDialogElement | null>(null);
   const shareUrlRef = useRef<HTMLInputElement | null>(null);
@@ -236,6 +246,7 @@ export default function App() {
   const baseProjectedRegionDetailStrokeCacheRef = useRef(new Map<string, string>());
   const metadataEditKeyRef = useRef<string | null>(null);
   const geometryWorkerRequestIdRef = useRef(0);
+  const mapChangeIdRef = useRef(0);
 
   useEffect(() => {
     baseProjectedRegionCacheRef.current.clear();
@@ -279,6 +290,12 @@ export default function App() {
   }, [transferConfirmation]);
 
   useEffect(() => {
+    if (!mapChange) return;
+    const timer = window.setTimeout(() => setMapChange(null), 1650);
+    return () => window.clearTimeout(timer);
+  }, [mapChange]);
+
+  useEffect(() => {
     if (!share || isPresenting || !shareDialogRef.current || shareDialogRef.current.open) return;
     shareDialogRef.current.showModal();
     shareUrlRef.current?.focus();
@@ -295,6 +312,17 @@ export default function App() {
     window.addEventListener("keydown", handlePresentationKeyDown);
     return () => window.removeEventListener("keydown", handlePresentationKeyDown);
   }, [isPresenting]);
+
+  useEffect(() => {
+    const dismissActionsMenu = (event: PointerEvent) => {
+      const menu = actionsMenuRef.current;
+      if (menu?.open && event.target instanceof Node && !menu.contains(event.target)) {
+        menu.open = false;
+      }
+    };
+    document.addEventListener("pointerdown", dismissActionsMenu);
+    return () => document.removeEventListener("pointerdown", dismissActionsMenu);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1406,8 +1434,30 @@ export default function App() {
     metadataEditKeyRef.current = null;
   }
 
+  function showMapChange(
+    pieces: MapChangeAnimation["pieces"],
+    reveal: MapChangeAnimation["reveal"],
+  ) {
+    const groupedPieces = new Map<string, MapChangeAnimation["pieces"][number]>();
+    for (const piece of pieces) {
+      if (!piece.path) continue;
+      const key = `${piece.fromColor}|${piece.toColor}`;
+      const previous = groupedPieces.get(key);
+      groupedPieces.set(key, previous ? { ...previous, path: previous.path + piece.path } : piece);
+    }
+    const visiblePieces = [...groupedPieces.values()];
+    if (visiblePieces.length === 0) return;
+    mapChangeIdRef.current += 1;
+    setMapChange({
+      id: mapChangeIdRef.current,
+      pieces: visiblePieces,
+      reveal,
+    });
+  }
+
   function togglePresentation() {
     finishMetadataEdit();
+    setMapChange(null);
     setIsBrushDown(false);
     setIsDrawingDivideLine(false);
     divideDrawRef.current = null;
@@ -1462,6 +1512,7 @@ export default function App() {
 
   function selectMode(nextMode: EditMode) {
     finishMetadataEdit();
+    setMapChange(null);
     setMode(nextMode);
     setSelectedRegions(new Set());
     setTransferFocusedRegionId("");
@@ -1486,6 +1537,7 @@ export default function App() {
 
   function clearHistoryTransientState() {
     finishMetadataEdit();
+    setMapChange(null);
     setShare(null);
     setIsBrushDown(false);
     clearGeometryRenderCaches();
@@ -1627,6 +1679,20 @@ export default function App() {
     );
     if (!result) return;
 
+    const bounds = getRegionBounds(regionId);
+    if (bounds) {
+      showMapChange([{
+        path: getRegionPath(regionId),
+        fromColor: entities?.[regionOwners?.[regionId] ?? ""]?.color ?? "#d7d2c8",
+        toColor: result.snapshot.entities[result.entityId].color,
+      }], {
+        kind: "point",
+        x: (bounds.minX + bounds.maxX) / 2,
+        y: (bounds.minY + bounds.maxY) / 2,
+        extent: Math.hypot(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) + 4,
+      });
+    }
+
     setShare(null);
     clearGeometryRenderCaches();
     setHistory({
@@ -1639,6 +1705,7 @@ export default function App() {
     setSelectedRegions(new Set([regionId]));
     setTransferFocusedRegionId(regionId);
     setInspectFocusedRegionId("");
+    setTransferConfirmation({ id: Date.now(), message: `${regionName} is now a country` });
   }
 
   function handleRegionClick(regionId: string) {
@@ -1868,6 +1935,29 @@ export default function App() {
     const regionIds = [...selectedRegions];
     const nextSelectedEntityId = targetEntityId;
     const destinationName = entities[nextSelectedEntityId]?.name ?? nextSelectedEntityId;
+    const regionBounds = regionIds.reduce<ProjectedBounds | null>((combined, regionId) => {
+      const bounds = getRegionBounds(regionId);
+      return bounds ? mergeBounds(combined, bounds) : combined;
+    }, null);
+    if (regionBounds) {
+      const destinationBounds = projectedGeometriesBounds(
+        renderGeometriesByEntityId.get(nextSelectedEntityId) ?? [],
+        projection,
+      );
+      const reveal = getTransferReveal(
+        regionIds,
+        nextSelectedEntityId,
+        regionOwners ?? {},
+        projectedBoundaryEdges,
+        regionBounds,
+        destinationBounds,
+      );
+      showMapChange(regionIds.map((regionId) => ({
+        path: getRegionPath(regionId),
+        fromColor: entities[regionOwners?.[regionId] ?? ""]?.color ?? "#d7d2c8",
+        toColor: entities[nextSelectedEntityId]?.color ?? "#d7d2c8",
+      })), reveal);
+    }
     setShare(null);
     clearGeometryRenderCaches();
     setHistory((currentHistory) => {
@@ -1908,6 +1998,22 @@ export default function App() {
 
     const color = newCountryColor;
     const territories = divideTerritories;
+    const newBounds = projectedGeometryBounds(territories.newGeometry, projection);
+    if (newBounds) {
+      const diagonal = Math.hypot(newBounds.maxX - newBounds.minX, newBounds.maxY - newBounds.minY);
+      showMapChange([{
+        path: divideNewPath,
+        fromColor: selectedEntity.color,
+        toColor: color,
+      }], divideLinePath
+        ? { kind: "edge", path: divideLinePath, extent: diagonal * 2 + 4 }
+        : {
+          kind: "point",
+          x: (newBounds.minX + newBounds.maxX) / 2,
+          y: (newBounds.minY + newBounds.maxY) / 2,
+          extent: diagonal + 4,
+        });
+    }
     let newEntityId = "";
 
     commit((draft) => {
@@ -1953,6 +2059,7 @@ export default function App() {
     setSelectedRegions(new Set());
     setNewCountryName("");
     clearDivideDraft();
+    setTransferConfirmation({ id: Date.now(), message: `${name} is now a country` });
   }
 
   function mergeCountries() {
@@ -2321,7 +2428,7 @@ export default function App() {
           d={underlay.pathData}
           fill={color}
           fillRule="evenodd"
-          stroke={underlay.sealInternalSeams ? color : undefined}
+          stroke={color}
         />
       );
     });
@@ -2440,7 +2547,12 @@ export default function App() {
         />
       ) : null}
       {boundaryPaths.countryPath ? (
-        <path className="country-border-line" d={boundaryPaths.countryPath} fill="none" />
+        <path
+          className="country-border-line"
+          d={boundaryPaths.countryPath}
+          fill="none"
+          strokeWidth={getCountryBorderStrokeWidth(zoom.k)}
+        />
       ) : null}
       {boundaryPaths.selectedCountryPath ? (
         <g key={selectedEntityId} className="selected-country-boundary-highlight">
@@ -2508,10 +2620,11 @@ export default function App() {
   if (loadError && !data) {
     return (
       <main className="app-shell centered">
-        <div className="error-panel">
+        <div className="error-panel" role="alert">
           <Globe2 aria-hidden="true" />
           <h1>AltBorder</h1>
           <p>{loadError}</p>
+          <button onClick={() => window.location.reload()}><RotateCcw size={16} aria-hidden="true" /> Try again</button>
         </div>
       </main>
     );
@@ -2520,7 +2633,7 @@ export default function App() {
   if (!data || !snapshot) {
     return (
       <main className="app-shell centered">
-        <div className="loading-panel">
+        <div className="loading-panel" role="status">
           <Globe2 aria-hidden="true" />
           <span>Loading map data</span>
         </div>
@@ -2570,21 +2683,36 @@ export default function App() {
             </button>
           ) : (
             <div className="history-actions">
-              <button className="icon-button" onClick={undo} disabled={history!.past.length === 0} title="Undo">
+              <button className="icon-button" onClick={undo} disabled={history!.past.length === 0} title="Undo" aria-label="Undo">
                 <Undo2 size={16} />
               </button>
-              <button className="icon-button" onClick={redo} disabled={history!.future.length === 0} title="Redo">
+              <button className="icon-button" onClick={redo} disabled={history!.future.length === 0} title="Redo" aria-label="Redo">
                 <Redo2 size={16} />
               </button>
             </div>
           ))}
           {!readOnly && !isPresenting ? (
-            <details className="topbar-menu">
+            <details
+              ref={actionsMenuRef}
+              className="topbar-menu"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape" || !event.currentTarget.open) return;
+                event.preventDefault();
+                event.currentTarget.open = false;
+                event.currentTarget.querySelector("summary")?.focus();
+              }}
+            >
               <summary title="More actions" aria-label="More actions">
                 <MoreHorizontal size={18} />
               </summary>
               <div className="topbar-menu-popover">
-                <button onClick={resetMap}>
+                <button onClick={() => {
+                  if (actionsMenuRef.current) actionsMenuRef.current.open = false;
+                  resetMap();
+                }}>
                   <RotateCcw size={16} /> Reset map
                 </button>
               </div>
@@ -2601,7 +2729,7 @@ export default function App() {
       <section className="workspace">
         <section className="map-stage" aria-label={isPresenting ? "World map presentation" : "World map editor"}>
           {loadError && !isPresenting ? (
-            <div className="inline-error">
+            <div className="inline-error" role="alert">
               <span>{loadError}</span>
               <button onClick={startFreshAfterLoadError}>Start fresh</button>
             </div>
@@ -2673,6 +2801,98 @@ export default function App() {
               ) : null}
               {!isPresenting && divideLinePath ? (
                 <path className="divide-line" d={divideLinePath} aria-hidden="true" />
+              ) : null}
+              {!isPresenting && mapChange ? (
+                <g
+                  key={mapChange.id}
+                  className="map-change"
+                  aria-hidden="true"
+                  style={{ "--creep-extent": `${mapChange.reveal.extent}px` } as CSSProperties}
+                >
+                  <defs>
+                    <mask
+                      id={`map-change-mask-${mapChange.id}`}
+                      maskUnits="userSpaceOnUse"
+                      x={0}
+                      y={0}
+                      width={viewportWidth}
+                      height={viewportHeight}
+                    >
+                      <rect x={0} y={0} width={viewportWidth} height={viewportHeight} fill="white" />
+                      <path
+                        className="map-change-reveal"
+                        d={mapChange.reveal.kind === "edge"
+                          ? mapChange.reveal.path
+                          : `M${mapChange.reveal.x},${mapChange.reveal.y}h0.01`}
+                        fill="none"
+                        stroke="black"
+                      />
+                    </mask>
+                    <mask
+                      id={`map-change-front-mask-${mapChange.id}`}
+                      maskUnits="userSpaceOnUse"
+                      x={0}
+                      y={0}
+                      width={viewportWidth}
+                      height={viewportHeight}
+                    >
+                      <rect x={0} y={0} width={viewportWidth} height={viewportHeight} fill="black" />
+                      <path
+                        className="map-change-front-outer"
+                        d={mapChange.reveal.kind === "edge"
+                          ? mapChange.reveal.path
+                          : `M${mapChange.reveal.x},${mapChange.reveal.y}h0.01`}
+                        fill="none"
+                        stroke="white"
+                      />
+                      <path
+                        className="map-change-front-inner"
+                        d={mapChange.reveal.kind === "edge"
+                          ? mapChange.reveal.path
+                          : `M${mapChange.reveal.x},${mapChange.reveal.y}h0.01`}
+                        fill="none"
+                        stroke="black"
+                      />
+                    </mask>
+                  </defs>
+                  {mapChange.pieces.map((piece, index) => (
+                    <path
+                      key={`${index}-destination`}
+                      className="map-change-destination"
+                      d={piece.path}
+                      fillRule="evenodd"
+                      fill={piece.toColor}
+                    />
+                  ))}
+                  {mapChange.pieces.map((piece, index) => (
+                    <path
+                      key={`${index}-fill`}
+                      className="map-change-cover"
+                      d={piece.path}
+                      fillRule="evenodd"
+                      fill={piece.fromColor}
+                      mask={`url(#map-change-mask-${mapChange.id})`}
+                    />
+                  ))}
+                  {mapChange.pieces.map((piece, index) => (
+                    <path
+                      key={`${index}-front`}
+                      className="map-change-front"
+                      d={piece.path}
+                      fillRule="evenodd"
+                      fill="#f9dfaa"
+                      mask={`url(#map-change-front-mask-${mapChange.id})`}
+                    />
+                  ))}
+                  {mapChange.pieces.map((piece, index) => (
+                    <path
+                      key={`${index}-outline`}
+                      className="map-change-outline"
+                      d={piece.path}
+                      fill="none"
+                    />
+                  ))}
+                </g>
               ) : null}
               {!isPresenting && keyboardCutActive && keyboardCutCursor ? (
                 <circle
@@ -2839,6 +3059,7 @@ export default function App() {
           ref={shareDialogRef}
           className="share-dialog"
           aria-labelledby="share-dialog-title"
+          aria-describedby="share-dialog-description"
           onClose={() => {
             setShare(null);
             shareTriggerRef.current?.focus();
@@ -2865,7 +3086,7 @@ export default function App() {
             <div className="share-dialog-header">
               <div>
                 <h2 id="share-dialog-title">Share map</h2>
-                <p>Shared links open read-only by default. Use Remix/Edit to make a copy.</p>
+                <p id="share-dialog-description">Shared links open read-only by default. Use Remix/Edit to make a copy.</p>
               </div>
               <button className="icon-button" aria-label="Close Share dialog" onClick={() => shareDialogRef.current?.close()}>
                 <X size={17} aria-hidden="true" />
@@ -2966,6 +3187,62 @@ function mergeBounds(a: ProjectedBounds | null, b: ProjectedBounds): ProjectedBo
     maxX: Math.max(a.maxX, b.maxX),
     maxY: Math.max(a.maxY, b.maxY),
   };
+}
+
+function getTransferReveal(
+  regionIds: string[],
+  destinationId: string,
+  regionOwners: Record<string, string>,
+  edges: ProjectedBoundaryEdgeWithBounds[],
+  bounds: ProjectedBounds,
+  destinationBounds: ProjectedBounds | null,
+): MapChangeAnimation["reveal"] {
+  const selected = new Set(regionIds);
+  let sharedBorder = "";
+  let sharedBounds: ProjectedBounds | null = null;
+  for (const edge of edges) {
+    const [first, second] = edge.regionIds;
+    if (second === null || !(
+      (selected.has(first) && regionOwners[second] === destinationId) ||
+      (selected.has(second) && regionOwners[first] === destinationId)
+    )) continue;
+    sharedBorder += edge.pathData;
+    sharedBounds = mergeBounds(sharedBounds, edge.bounds);
+  }
+  if (sharedBorder && sharedBounds) {
+    const acrossX = Math.max(
+      Math.abs(bounds.minX - sharedBounds.minX),
+      Math.abs(bounds.maxX - sharedBounds.maxX),
+    );
+    const acrossY = Math.max(
+      Math.abs(bounds.minY - sharedBounds.minY),
+      Math.abs(bounds.maxY - sharedBounds.maxY),
+    );
+    return {
+      kind: "edge",
+      path: sharedBorder,
+      extent: Math.max(
+        Math.hypot(acrossX, acrossY) * 2,
+        Math.min(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 1.5,
+      ) + 4,
+    };
+  }
+
+  const destinationX = destinationBounds
+    ? (destinationBounds.minX + destinationBounds.maxX) / 2
+    : bounds.minX;
+  const destinationY = destinationBounds
+    ? (destinationBounds.minY + destinationBounds.maxY) / 2
+    : (bounds.minY + bounds.maxY) / 2;
+  const dx = destinationX - (bounds.minX + bounds.maxX) / 2;
+  const dy = destinationY - (bounds.minY + bounds.maxY) / 2;
+  const path = Math.abs(dx) >= Math.abs(dy)
+    ? `M${dx < 0 ? bounds.minX : bounds.maxX},${bounds.minY}V${bounds.maxY}`
+    : `M${bounds.minX},${dy < 0 ? bounds.minY : bounds.maxY}H${bounds.maxX}`;
+  const depth = Math.abs(dx) >= Math.abs(dy)
+    ? bounds.maxX - bounds.minX
+    : bounds.maxY - bounds.minY;
+  return { kind: "edge", path, extent: depth * 2 + 4 };
 }
 
 function getSvgPoint(svg: SVGSVGElement, clientX: number, clientY: number): SvgPoint {

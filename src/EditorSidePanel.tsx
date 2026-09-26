@@ -3,6 +3,7 @@ import {
   ArrowLeftRight,
   Brush,
   Check,
+  ChevronDown,
   Eye,
   GitMerge,
   Image,
@@ -96,21 +97,29 @@ type EditorSidePanelProps = {
 };
 
 export function EditorSidePanel(props: EditorSidePanelProps) {
+  const panelScrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    panelScrollRef.current?.scrollTo({ top: 0 });
+  }, [props.mode]);
+
   return (
     <aside className="side-panel">
       <PanelNav mode={props.mode} readOnly={props.readOnly} onChangeMode={props.onChangeMode} />
 
-      <div key={props.mode} className="panel-mode-content" role="tabpanel" id="editor-mode-panel" aria-labelledby={`editor-mode-${props.mode}`}>
-        {props.mode === "inspect" ? <InspectPanel {...props} /> : null}
-        {props.mode === "transfer" ? <TransferPanel {...props} /> : null}
-        {props.mode === "divide" ? <DividePanel {...props} /> : null}
-        {props.mode === "merge" ? <MergePanel {...props} /> : null}
-      </div>
+      <div ref={panelScrollRef} className="panel-scroll">
+        <div key={props.mode} className="panel-mode-content" role="tabpanel" id="editor-mode-panel" aria-labelledby={`editor-mode-${props.mode}`}>
+          {props.mode === "inspect" ? <InspectPanel {...props} /> : null}
+          {props.mode === "transfer" ? <TransferPanel {...props} /> : null}
+          {props.mode === "divide" ? <DividePanel {...props} /> : null}
+          {props.mode === "merge" ? <MergePanel {...props} /> : null}
+        </div>
 
-      <details className="panel-about">
-        <summary>About map data</summary>
-        <p>{props.attribution}</p>
-      </details>
+        <details className="panel-about">
+          <summary>About map data <ChevronDown className="disclosure-icon" size={14} aria-hidden="true" /></summary>
+          <p>{props.attribution}</p>
+        </details>
+      </div>
     </aside>
   );
 }
@@ -154,6 +163,7 @@ function InspectPanel(props: EditorSidePanelProps) {
               <summary>
                 <span>Regions</span>
                 <small>{props.inspectRegionRows.length}</small>
+                <ChevronDown className="disclosure-icon" size={16} aria-hidden="true" />
               </summary>
               <RegionList
                 regions={props.inspectRegionRows}
@@ -333,8 +343,8 @@ function DividePanel(props: EditorSidePanelProps) {
                 Clear
               </button>
             </div>
-            {props.divideIsCalculating ? <div className="tool-status">Calculating border...</div> : null}
-            {props.divideError ? <div className="tool-error">{props.divideError}</div> : null}
+            {props.divideIsCalculating ? <div className="tool-status" role="status">Calculating border...</div> : null}
+            {props.divideError ? <div className="tool-error" role="alert">{props.divideError}</div> : null}
             {props.divideCanSwap ? (
               <>
                 <label className="field">
@@ -395,7 +405,7 @@ function TransferRegionPicker({
 
   return (
     <details className="region-picker">
-      <summary>Choose regions by name</summary>
+      <summary>Choose regions by name <ChevronDown className="disclosure-icon" size={16} aria-hidden="true" /></summary>
       <div className="region-picker-body">
         <label className="field">
           <span>Find region</span>
@@ -522,7 +532,6 @@ function CountryContext({
             value={selectedEntityId}
             options={entityOptions}
             onChange={onSelectEntity}
-            disabled={readOnly && !selectedEntity}
             placeholder="Search countries"
           />
         </>
@@ -533,6 +542,7 @@ function CountryContext({
           <summary>
             <span>Appearance</span>
             <small>Edit name, color, and flag</small>
+            <ChevronDown className="disclosure-icon" size={16} aria-hidden="true" />
           </summary>
           <div className="country-edit-fields">
           <label className="field">
@@ -673,7 +683,7 @@ function FlagEditor({
           <RotateCcw size={15} aria-hidden="true" /> Reset
         </button>
       </div>
-      {uploadError ? <div className="tool-error">{uploadError}</div> : null}
+      {uploadError ? <div className="tool-error" role="alert">{uploadError}</div> : null}
       <p className="hint flag-upload-hint">
         <Image size={13} aria-hidden="true" /> PNG, JPEG, WebP, or SVG. Maximum 2 MiB.
       </p>
@@ -702,6 +712,7 @@ function CountrySearchSelect({
 }) {
   const listboxId = useId();
   const labelId = useId();
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const listboxRef = useRef<HTMLDivElement | null>(null);
   const selectedOption = options.find((option) => option.id === value);
   const [query, setQuery] = useState(selectedOption?.name ?? "");
@@ -716,11 +727,12 @@ function CountrySearchSelect({
     () => filterCountryOptions(options, query, value),
     [options, query, value],
   );
+  const activeOptionIndex = Math.min(activeIndex, Math.max(0, filteredOptions.length - 1));
 
   useEffect(() => {
     if (!open) return;
-    listboxRef.current?.querySelectorAll<HTMLElement>('[role="option"]')[activeIndex]?.scrollIntoView({ block: "nearest" });
-  }, [activeIndex, open, query]);
+    listboxRef.current?.querySelectorAll<HTMLElement>('[role="option"]')[activeOptionIndex]?.scrollIntoView({ block: "nearest" });
+  }, [activeOptionIndex, open, query]);
 
   return (
     <div
@@ -733,13 +745,14 @@ function CountrySearchSelect({
       <div className="country-search-control">
         <Search size={15} aria-hidden="true" />
         <input
+          ref={inputRef}
           type="search"
           role="combobox"
           aria-labelledby={labelId}
           aria-autocomplete="list"
           aria-controls={listboxId}
           aria-expanded={open}
-          aria-activedescendant={open && filteredOptions.length > 0 ? `${listboxId}-${activeIndex}` : undefined}
+          aria-activedescendant={open && filteredOptions.length > 0 ? `${listboxId}-${activeOptionIndex}` : undefined}
           autoComplete="off"
           value={query}
           disabled={disabled}
@@ -791,6 +804,7 @@ function CountrySearchSelect({
               setQuery("");
               setActiveIndex(0);
               setOpen(true);
+              inputRef.current?.focus();
             }}
           >
             <X size={14} />
@@ -799,7 +813,7 @@ function CountrySearchSelect({
       </div>
 
       {open && !disabled ? (
-        <div ref={listboxRef} className="country-search-results" id={listboxId} role="listbox">
+        <div ref={listboxRef} className="country-search-results" id={listboxId} role="listbox" aria-labelledby={labelId}>
           {filteredOptions.length > 0 ? (
             filteredOptions.map((option, index) => (
               <button
@@ -809,7 +823,7 @@ function CountrySearchSelect({
                 id={`${listboxId}-${index}`}
                 aria-selected={option.id === value}
                 key={option.id}
-                className={index === activeIndex ? "keyboard-active" : option.id === value ? "active" : ""}
+                className={index === activeOptionIndex ? "keyboard-active" : option.id === value ? "active" : ""}
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => {
@@ -824,7 +838,7 @@ function CountrySearchSelect({
               </button>
             ))
           ) : (
-            <div className="country-search-empty">No matching countries</div>
+            <div className="country-search-empty" role="status">{label === "Choose a flag" ? "No matching flags" : "No matching countries"}</div>
           )}
         </div>
       ) : null}

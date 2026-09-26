@@ -15,7 +15,8 @@
   --color-primary-hover: #e0c48a;
   --color-primary-soft: #34352c;
   --color-primary-ink: #1b211f;
-  --color-focus: rgba(224, 196, 138, 0.65);
+  --color-focus: #e0c48a;
+  --control-height: 38px;
   --color-danger-bg: #38282a;
   --color-danger-border: #805052;
   --color-danger-text: #f0b1ad;
@@ -30,12 +31,14 @@
   --shadow-dialog: 0 24px 80px rgba(4, 12, 16, 0.5);
 
   color: var(--color-text);
+  accent-color: var(--color-primary);
   background: var(--color-app-bg);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   scrollbar-color: var(--color-border-strong) var(--color-surface);
+  -webkit-tap-highlight-color: rgba(200, 172, 115, 0.14);
 }
 
 html,
@@ -48,6 +51,11 @@ body,
 
 * {
   box-sizing: border-box;
+}
+
+::selection {
+  background: var(--color-primary);
+  color: var(--color-primary-ink);
 }
 
 body {
@@ -73,7 +81,7 @@ a {
   display: inline-flex;
   gap: 7px;
   justify-content: center;
-  min-height: 36px;
+  min-height: var(--control-height);
   padding: 0 11px;
   text-decoration: none;
   transition:
@@ -83,10 +91,21 @@ a {
     color 130ms ease;
 }
 
-button:hover,
+button:not(:disabled):hover,
 a:hover {
   background: var(--color-surface-muted);
   border-color: var(--color-primary);
+}
+
+button svg,
+a svg,
+.button-like svg {
+  flex-shrink: 0;
+}
+
+button:not(:disabled):active,
+a:active {
+  background: var(--color-primary-soft);
 }
 
 button:focus-visible,
@@ -118,8 +137,9 @@ textarea:disabled {
   overflow: hidden;
 }
 
-.centered {
+.app-shell.centered {
   display: grid;
+  grid-template-rows: 1fr;
   min-height: 100vh;
   place-items: center;
 }
@@ -224,7 +244,8 @@ textarea {
   border-radius: 4px;
   background: var(--color-surface-elevated);
   color: var(--color-text);
-  min-height: 36px;
+  caret-color: var(--color-primary-hover);
+  min-height: var(--control-height);
   padding: 7px 9px;
   transition:
     background-color 130ms ease,
@@ -239,9 +260,9 @@ textarea::placeholder {
   opacity: 1;
 }
 
-input:hover,
-select:hover,
-textarea:hover {
+input:not(:disabled):hover,
+select:not(:disabled):hover,
+textarea:not(:disabled):hover {
   border-color: var(--color-primary);
 }
 
@@ -273,7 +294,6 @@ textarea {
 .topbar-actions {
   align-items: center;
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
 }
@@ -286,13 +306,18 @@ textarea {
   align-items: center;
   background: var(--color-surface-elevated);
   border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   display: flex;
-  height: 38px;
+  height: var(--control-height);
   justify-content: center;
   list-style: none;
-  width: 38px;
+  width: var(--control-height);
+}
+
+.topbar-menu > summary:hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-primary);
 }
 
 .topbar-menu > summary::-webkit-details-marker {
@@ -378,9 +403,13 @@ textarea {
   font-weight: 700;
 }
 
-.primary:hover {
+.primary:not(:disabled):hover {
   background: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
+}
+
+.primary:not(:disabled):active {
+  background: var(--color-primary);
 }
 
 .workspace {
@@ -426,9 +455,15 @@ textarea {
 .map-controls button {
   border-color: transparent;
   box-shadow: none;
-  min-height: 36px;
+  min-height: var(--control-height);
   padding: 0;
-  width: 36px;
+  width: var(--control-height);
+}
+
+.map-controls button:last-child {
+  border-left-color: var(--color-border);
+  border-radius: 0 3px 3px 0;
+  margin-left: 2px;
 }
 
 .map {
@@ -492,15 +527,16 @@ textarea {
 }
 
 .country-underlay {
+  paint-order: stroke fill;
   pointer-events: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
 }
 
 .country-underlay-composed {
-  paint-order: stroke fill;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 0.6;
-  vector-effect: non-scaling-stroke;
+  stroke-width: 1.4;
 }
 
 .country-underlay-interactive {
@@ -528,13 +564,12 @@ textarea {
 }
 
 .coastline-line {
-  stroke: rgba(4, 7, 7, 0.44);
-  stroke-width: 0.5;
+  stroke: rgba(4, 7, 7, 0.5);
+  stroke-width: 0.6;
 }
 
 .country-border-line {
-  stroke: rgba(4, 7, 7, 0.68);
-  stroke-width: 0.72;
+  stroke: rgba(4, 7, 7, 0.72);
 }
 
 .region {
@@ -547,27 +582,27 @@ textarea {
 
 .administrative-border-line {
   pointer-events: none;
-  stroke: rgba(6, 9, 8, 0.52);
-  stroke-opacity: 0;
-  stroke-width: 0.3;
+  stroke: rgba(6, 9, 8, 0.6);
+  stroke-opacity: 0.18;
+  stroke-width: 0.36;
   transition:
     stroke-opacity 120ms ease,
     stroke-width 120ms ease;
 }
 
 .map-admin-borders-close .administrative-border-line {
-  stroke-opacity: 0.26;
-  stroke-width: 0.38;
+  stroke-opacity: 0.43;
+  stroke-width: 0.45;
 }
 
 .map-admin-borders-detail .administrative-border-line {
-  stroke-opacity: 0.44;
-  stroke-width: 0.48;
+  stroke-opacity: 0.58;
+  stroke-width: 0.55;
 }
 
 .administrative-border-line.administrative-border-active {
-  stroke-opacity: 0.56;
-  stroke-width: 0.48;
+  stroke-opacity: 0.7;
+  stroke-width: 0.6;
 }
 
 .selected-region-overlays,
@@ -665,6 +700,47 @@ textarea {
   vector-effect: non-scaling-stroke;
 }
 
+.map-change {
+  pointer-events: none;
+}
+
+.map-change-reveal {
+  animation: map-change-creep 1450ms linear both;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: var(--creep-extent);
+}
+
+.map-change-front-outer,
+.map-change-front-inner {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.map-change-front-outer {
+  animation: map-change-front-outer 1450ms linear both;
+  stroke-width: calc(var(--creep-extent) + 0.7px);
+}
+
+.map-change-front-inner {
+  animation: map-change-front-inner 1450ms linear both;
+  stroke-width: calc(var(--creep-extent) - 0.7px);
+}
+
+.map-change-front {
+  animation: map-change-front-life 1450ms linear both;
+}
+
+.map-change-outline {
+  animation: map-change-outline-life 1450ms linear both;
+  fill: none;
+  stroke: #f9dfaa;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
 .keyboard-cut-cursor {
   fill: var(--color-map-ocean);
   pointer-events: none;
@@ -730,28 +806,44 @@ textarea {
 }
 
 .side-panel {
+  --panel-padding: 16px;
   background: var(--color-surface);
   border-left: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 16px;
   min-height: 0;
-  overflow: auto;
-  padding: 18px 16px;
+  overflow: hidden;
+  padding: var(--panel-padding);
   position: relative;
   box-shadow: var(--shadow-panel);
   width: 100%;
   z-index: 4;
 }
 
+.panel-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  margin: -4px calc(-1 * var(--panel-padding)) calc(-1 * var(--panel-padding));
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 4px var(--panel-padding) var(--panel-padding);
+  scroll-padding-block: 8px;
+}
+
 .panel-mode-content {
   animation: panel-mode-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
   display: grid;
-  gap: 13px;
+  flex: 0 0 auto;
+  gap: 16px;
 }
 
 .panel-nav {
   display: grid;
+  flex-shrink: 0;
   gap: 8px;
 }
 
@@ -852,6 +944,7 @@ textarea {
   line-height: 1.1;
   margin: 0;
   max-width: 250px;
+  text-wrap: balance;
 }
 
 .country-intro p {
@@ -862,8 +955,7 @@ textarea {
 }
 
 .country-search {
-  position: relative;
-  z-index: 2;
+  min-width: 0;
 }
 
 .country-search-control {
@@ -885,6 +977,10 @@ textarea {
   padding-right: 36px;
 }
 
+.country-search-control:has(.country-search-clear) input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
 .country-search-clear {
   border: 0;
   box-shadow: none;
@@ -898,18 +994,13 @@ textarea {
 .country-search-results {
   background: var(--color-surface-elevated);
   border: 1px solid var(--color-border-strong);
-  border-radius: 7px;
-  box-shadow: var(--shadow-dialog);
+  border-radius: 4px;
   display: grid;
   gap: 3px;
-  left: 0;
-  max-height: min(300px, 40vh);
+  max-height: min(240px, 30dvh);
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 5px;
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 8;
 }
 
 .country-search-results button {
@@ -1032,6 +1123,7 @@ textarea {
   display: flex;
   gap: 7px;
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .country-summary-meta .country-swatch {
@@ -1086,20 +1178,33 @@ textarea {
   padding: 10px;
 }
 
-.country-appearance > summary::-webkit-details-marker {
+.country-appearance > summary::-webkit-details-marker,
+.region-picker > summary::-webkit-details-marker,
+.panel-about > summary::-webkit-details-marker {
   display: none;
 }
 
-.country-appearance > summary::after {
+.disclosure-icon {
   color: var(--color-muted);
-  content: "+";
-  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.country-appearance .disclosure-icon {
   grid-column: 2;
   grid-row: 1 / span 2;
 }
 
-.country-appearance[open] > summary::after {
-  content: "−";
+details[open] > summary > .disclosure-icon {
+  transform: rotate(180deg);
+}
+
+.side-panel summary:hover {
+  background: var(--color-surface-elevated);
+}
+
+.country-appearance > summary:focus-visible,
+.region-browser > summary:focus-visible {
+  outline-offset: -3px;
 }
 
 .country-appearance > summary span {
@@ -1137,10 +1242,15 @@ textarea {
 }
 
 .region-picker > summary {
+  align-items: center;
   color: var(--color-text-strong);
   cursor: pointer;
+  display: flex;
   font-size: 12px;
   font-weight: 700;
+  gap: 8px;
+  justify-content: space-between;
+  list-style: none;
   padding: 10px;
 }
 
@@ -1198,8 +1308,9 @@ textarea {
 .region-browser > summary {
   align-items: center;
   cursor: pointer;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   list-style: none;
   padding: 10px;
 }
@@ -1220,6 +1331,7 @@ textarea {
   color: var(--color-muted);
   font-size: 11px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   padding: 2px 7px;
 }
 
@@ -1274,13 +1386,24 @@ textarea {
   align-items: center;
   background: var(--color-surface-elevated);
   border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--color-text);
   cursor: pointer;
   display: inline-flex;
   gap: 7px;
   justify-content: center;
   padding: 0 11px;
+  position: relative;
+}
+
+.button-like:not(.disabled):hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-primary);
+}
+
+.button-like:has(input:focus-visible) {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .button-like.disabled {
@@ -1289,17 +1412,26 @@ textarea {
 }
 
 .button-like input[type="file"] {
+  border: 0;
+  clip-path: inset(50%);
   height: 1px;
+  min-height: 0;
   opacity: 0;
   overflow: hidden;
+  padding: 0;
   position: absolute;
   width: 1px;
 }
 
 .flag-upload-hint {
-  align-items: center;
+  align-items: start;
   display: flex;
   gap: 5px;
+}
+
+.flag-upload-hint svg {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .compact-context-card {
@@ -1328,6 +1460,7 @@ textarea {
   color: var(--color-muted);
   font-size: 11px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .section-heading {
@@ -1521,15 +1654,22 @@ textarea {
 
 .panel-about {
   border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
   margin-top: auto;
   padding-top: 10px;
 }
 
 .panel-about summary {
+  align-items: center;
   color: var(--color-muted);
   cursor: pointer;
+  display: flex;
   font-size: 11px;
   font-weight: 700;
+  gap: 8px;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 28px;
 }
 
 .panel-about p {
@@ -1554,6 +1694,7 @@ textarea {
   gap: 8px;
   left: 50%;
   max-width: min(420px, calc(100% - 32px));
+  overflow-wrap: anywhere;
   padding: 9px 14px;
   pointer-events: none;
   position: absolute;
@@ -1566,6 +1707,7 @@ textarea {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 999px;
   display: flex;
+  flex-shrink: 0;
   height: 24px;
   justify-content: center;
   width: 24px;
@@ -1634,6 +1776,42 @@ textarea {
   }
 }
 
+@keyframes map-change-creep {
+  from { stroke-width: 0; }
+  to { stroke-width: var(--creep-extent); }
+}
+
+@keyframes map-change-front-outer {
+  from { stroke-width: 0; }
+  to { stroke-width: calc(var(--creep-extent) + 0.7px); }
+}
+
+@keyframes map-change-front-inner {
+  from { stroke-width: 0; }
+  to { stroke-width: calc(var(--creep-extent) - 0.7px); }
+}
+
+@keyframes map-change-front-life {
+  0%, 8%, 82% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+
+@keyframes map-change-outline-life {
+  0% { opacity: 0; }
+  12%, 74% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+
+@keyframes map-change-outline-reduced {
+  from { opacity: 0.9; }
+  to { opacity: 0; }
+}
+
+@keyframes map-change-cover-reduced {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 .share-dialog,
 .error-panel,
 .loading-panel {
@@ -1676,13 +1854,13 @@ textarea {
   flex: 0 0 auto;
 }
 
-.copy-feedback {
+.share-dialog .copy-feedback {
   color: var(--color-success-text);
   font-size: 12px;
   margin: 0;
 }
 
-.copy-feedback.error {
+.share-dialog .copy-feedback.error {
   color: var(--color-danger-text);
 }
 
@@ -1694,12 +1872,15 @@ textarea {
 
 .share-dialog p {
   color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.5;
   margin: 4px 0 0;
 }
 
 .url-size {
   border-radius: 6px;
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
   padding: 7px 9px;
 }
 
@@ -1725,6 +1906,14 @@ textarea {
   gap: 10px;
   justify-items: center;
   padding: 28px;
+  max-width: calc(100% - 32px);
+  text-align: center;
+}
+
+.error-panel h1,
+.error-panel p {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .inline-error {
@@ -1734,8 +1923,11 @@ textarea {
   border-radius: 6px;
   color: var(--color-danger-text);
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   left: 14px;
+  max-width: calc(100% - 28px);
+  overflow-wrap: anywhere;
   padding: 8px 10px;
   position: absolute;
   top: 14px;
@@ -1803,10 +1995,8 @@ textarea {
     grid-column: 3;
   }
 
-  .country-search-results {
-    margin-top: 4px;
-    max-height: min(240px, 30vh);
-    position: static;
+  .transfer-confirmation {
+    bottom: 80px;
   }
 }
 
@@ -1869,7 +2059,7 @@ textarea {
     width: 38px;
   }
 
-  .side-panel { padding: 12px; }
+  .side-panel { --panel-padding: 12px; }
 
   .country-context > .country-intro + .country-search {
     order: -1;
@@ -1909,8 +2099,48 @@ textarea {
   }
 }
 
+@media (min-width: 600px) and (max-width: 900px) and (max-height: 500px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 8px 12px;
+  }
+
+  .topbar-main {
+    gap: 12px;
+  }
+
+  .title-field {
+    padding-left: 12px;
+  }
+
+  .presentation-toggle span {
+    display: none;
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .side-panel {
+    --panel-padding: 12px;
+    border-left: 1px solid var(--color-border);
+    border-top: 0;
+  }
+
+  .country-summary-flag {
+    height: 39px;
+    width: 52px;
+  }
+}
+
 @media (pointer: coarse) {
+  :root {
+    --control-height: 44px;
+  }
+
   button,
+  a,
   .button-like,
   .mode-tabs button,
   .map-controls button,
@@ -1933,6 +2163,7 @@ textarea {
   .map-controls button,
   .country-summary-clear,
   .country-search-clear,
+  .country-list-remove,
   .presentation-toggle,
   .topbar-menu > summary {
     min-width: 44px;
@@ -1943,9 +2174,30 @@ textarea {
   textarea {
     font-size: 16px;
   }
+
+  .country-search-control:has(.country-search-clear) input {
+    padding-right: 52px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .map-change-reveal {
+    animation: none;
+    stroke-width: 0;
+  }
+
+  .map-change-cover {
+    animation: map-change-cover-reduced 180ms ease-out both;
+  }
+
+  .map-change-front {
+    display: none;
+  }
+
+  .map-change-outline {
+    animation: map-change-outline-reduced 900ms ease-out both;
+  }
+
   .panel-mode-content,
   .country-summary,
   .country-appearance[open] .country-edit-fields,

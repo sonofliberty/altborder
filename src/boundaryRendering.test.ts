@@ -35,8 +35,8 @@ describe("shared boundary rendering", () => {
     );
   });
 
-  it("seals composed fill seams with the country color", () => {
+  it("seals country fill seams with the country color", () => {
     expect(appSource).toContain('underlay.sealInternalSeams ? "country-underlay-composed"');
-    expect(appSource).toContain("stroke={underlay.sealInternalSeams ? color : undefined}");
+    expect(appSource).toContain("stroke={color}");
   });
 });

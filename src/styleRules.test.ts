@@ -6,16 +6,17 @@ const { readFileSync } = require("node:fs");
 const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 
 describe("map style rules", () => {
-  it("reveals subtle administrative borders as the map zooms in", () => {
-    expect(styles).toMatch(/\.administrative-border-line \{[^}]*stroke-opacity: 0;[^}]*stroke-width: 0\.3;/);
-    expect(styles).toMatch(/\.map-admin-borders-close \.administrative-border-line \{[^}]*stroke-opacity: 0\.26;[^}]*stroke-width: 0\.38;/);
-    expect(styles).toMatch(/\.map-admin-borders-detail \.administrative-border-line \{[^}]*stroke-opacity: 0\.44;[^}]*stroke-width: 0\.48;/);
-    expect(styles).toMatch(/\.administrative-border-line\.administrative-border-active \{[^}]*stroke-opacity: 0\.56;/);
+  it("keeps administrative borders visible as the map zooms in", () => {
+    expect(styles).toMatch(/\.administrative-border-line \{[^}]*stroke-opacity: 0\.18;[^}]*stroke-width: 0\.36;/);
+    expect(styles).toMatch(/\.map-admin-borders-close \.administrative-border-line \{[^}]*stroke-opacity: 0\.43;[^}]*stroke-width: 0\.45;/);
+    expect(styles).toMatch(/\.map-admin-borders-detail \.administrative-border-line \{[^}]*stroke-opacity: 0\.58;[^}]*stroke-width: 0\.55;/);
+    expect(styles).toMatch(/\.administrative-border-line\.administrative-border-active \{[^}]*stroke-opacity: 0\.7;/);
   });
 
   it("uses crisp non-scaling country and coastline strokes", () => {
-    expect(styles).toMatch(/\.country-border-line \{[^}]*stroke-width: 0\.72;/);
-    expect(styles).toMatch(/\.coastline-line \{[^}]*stroke-width: 0\.5;/);
+    expect(styles).toMatch(/\.country-underlay \{[^}]*paint-order: stroke fill;[^}]*stroke-width: 1\.2;[^}]*vector-effect: non-scaling-stroke;/);
+    expect(styles).not.toMatch(/\.country-border-line \{[^}]*stroke-width:/);
+    expect(styles).toMatch(/\.coastline-line \{[^}]*stroke-width: 0\.6;/);
     expect(styles).toMatch(/\.coastline-line,[^}]*stroke-linecap: butt;/);
     expect(styles).toMatch(/\.coastline-line,[^}]*shape-rendering: geometricPrecision;/);
     expect(styles).toMatch(/\.coastline-line,[^}]*vector-effect: non-scaling-stroke;/);
