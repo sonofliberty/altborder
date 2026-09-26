@@ -1538,6 +1538,7 @@ export default function App() {
   function clearHistoryTransientState() {
     finishMetadataEdit();
     setMapChange(null);
+    setTransferConfirmation(null);
     setShare(null);
     setIsBrushDown(false);
     clearGeometryRenderCaches();
@@ -2092,6 +2093,7 @@ export default function App() {
     setSelectedEntityId(newEntityId);
     setMergeSelection(new Set());
     setMergeName("");
+    setTransferConfirmation({ id: Date.now(), message: `Merged ${members.length} countries as ${name}` });
   }
 
   function updateSelectedName(name: string) {

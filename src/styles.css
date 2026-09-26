@@ -834,6 +834,11 @@ textarea {
   scroll-padding-block: 8px;
 }
 
+.panel-scroll button,
+.panel-scroll .button-like {
+  font-size: 13px;
+}
+
 .panel-mode-content {
   animation: panel-mode-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
   display: grid;
@@ -1134,9 +1139,10 @@ textarea {
 
 .compact-context-card .country-summary {
   align-items: start;
+  border-bottom: 0;
   gap: 10px;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  padding-block: 8px 14px;
+  padding-block: 8px 0;
 }
 
 .compact-context-card .country-summary-flag {
@@ -1281,6 +1287,11 @@ details[open] > summary > .disclosure-icon {
 .region-picker-row:hover,
 .region-picker-row:focus-within {
   background: var(--color-surface-muted);
+}
+
+.region-picker-row:has(input:checked) {
+  background: var(--color-primary-soft);
+  color: var(--color-text-strong);
 }
 
 .region-picker-row input {
@@ -2147,6 +2158,14 @@ details[open] > summary > .disclosure-icon {
   .icon-button,
   .presentation-toggle,
   .topbar-menu > summary {
+    min-height: 44px;
+  }
+
+  .side-panel .compact,
+  .side-panel .region-row,
+  .country-search-results button,
+  .country-list-remove,
+  .country-search-clear {
     min-height: 44px;
   }
 

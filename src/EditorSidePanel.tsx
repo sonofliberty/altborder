@@ -229,6 +229,7 @@ function TransferPanel(props: EditorSidePanelProps) {
             </div>
 
             <TransferRegionPicker
+              key={props.selectedEntityId}
               regions={props.transferRegionRows}
               selectedRegions={props.selectedTransferRegions}
               readOnly={props.readOnly}
@@ -443,6 +444,9 @@ function MergePanel(props: EditorSidePanelProps) {
           placeholder="Search countries"
           resetAfterChange
         />
+        {props.mergeSelectedEntities.length === 0 ? (
+          <p className="hint">Select countries on the map, or search by name.</p>
+        ) : null}
       </section>
 
       {props.mergeSelectedEntities.length > 0 ? (
@@ -513,7 +517,7 @@ function CountryContext({
   showEditingFields?: boolean;
 }) {
   return (
-    <section className="context-section country-context">
+    <section className={`context-section country-context${showEditingFields ? "" : " compact-context-card"}`}>
       {selectedEntity ? (
         <CountrySummary key={selectedEntity.id} entity={selectedEntity} onClear={() => onSelectEntity("")} />
       ) : (
@@ -738,7 +742,10 @@ function CountrySearchSelect({
     <div
       className="field country-search"
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setOpen(false);
+          setQuery(selectedOption?.name ?? "");
+        }
       }}
     >
       <span id={labelId}>{label}</span>
