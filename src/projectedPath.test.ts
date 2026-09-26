@@ -4,7 +4,7 @@ import type { GeoProjection } from "d3-geo";
 import type { FeatureCollection, Geometry } from "geojson";
 import mapDataFixture from "../public/data/map-data.json";
 import { subtractGeoJsonGeometries, unionGeoJsonGeometriesClosingGaps } from "./geometrySplit";
-import { projectGeometryToPathData } from "./projectedPath";
+import { projectGeometryToPathData, projectedGeometryBounds } from "./projectedPath";
 import type { ProjectedPathData } from "./projectedPath";
 import type { MapData } from "./types";
 
@@ -15,6 +15,22 @@ const renderPathOptions = {
 };
 
 describe("projected path layout", () => {
+  it("finds the same country bounds without generating SVG paths", () => {
+    const data = mapDataFixture as MapData;
+    const projection = makeMapProjection(data);
+    for (const id of ["BRA", "RUS", "USA", "CAN", "JPN", "IDN"]) {
+      const geometry = data.baseCountries.find((candidate) => candidate.entityId === id)?.geometry
+        ?? getRegionGeometry(data, `${id}-ALL`);
+      expect(projectedGeometryBounds(geometry, projection)).toEqual(
+        projectGeometryToPathData(geometry, projection, renderPathOptions)?.bounds,
+      );
+    }
+  });
+
+  it("returns no bounds for an empty polygon", () => {
+    expect(projectedGeometryBounds({ type: "Polygon", coordinates: [] }, identityProjection)).toBeNull();
+  });
+
   it("projects simple polygon paths and bounds without duplicate closing coordinates", () => {
     const geometry: Geometry = {
       type: "Polygon",

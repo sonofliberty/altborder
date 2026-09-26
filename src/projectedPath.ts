@@ -28,6 +28,31 @@ export function geometryToSvgPath(
   return projectGeometryToPathData(geometry, projection, options)?.pathData ?? "";
 }
 
+export function projectedGeometryBounds(geometry: Geometry, projection: GeoProjection): ProjectedBounds | null {
+  const polygons = geometry.type === "Polygon"
+    ? [geometry.coordinates]
+    : geometry.type === "MultiPolygon" ? geometry.coordinates : [];
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const polygon of polygons) {
+    for (const ring of polygon) {
+      for (const position of ring) {
+        const point = projection([position[0], position[1]]);
+        if (!point || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) continue;
+        minX = Math.min(minX, point[0]);
+        minY = Math.min(minY, point[1]);
+        maxX = Math.max(maxX, point[0]);
+        maxY = Math.max(maxY, point[1]);
+      }
+    }
+  }
+
+  return Number.isFinite(minX) ? { minX, minY, maxX, maxY } : null;
+}
+
 export function projectGeometryToPathData(
   geometry: Geometry,
   projection: GeoProjection,

@@ -2,6 +2,10 @@ import type { Geometry, Position } from "geojson";
 import type { MapData } from "./types";
 
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+const coordinateDigits = new Int8Array(128).fill(-1);
+for (let index = 0; index < alphabet.length; index += 1) {
+  coordinateDigits[alphabet.charCodeAt(index)] = index;
+}
 
 type PackedGeometry = {
   type: Geometry["type"];
@@ -21,36 +25,41 @@ type PackedMapData = {
 };
 
 function decodeLine(encoded: string): Position[] {
-  const numbers: number[] = [];
+  const positions: Position[] = [];
   let value = 0;
   let shift = 0;
+  let factor = 1;
+  let longitude = 0;
+  let latitude = 0;
+  let expectsLatitude = false;
 
-  for (const character of encoded) {
-    const digit = alphabet.indexOf(character);
-    if (digit < 0) throw new Error("Map data contains an invalid coordinate.");
-    value += (digit & 31) * 2 ** shift;
+  for (let index = 0; index < encoded.length; index += 1) {
+    const digit = coordinateDigits[encoded.charCodeAt(index)];
+    if (digit === undefined || digit < 0) throw new Error("Map data contains an invalid coordinate.");
+    value += (digit & 31) * factor;
     if (digit & 32) {
       shift += 5;
       if (shift > 50) throw new Error("Map data contains an invalid coordinate.");
+      factor *= 32;
       continue;
     }
-    numbers.push(value & 1 ? -(value + 1) / 2 : value / 2);
+    const delta = value & 1 ? -(value + 1) / 2 : value / 2;
+    if (expectsLatitude) {
+      latitude += delta;
+      positions.push([longitude / 100, latitude / 100]);
+    } else {
+      longitude += delta;
+    }
+    expectsLatitude = !expectsLatitude;
     value = 0;
     shift = 0;
+    factor = 1;
   }
 
-  if (shift !== 0 || numbers.length % 2 !== 0) {
+  if (shift !== 0 || expectsLatitude) {
     throw new Error("Map data contains an incomplete coordinate.");
   }
 
-  const positions: Position[] = [];
-  let longitude = 0;
-  let latitude = 0;
-  for (let index = 0; index < numbers.length; index += 2) {
-    longitude += numbers[index];
-    latitude += numbers[index + 1];
-    positions.push([longitude / 100, latitude / 100]);
-  }
   return positions;
 }
 

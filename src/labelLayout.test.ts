@@ -85,6 +85,23 @@ describe("layoutCountryLabel", () => {
     expect(label!.y).toBeGreaterThan(50);
   });
 
+  it("keeps label samples out of a hole across indexed boundary bands", () => {
+    const outer = squareCoordinates(0, 0, 100, 100);
+    const hole = squareCoordinates(20, 20, 80, 80);
+    const label = layoutCountryLabel({
+      id: "ring",
+      name: "Ring",
+      geometries: [{ type: "Polygon", coordinates: [outer, hole] }],
+      project: identityProject,
+    });
+
+    expect(label).not.toBeNull();
+    for (const point of rectangleSamplePoints(label!.x, label!.y, label!.width, label!.height, label!.angle)) {
+      expect(ringContainsPoint(outer, point)).toBe(true);
+      expect(ringContainsPoint(hole, point)).toBe(false);
+    }
+  });
+
   it("fits expanded labels across adjacent owned polygon components", () => {
     const original = layoutCountryLabel({
       id: "expanded",

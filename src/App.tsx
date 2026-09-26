@@ -86,6 +86,7 @@ import { decodePackedMapData } from "./mapDataPacking";
 import {
   geometryToSvgPath,
   projectGeometryToPathData,
+  projectedGeometryBounds,
   type ProjectedPathData,
 } from "./projectedPath";
 import { getCountryLabelGeometry } from "./countryLabelGeometry";
@@ -246,6 +247,7 @@ export default function App() {
   const countryUnderlayCacheRef = useRef(new Map<string, CountryUnderlay>());
   const countryUnderlaysInitializedRef = useRef(false);
   const baseProjectedRegionCacheRef = useRef(new Map<string, ProjectedPathData>());
+  const baseRegionBoundsCacheRef = useRef(new Map<string, ProjectedBounds | null>());
   const baseProjectedRegionDetailStrokeCacheRef = useRef(new Map<string, string>());
   const metadataEditKeyRef = useRef<string | null>(null);
   const geometryWorkerRequestIdRef = useRef(0);
@@ -253,6 +255,7 @@ export default function App() {
 
   useEffect(() => {
     baseProjectedRegionCacheRef.current.clear();
+    baseRegionBoundsCacheRef.current.clear();
     baseProjectedRegionDetailStrokeCacheRef.current.clear();
     countryUnderlayCacheRef.current.clear();
   }, []);
@@ -539,6 +542,7 @@ export default function App() {
 
   useEffect(() => {
     baseProjectedRegionCacheRef.current.clear();
+    baseRegionBoundsCacheRef.current.clear();
     baseProjectedRegionDetailStrokeCacheRef.current.clear();
   }, [data, projection]);
 
@@ -598,8 +602,15 @@ export default function App() {
   }, [customProjectedRegionById, getBaseDetailedRegionStrokePath, getBaseProjectedRegion]);
 
   const getRegionBounds = useCallback((regionId: string) => {
-    return customProjectedRegionById.get(regionId)?.bounds ?? getBaseProjectedRegion(regionId)?.bounds ?? null;
-  }, [customProjectedRegionById, getBaseProjectedRegion]);
+    const customBounds = customProjectedRegionById.get(regionId)?.bounds;
+    if (customBounds) return customBounds;
+    const cached = baseRegionBoundsCacheRef.current.get(regionId);
+    if (cached !== undefined) return cached;
+    const geometry = renderRegionGeometryById.get(regionId) ?? regionById.get(regionId)?.geometry;
+    const bounds = geometry ? projectedGeometryBounds(geometry, projection) : null;
+    baseRegionBoundsCacheRef.current.set(regionId, bounds);
+    return bounds;
+  }, [customProjectedRegionById, projection, regionById, renderRegionGeometryById]);
 
   const projectedBoundaryEdges = useMemo(() => {
     const projectedEdges: ProjectedBoundaryEdgeWithBounds[] = [];
@@ -2478,7 +2489,7 @@ export default function App() {
   ]);
 
   const regionInteractionElements = useMemo(() => {
-    if (!entities || !regionOwners) return [];
+    if (!entities || !regionOwners || isMapMoving || isPresenting) return [];
 
     return regionsToRender.map((region) => {
       const regionId = region.id;
@@ -2514,6 +2525,8 @@ export default function App() {
     getRegionDisplayName,
     getRegionPath,
     entities,
+    isMapMoving,
+    isPresenting,
     regionOwners,
     selectedEntityId,
     regionsToRender,
@@ -3161,42 +3174,11 @@ function makeDefaultMergeName(snapshot: EditorSnapshot, selection: Set<string>):
   return `${names.join(" + ")} Union`;
 }
 
-function visitPositions(geometry: Geometry, visitor: (position: Position) => void) {
-  if (geometry.type === "Polygon") {
-    for (const ring of geometry.coordinates) {
-      for (const position of ring) visitor(position);
-    }
-  } else if (geometry.type === "MultiPolygon") {
-    for (const polygon of geometry.coordinates) {
-      for (const ring of polygon) {
-        for (const position of ring) visitor(position);
-      }
-    }
-  }
-}
-
 function projectedGeometriesBounds(geometries: Geometry[], projection: GeoProjection): ProjectedBounds | null {
   return geometries.reduce<ProjectedBounds | null>((combined, geometry) => {
     const bounds = projectedGeometryBounds(geometry, projection);
     return bounds ? mergeBounds(combined, bounds) : combined;
   }, null);
-}
-
-function projectedGeometryBounds(geometry: Geometry, projection: GeoProjection): ProjectedBounds | null {
-  let bounds: ProjectedBounds | null = null;
-
-  visitPositions(geometry, (position) => {
-    const projected = projection([position[0], position[1]]);
-    if (!projected || !Number.isFinite(projected[0]) || !Number.isFinite(projected[1])) return;
-    bounds = mergeBounds(bounds, {
-      minX: projected[0],
-      minY: projected[1],
-      maxX: projected[0],
-      maxY: projected[1],
-    });
-  });
-
-  return bounds;
 }
 
 function mergeBounds(a: ProjectedBounds | null, b: ProjectedBounds): ProjectedBounds {

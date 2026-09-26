@@ -43,9 +43,16 @@ type Bounds = {
 };
 
 type ProjectedPolygon = {
-  rings: Point[][];
+  rings: IndexedRing[];
   bounds: Bounds;
   area: number;
+};
+
+type IndexedRing = {
+  points: Point[];
+  bounds: Bounds;
+  bucketScale: number;
+  edgeBuckets: number[][];
 };
 
 type PolygonCluster = {
@@ -180,7 +187,7 @@ function projectPolygon(polygon: Position[][], project: ProjectPoint): Projected
 
   return [
     {
-      rings,
+      rings: rings.map(indexRing),
       bounds: boundsForRings(rings),
       area,
     },
@@ -317,14 +324,17 @@ function polygonContainsPoint(polygon: ProjectedPolygon, point: Point): boolean 
   return polygon.rings.slice(1).every((hole) => !ringContainsPoint(hole, point));
 }
 
-function ringContainsPoint(ring: Point[], point: Point): boolean {
+function ringContainsPoint(ring: IndexedRing, point: Point): boolean {
   let inside = false;
   const x = point[0];
   const y = point[1];
+  const { points, bounds, edgeBuckets, bucketScale } = ring;
+  if (x < bounds.minX || x > bounds.maxX || y < bounds.minY || y > bounds.maxY) return false;
+  const bucket = Math.min(edgeBuckets.length - 1, Math.floor((y - bounds.minY) * bucketScale));
 
-  for (let index = 0, previousIndex = ring.length - 1; index < ring.length; previousIndex = index, index += 1) {
-    const current = ring[index];
-    const previous = ring[previousIndex];
+  for (const index of edgeBuckets[bucket]) {
+    const current = points[index];
+    const previous = points[index === 0 ? points.length - 1 : index - 1];
     const x1 = current[0];
     const y1 = current[1];
     const x2 = previous[0];
@@ -334,6 +344,26 @@ function ringContainsPoint(ring: Point[], point: Point): boolean {
   }
 
   return inside;
+}
+
+function indexRing(points: Point[]): IndexedRing {
+  const bounds = boundsForRings([points]);
+  const bucketCount = Math.min(64, Math.ceil(Math.sqrt(points.length)));
+  const height = bounds.maxY - bounds.minY;
+  const bucketScale = height > 0 ? bucketCount / height : 0;
+  const edgeBuckets: number[][] = Array.from({ length: bucketCount }, () => []);
+
+  // A horizontal ray can only cross edges in its own vertical band.
+  for (let index = 0; index < points.length; index += 1) {
+    const y1 = points[index][1];
+    const y2 = points[index === 0 ? points.length - 1 : index - 1][1];
+    if (y1 === y2) continue;
+    const first = Math.min(bucketCount - 1, Math.floor((Math.min(y1, y2) - bounds.minY) * bucketScale));
+    const last = Math.min(bucketCount - 1, Math.floor((Math.max(y1, y2) - bounds.minY) * bucketScale));
+    for (let bucket = first; bucket <= last; bucket += 1) edgeBuckets[bucket].push(index);
+  }
+
+  return { points, bounds, bucketScale, edgeBuckets };
 }
 
 function ringArea(ring: Point[]): number {
