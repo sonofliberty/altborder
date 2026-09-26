@@ -16,6 +16,29 @@ export type ScreenLabelCandidate = {
   priority: number;
 };
 
+export type LabelBox = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+};
+
+export function getLabelBox(
+  label: Pick<ScreenLabelCandidate, "x" | "y">,
+  zoom: LabelZoomState,
+  size: LabelBoxSize,
+  gap = 0,
+): LabelBox {
+  const x = zoom.x + label.x * zoom.k;
+  const y = zoom.y + label.y * zoom.k;
+  return {
+    left: x - size.width / 2 - gap,
+    right: x + size.width / 2 + gap,
+    top: y - size.height / 2 - gap,
+    bottom: y + size.height / 2 + gap,
+  };
+}
+
 const minCountryLabelScreenFontSize = 3.8;
 
 export function getCountryLabelMinScreenFontSize(baseMinFontSize: number, zoomScale: number): number {
@@ -32,6 +55,7 @@ export function filterLabels<T extends ScreenLabelCandidate>(
     minGap: number;
     viewportWidth?: number;
     viewportHeight?: number;
+    reservedBoxes?: LabelBox[];
     getBoxSize: (label: T) => LabelBoxSize;
     getSortText?: (label: T) => string;
   },
@@ -44,15 +68,7 @@ export function filterLabels<T extends ScreenLabelCandidate>(
 
   for (const label of sorted) {
     if (accepted.length >= options.maxLabels) break;
-    const screenX = zoom.x + label.x * zoom.k;
-    const screenY = zoom.y + label.y * zoom.k;
-    const { width, height } = options.getBoxSize(label);
-    const box = {
-      left: screenX - width / 2 - options.minGap,
-      right: screenX + width / 2 + options.minGap,
-      top: screenY - height / 2 - options.minGap,
-      bottom: screenY + height / 2 + options.minGap,
-    };
+    const box = getLabelBox(label, zoom, options.getBoxSize(label), options.minGap);
 
     if (
       options.viewportWidth !== undefined &&
@@ -62,7 +78,10 @@ export function filterLabels<T extends ScreenLabelCandidate>(
       continue;
     }
 
-    if (accepted.every((existing) => !boxesOverlap(box, existing.box))) {
+    if (
+      accepted.every((existing) => !boxesOverlap(box, existing.box)) &&
+      (options.reservedBoxes ?? []).every((reserved) => !boxesOverlap(box, reserved))
+    ) {
       accepted.push({ ...label, box });
     }
   }
@@ -73,13 +92,6 @@ export function filterLabels<T extends ScreenLabelCandidate>(
     return label as T;
   });
 }
-
-type LabelBox = {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-};
 
 function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;

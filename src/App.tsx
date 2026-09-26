@@ -65,6 +65,7 @@ import { countryLabelMinScreenFontSize } from "./labelConstants";
 import {
   filterLabels,
   getCountryLabelMinScreenFontSize,
+  getLabelBox,
 } from "./mapLabelDisplay";
 import { zoomToBounds, type ProjectedBounds } from "./mapZoom";
 import { getAdministrativeBorderZoomClass, getCountryBorderStrokeWidth } from "./mapVisualStyle";
@@ -116,6 +117,7 @@ const simplifiedCountryLayerMaxZoom = 1.35;
 const wheelZoomMaxDelta = 80;
 const wheelZoomSensitivity = 0.001;
 const countryFlagImageRasterScale = 16;
+const regionLabelScreenFontSize = 11;
 const oceanLabels = [
   { name: "Pacific Ocean", coordinates: [-132, 0] as [number, number] },
   { name: "North Atlantic", coordinates: [-38, 23] as [number, number] },
@@ -207,6 +209,7 @@ export default function App() {
   const [transferConfirmation, setTransferConfirmation] = useState<TransferConfirmation | null>(null);
   const [mapChange, setMapChange] = useState<MapChangeAnimation | null>(null);
   const [zoom, setZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
+  const [mapViewScale, setMapViewScale] = useState(1);
   const [settledZoom, setSettledZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
   const [isMapMoving, setIsMapMoving] = useState(false);
   const [countryUnderlays, setCountryUnderlays] = useState<CountryUnderlay[]>([]);
@@ -257,6 +260,26 @@ export default function App() {
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
+
+  useEffect(() => {
+    const svg = mapSvgRef.current;
+    if (!svg) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const scale = Math.min(entry.contentRect.width / viewportWidth, entry.contentRect.height / viewportHeight);
+      if (scale > 0) setMapViewScale(scale);
+    });
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, [data]);
+
+  useEffect(() => {
+    const svg = mapSvgRef.current;
+    if (!svg) return;
+    // React's wheel listener is passive, so cancel page scrolling on the SVG itself.
+    const preventPageScroll = (event: WheelEvent) => event.preventDefault();
+    svg.addEventListener("wheel", preventPageScroll, { passive: false });
+    return () => svg.removeEventListener("wheel", preventPageScroll);
+  }, [data]);
 
   const applyZoomToDom = useCallback((nextZoom: ZoomState) => {
     mapContentRef.current?.setAttribute("transform", formatZoomTransform(nextZoom));
@@ -1035,17 +1058,7 @@ export default function App() {
       viewportWidth,
       viewportHeight,
       getSortText: (label) => label.displayName,
-      getBoxSize: (label) => {
-        const angle = (label.angle * Math.PI) / 180;
-        const cos = Math.abs(Math.cos(angle));
-        const sin = Math.abs(Math.sin(angle));
-        const width = Math.max(10, label.width * displayScale);
-        const height = Math.max(5, label.height * displayScale);
-        return {
-          width: width * cos + height * sin,
-          height: width * sin + height * cos,
-        };
-      },
+      getBoxSize: (label) => getCountryLabelBoxSize(label, displayScale),
     });
   }, [countryLabelLayouts, isMapMoving, zoom]);
 
@@ -1085,18 +1098,21 @@ export default function App() {
 
     return filterLabels(rawLabels, zoom, {
       maxLabels: zoom.k < 2.7 ? 18 : 55,
-      minGap: 8,
+      minGap: 4 / mapViewScale,
       viewportWidth,
       viewportHeight,
+      reservedBoxes: countryLabels.map((label) => getLabelBox(label, zoom, getCountryLabelBoxSize(label, zoom.k))),
       getSortText: (label) => label.name,
       getBoxSize: (label) => ({
-        width: Math.min(130, Math.max(18, label.name.length * 5.2)),
-        height: 10,
+        width: Math.max(18, label.name.length * regionLabelScreenFontSize * 0.6) / mapViewScale,
+        height: (regionLabelScreenFontSize + 3) / mapViewScale,
       }),
     });
   }, [
     activeModeUsesRegions,
+    countryLabels,
     getRegionBounds,
+    mapViewScale,
     regionNameOverrides,
     regionOwners,
     isMapMoving,
@@ -2328,16 +2344,16 @@ export default function App() {
     }
 
     if (!panRef.current) return;
-    const dx = event.clientX - panRef.current.x;
-    const dy = event.clientY - panRef.current.y;
-    if (Math.hypot(dx, dy) > 3) {
+    const start = getSvgPoint(event.currentTarget, panRef.current.x, panRef.current.y);
+    const current = getSvgPoint(event.currentTarget, event.clientX, event.clientY);
+    if (Math.hypot(event.clientX - panRef.current.x, event.clientY - panRef.current.y) > 3) {
       panRef.current.moved = true;
       markMapMoving();
     }
     queueZoomUpdate({
       ...panRef.current.zoom,
-      x: panRef.current.zoom.x + dx,
-      y: panRef.current.zoom.y + dy,
+      x: panRef.current.zoom.x + current.x - start.x,
+      y: panRef.current.zoom.y + current.y - start.y,
     });
   }
 
@@ -2383,15 +2399,14 @@ export default function App() {
   }
 
   function handleWheel(event: React.WheelEvent<SVGSVGElement>) {
-    event.preventDefault();
     markMapMoving();
     const deltaX = normalizeWheelDelta(event.deltaX, event.deltaMode, viewportWidth);
     const deltaY = normalizeWheelDelta(event.deltaY, event.deltaMode, viewportHeight);
     if (event.shiftKey) {
       queueZoomUpdate({
         ...zoomRef.current,
-        x: zoomRef.current.x - deltaX,
-        y: zoomRef.current.y - deltaY,
+        x: zoomRef.current.x - deltaX / mapViewScale,
+        y: zoomRef.current.y - deltaY / mapViewScale,
       });
       settleMapMoving(180);
       return;
@@ -2431,7 +2446,9 @@ export default function App() {
           fill={color}
           fillRule="evenodd"
           stroke={color}
-        />
+        >
+          <title>{entities[underlay.id]?.name}</title>
+        </path>
       );
     });
   }, [
@@ -2739,6 +2756,7 @@ export default function App() {
           <svg
             ref={mapSvgRef}
             viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}
+            style={{ "--map-region-label-size": `${regionLabelScreenFontSize / mapViewScale}px` } as CSSProperties}
             className={[
               "map",
               administrativeBorderZoomClass,
@@ -2963,10 +2981,10 @@ export default function App() {
             </g>
           </svg>
           <div className="map-controls" role="group" aria-label="Map zoom controls">
-            <button onClick={() => zoomBy(1.25)} title="Zoom in" aria-label="Zoom in">
+            <button onClick={() => zoomBy(1.25)} disabled={zoom.k >= maxZoom} title="Zoom in" aria-label="Zoom in">
               <Plus size={17} />
             </button>
-            <button onClick={() => zoomBy(1 / 1.25)} title="Zoom out" aria-label="Zoom out">
+            <button onClick={() => zoomBy(1 / 1.25)} disabled={zoom.k <= minZoom} title="Zoom out" aria-label="Zoom out">
               <Minus size={17} />
             </button>
             <button onClick={resetMapView} title="Show whole world" aria-label="Show whole world">
@@ -3245,6 +3263,18 @@ function getTransferReveal(
     ? bounds.maxX - bounds.minX
     : bounds.maxY - bounds.minY;
   return { kind: "edge", path, extent: depth * 2 + 4 };
+}
+
+function getCountryLabelBoxSize(label: FittedCountryLabel, scale: number) {
+  const angle = (label.angle * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(angle));
+  const sin = Math.abs(Math.sin(angle));
+  const width = Math.max(10, label.width * scale);
+  const height = Math.max(5, label.height * scale);
+  return {
+    width: width * cos + height * sin,
+    height: width * sin + height * cos,
+  };
 }
 
 function getSvgPoint(svg: SVGSVGElement, clientX: number, clientY: number): SvgPoint {

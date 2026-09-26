@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   filterLabels,
   getCountryLabelMinScreenFontSize,
+  getLabelBox,
 } from "./mapLabelDisplay";
 
 describe("country label display thresholds", () => {
@@ -13,6 +14,40 @@ describe("country label display thresholds", () => {
 });
 
 describe("filterLabels", () => {
+  it("keeps region labels clear of country names and flags after zoom and pan", () => {
+    const zoom = { x: -40, y: -20, k: 3 };
+    const countryBox = getLabelBox({ x: 30, y: 20 }, zoom, { width: 60, height: 20 });
+    const labels = [
+      { id: "under-country-name", x: 30, y: 20, priority: 100 },
+      { id: "below-country-name", x: 30, y: 35, priority: 1 },
+    ];
+
+    const filtered = filterLabels(labels, zoom, {
+      maxLabels: 1,
+      minGap: 4,
+      reservedBoxes: [countryBox],
+      getBoxSize: () => ({ width: 40, height: 14 }),
+    });
+
+    expect(filtered.map((label) => label.id)).toEqual(["below-country-name"]);
+  });
+
+  it("keeps a readable label budget when the map is displayed at phone size", () => {
+    const labels = [
+      { id: "selected-region", x: 100, y: 100, priority: 100 },
+      { id: "nearby-region", x: 180, y: 100, priority: 1 },
+      { id: "distant-region", x: 400, y: 100, priority: 1 },
+    ];
+    const viewScale = 0.39;
+    const filtered = filterLabels(labels, { x: 0, y: 0, k: 1 }, {
+      maxLabels: 55,
+      minGap: 4 / viewScale,
+      getBoxSize: () => ({ width: 80 / viewScale, height: 14 / viewScale }),
+    });
+
+    expect(filtered.map((label) => label.id)).toEqual(["distant-region", "selected-region"]);
+  });
+
   it("keeps the higher-priority label when country labels overlap", () => {
     const labels = [
       { id: "czechia", name: "CZECHIA", x: 10, y: 10, priority: 5 },
