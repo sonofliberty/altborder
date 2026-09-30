@@ -24,7 +24,13 @@
   --color-warning-text: #e6cb8e;
   --color-success-bg: #23382f;
   --color-success-text: #abd5b7;
-  --color-map-ocean: #172e3a;
+  --color-map-ocean: #344959;
+  --color-map-coast: #273645;
+  --color-map-country-border: #282c32;
+  --color-map-region-border: #282c32;
+  --color-map-label: #252a30;
+  --color-map-label-outline: #d9d7cd;
+  --font-map-country: "Trebuchet MS", Arial, sans-serif;
   --font-atlas: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
   --shadow-chrome: 0 1px 0 rgba(200, 172, 115, 0.06), 0 8px 24px rgba(4, 12, 16, 0.16);
   --shadow-panel: -12px 0 32px rgba(4, 12, 16, 0.18);
@@ -495,8 +501,8 @@ textarea {
 .atlas-graticule {
   fill: none;
   pointer-events: none;
-  stroke: #b7c3bb;
-  stroke-opacity: 0.095;
+  stroke: #c7d1d6;
+  stroke-opacity: 0.09;
   stroke-width: 0.6;
   vector-effect: non-scaling-stroke;
 }
@@ -506,8 +512,8 @@ textarea {
 }
 
 .ocean-label {
-  fill: #9facad;
-  fill-opacity: 0.55;
+  fill: #edf0ee;
+  fill-opacity: 1;
   font-family: var(--font-atlas);
   font-size: 9px;
   font-style: italic;
@@ -564,12 +570,12 @@ textarea {
 }
 
 .coastline-line {
-  stroke: rgba(4, 7, 7, 0.5);
-  stroke-width: 0.6;
+  stroke: var(--color-map-coast);
+  stroke-width: 0.7;
 }
 
 .country-border-line {
-  stroke: rgba(4, 7, 7, 0.72);
+  stroke: var(--color-map-country-border);
 }
 
 .region {
@@ -582,17 +588,17 @@ textarea {
 
 .administrative-border-line {
   pointer-events: none;
-  stroke: rgba(6, 9, 8, 0.6);
-  stroke-opacity: 0.18;
-  stroke-width: 0.36;
+  stroke: var(--color-map-region-border);
+  stroke-opacity: 0.08;
+  stroke-width: 0.4;
   transition:
     stroke-opacity 120ms ease,
     stroke-width 120ms ease;
 }
 
 .map-admin-borders-close .administrative-border-line {
-  stroke-opacity: 0.43;
-  stroke-width: 0.45;
+  stroke-opacity: 0.28;
+  stroke-width: 0.4;
 }
 
 .map-admin-borders-detail .administrative-border-line {
@@ -645,13 +651,13 @@ textarea {
 
 .selected-country-aura-outer {
   animation: selected-aura-outer-in 320ms cubic-bezier(0.22, 1, 0.36, 1);
-  stroke-opacity: 0.16;
+  stroke-opacity: 0.1;
   stroke-width: 10;
 }
 
 .selected-country-aura-inner {
   animation: selected-aura-inner-in 280ms cubic-bezier(0.22, 1, 0.36, 1);
-  stroke-opacity: 0.34;
+  stroke-opacity: 0.24;
   stroke-width: 5;
 }
 
@@ -762,37 +768,34 @@ textarea {
   transition: opacity 90ms ease;
 }
 
-.country-labels > g {
-  transition: opacity 90ms ease;
+.country-labels {
+  transition: opacity 160ms ease-out;
 }
 
-.map.is-moving .country-labels > g,
+.country-label-content {
+  transform: scale(min(1, calc(var(--map-country-label-max) / var(--country-label-size) / var(--map-camera-scale) / var(--map-view-scale))));
+  transform-origin: 0 0;
+}
+
+.map.is-moving .country-labels {
+  opacity: 0.72;
+}
+
 .map.is-moving .region-labels text {
   opacity: 0;
 }
 
 .country-labels text {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-map-country);
   font-weight: 700;
 }
 
 .country-label {
-  fill: rgba(12, 18, 16, 0.97);
-  filter: drop-shadow(0 0.04em 0.08em rgba(3, 10, 9, 0.3));
+  fill: var(--color-map-label);
   paint-order: stroke fill;
-  stroke: rgba(248, 250, 247, 0.74);
+  stroke: var(--color-map-label-outline);
   stroke-linejoin: round;
-  stroke-width: 0.055em;
-}
-
-.country-flag,
-.country-flag-border {
-  pointer-events: none;
-}
-
-.country-flag-border {
-  fill: none;
-  stroke: rgba(25, 38, 33, 0.58);
+  stroke-width: 0.1em;
 }
 
 .region-labels text {
@@ -2233,7 +2236,8 @@ details[open] > summary > .disclosure-icon {
     animation: none !important;
   }
 
-  .mode-tabs button {
+  .mode-tabs button,
+  .country-labels {
     transition: none;
   }
 }

@@ -14,7 +14,7 @@ describe("country label rendering", () => {
   it("keeps country label visibility independent from selected country state", () => {
     expect(appSource).not.toContain("label.id === selectedEntityId");
     expect(appSource).not.toContain("priority: label.priority +");
-    expect(appSource).toContain("}, [countryLabelLayouts, isMapMoving, zoom]);");
+    expect(appSource).toContain("}, [countryLabelLayouts, mapViewScale, settledZoom]);");
   });
 
   it("swaps rebuilt country labels only after the full layout pass completes", () => {
@@ -23,21 +23,11 @@ describe("country label rendering", () => {
     expect(appSource).toContain("flushLabels();");
   });
 
-  it("renders a flag before each country name", () => {
-    const flagIndex = appSource.indexOf('className="country-flag"');
-    const labelIndex = appSource.indexOf('className="country-label"');
-
-    expect(flagIndex).toBeGreaterThan(-1);
-    expect(labelIndex).toBeGreaterThan(flagIndex);
-    expect(appSource).toContain("getCountryFlagUrl(getCountryFlag(entities?.[label.id]))");
-    expect(appSource).toContain("-label.contentWidth / 2 + label.flagWidth + label.flagGap");
+  it("centers country names without map flag images", () => {
+    expect(appSource).not.toContain('className="country-flag"');
+    expect(appSource).toMatch(/className="country-label"\s+x=\{0\}/);
   });
 
-  it("rasterizes very small SVG flags before applying the label scale", () => {
-    expect(appSource).toContain("const countryFlagImageRasterScale = 16;");
-    expect(appSource).toContain("label.flagHeight * countryFlagImageRasterScale");
-    expect(appSource).toContain("transform={`scale(${1 / countryFlagImageRasterScale})`}");
-  });
 });
 
 describe("country underlay rendering", () => {

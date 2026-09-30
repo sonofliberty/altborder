@@ -1,0 +1,699 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-29T00:45:13.154779+00:00",
+  "title": "Design System: AltBorder",
+  "extensions": {
+    "colorMeta": {
+      "editor-text": {
+        "role": "neutral",
+        "displayName": "Editor Text",
+        "tonalRamp": [
+          "oklch(15.00% 0.01218 101.50)",
+          "oklch(26.43% 0.01218 101.50)",
+          "oklch(37.86% 0.01218 101.50)",
+          "oklch(49.29% 0.01218 101.50)",
+          "oklch(60.71% 0.01218 101.50)",
+          "oklch(72.14% 0.01218 101.50)",
+          "oklch(83.57% 0.01218 101.50)",
+          "oklch(95.00% 0.01218 101.50)"
+        ]
+      },
+      "editor-text-strong": {
+        "role": "neutral",
+        "displayName": "Editor Text Strong",
+        "tonalRamp": [
+          "oklch(15.00% 0.02058 91.59)",
+          "oklch(26.43% 0.02058 91.59)",
+          "oklch(37.86% 0.02058 91.59)",
+          "oklch(49.29% 0.02058 91.59)",
+          "oklch(60.71% 0.02058 91.59)",
+          "oklch(72.14% 0.02058 91.59)",
+          "oklch(83.57% 0.02058 91.59)",
+          "oklch(95.00% 0.02058 91.59)"
+        ]
+      },
+      "editor-muted": {
+        "role": "neutral",
+        "displayName": "Editor Muted",
+        "tonalRamp": [
+          "oklch(15.00% 0.00993 171.69)",
+          "oklch(26.43% 0.00993 171.69)",
+          "oklch(37.86% 0.00993 171.69)",
+          "oklch(49.29% 0.00993 171.69)",
+          "oklch(60.71% 0.00993 171.69)",
+          "oklch(72.14% 0.00993 171.69)",
+          "oklch(83.57% 0.00993 171.69)",
+          "oklch(95.00% 0.00993 171.69)"
+        ]
+      },
+      "editor-subtle": {
+        "role": "neutral",
+        "displayName": "Editor Subtle",
+        "tonalRamp": [
+          "oklch(15.00% 0.01439 179.25)",
+          "oklch(26.43% 0.01439 179.25)",
+          "oklch(37.86% 0.01439 179.25)",
+          "oklch(49.29% 0.01439 179.25)",
+          "oklch(60.71% 0.01439 179.25)",
+          "oklch(72.14% 0.01439 179.25)",
+          "oklch(83.57% 0.01439 179.25)",
+          "oklch(95.00% 0.01439 179.25)"
+        ]
+      },
+      "editor-app-bg": {
+        "role": "neutral",
+        "displayName": "Editor App Bg",
+        "tonalRamp": [
+          "oklch(15.00% 0.01750 230.21)",
+          "oklch(26.43% 0.01750 230.21)",
+          "oklch(37.86% 0.01750 230.21)",
+          "oklch(49.29% 0.01750 230.21)",
+          "oklch(60.71% 0.01750 230.21)",
+          "oklch(72.14% 0.01750 230.21)",
+          "oklch(83.57% 0.01750 230.21)",
+          "oklch(95.00% 0.01750 230.21)"
+        ]
+      },
+      "editor-surface": {
+        "role": "neutral",
+        "displayName": "Editor Surface",
+        "tonalRamp": [
+          "oklch(15.00% 0.01716 229.97)",
+          "oklch(26.43% 0.01716 229.97)",
+          "oklch(37.86% 0.01716 229.97)",
+          "oklch(49.29% 0.01716 229.97)",
+          "oklch(60.71% 0.01716 229.97)",
+          "oklch(72.14% 0.01716 229.97)",
+          "oklch(83.57% 0.01716 229.97)",
+          "oklch(95.00% 0.01716 229.97)"
+        ]
+      },
+      "editor-surface-elevated": {
+        "role": "neutral",
+        "displayName": "Editor Surface Elevated",
+        "tonalRamp": [
+          "oklch(15.00% 0.01995 223.56)",
+          "oklch(26.43% 0.01995 223.56)",
+          "oklch(37.86% 0.01995 223.56)",
+          "oklch(49.29% 0.01995 223.56)",
+          "oklch(60.71% 0.01995 223.56)",
+          "oklch(72.14% 0.01995 223.56)",
+          "oklch(83.57% 0.01995 223.56)",
+          "oklch(95.00% 0.01995 223.56)"
+        ]
+      },
+      "editor-surface-muted": {
+        "role": "neutral",
+        "displayName": "Editor Surface Muted",
+        "tonalRamp": [
+          "oklch(15.00% 0.02069 221.80)",
+          "oklch(26.43% 0.02069 221.80)",
+          "oklch(37.86% 0.02069 221.80)",
+          "oklch(49.29% 0.02069 221.80)",
+          "oklch(60.71% 0.02069 221.80)",
+          "oklch(72.14% 0.02069 221.80)",
+          "oklch(83.57% 0.02069 221.80)",
+          "oklch(95.00% 0.02069 221.80)"
+        ]
+      },
+      "editor-border": {
+        "role": "neutral",
+        "displayName": "Editor Border",
+        "tonalRamp": [
+          "oklch(15.00% 0.02289 228.04)",
+          "oklch(26.43% 0.02289 228.04)",
+          "oklch(37.86% 0.02289 228.04)",
+          "oklch(49.29% 0.02289 228.04)",
+          "oklch(60.71% 0.02289 228.04)",
+          "oklch(72.14% 0.02289 228.04)",
+          "oklch(83.57% 0.02289 228.04)",
+          "oklch(95.00% 0.02289 228.04)"
+        ]
+      },
+      "editor-border-strong": {
+        "role": "neutral",
+        "displayName": "Editor Border Strong",
+        "tonalRamp": [
+          "oklch(15.00% 0.02474 165.10)",
+          "oklch(26.43% 0.02474 165.10)",
+          "oklch(37.86% 0.02474 165.10)",
+          "oklch(49.29% 0.02474 165.10)",
+          "oklch(60.71% 0.02474 165.10)",
+          "oklch(72.14% 0.02474 165.10)",
+          "oklch(83.57% 0.02474 165.10)",
+          "oklch(95.00% 0.02474 165.10)"
+        ]
+      },
+      "editor-input-border": {
+        "role": "neutral",
+        "displayName": "Editor Input Border",
+        "tonalRamp": [
+          "oklch(15.00% 0.02448 166.86)",
+          "oklch(26.43% 0.02448 166.86)",
+          "oklch(37.86% 0.02448 166.86)",
+          "oklch(49.29% 0.02448 166.86)",
+          "oklch(60.71% 0.02448 166.86)",
+          "oklch(72.14% 0.02448 166.86)",
+          "oklch(83.57% 0.02448 166.86)",
+          "oklch(95.00% 0.02448 166.86)"
+        ]
+      },
+      "editor-primary": {
+        "role": "primary",
+        "displayName": "Editor Primary",
+        "tonalRamp": [
+          "oklch(15.00% 0.08144 84.42)",
+          "oklch(26.43% 0.08144 84.42)",
+          "oklch(37.86% 0.08144 84.42)",
+          "oklch(49.29% 0.08144 84.42)",
+          "oklch(60.71% 0.08144 84.42)",
+          "oklch(72.14% 0.08144 84.42)",
+          "oklch(83.57% 0.08144 84.42)",
+          "oklch(95.00% 0.08144 84.42)"
+        ]
+      },
+      "editor-primary-hover": {
+        "role": "primary",
+        "displayName": "Editor Primary Hover",
+        "tonalRamp": [
+          "oklch(15.00% 0.08148 84.94)",
+          "oklch(26.43% 0.08148 84.94)",
+          "oklch(37.86% 0.08148 84.94)",
+          "oklch(49.29% 0.08148 84.94)",
+          "oklch(60.71% 0.08148 84.94)",
+          "oklch(72.14% 0.08148 84.94)",
+          "oklch(83.57% 0.08148 84.94)",
+          "oklch(95.00% 0.08148 84.94)"
+        ]
+      },
+      "editor-primary-soft": {
+        "role": "primary",
+        "displayName": "Editor Primary Soft",
+        "tonalRamp": [
+          "oklch(15.00% 0.01548 112.41)",
+          "oklch(26.43% 0.01548 112.41)",
+          "oklch(37.86% 0.01548 112.41)",
+          "oklch(49.29% 0.01548 112.41)",
+          "oklch(60.71% 0.01548 112.41)",
+          "oklch(72.14% 0.01548 112.41)",
+          "oklch(83.57% 0.01548 112.41)",
+          "oklch(95.00% 0.01548 112.41)"
+        ]
+      },
+      "editor-primary-ink": {
+        "role": "primary",
+        "displayName": "Editor Primary Ink",
+        "tonalRamp": [
+          "oklch(15.00% 0.00954 173.38)",
+          "oklch(26.43% 0.00954 173.38)",
+          "oklch(37.86% 0.00954 173.38)",
+          "oklch(49.29% 0.00954 173.38)",
+          "oklch(60.71% 0.00954 173.38)",
+          "oklch(72.14% 0.00954 173.38)",
+          "oklch(83.57% 0.00954 173.38)",
+          "oklch(95.00% 0.00954 173.38)"
+        ]
+      },
+      "editor-focus": {
+        "role": "neutral",
+        "displayName": "Editor Focus",
+        "tonalRamp": [
+          "oklch(15.00% 0.08148 84.94)",
+          "oklch(26.43% 0.08148 84.94)",
+          "oklch(37.86% 0.08148 84.94)",
+          "oklch(49.29% 0.08148 84.94)",
+          "oklch(60.71% 0.08148 84.94)",
+          "oklch(72.14% 0.08148 84.94)",
+          "oklch(83.57% 0.08148 84.94)",
+          "oklch(95.00% 0.08148 84.94)"
+        ]
+      },
+      "editor-danger-bg": {
+        "role": "neutral",
+        "displayName": "Editor Danger Bg",
+        "tonalRamp": [
+          "oklch(15.00% 0.02423 10.29)",
+          "oklch(26.43% 0.02423 10.29)",
+          "oklch(37.86% 0.02423 10.29)",
+          "oklch(49.29% 0.02423 10.29)",
+          "oklch(60.71% 0.02423 10.29)",
+          "oklch(72.14% 0.02423 10.29)",
+          "oklch(83.57% 0.02423 10.29)",
+          "oklch(95.00% 0.02423 10.29)"
+        ]
+      },
+      "editor-danger-border": {
+        "role": "neutral",
+        "displayName": "Editor Danger Border",
+        "tonalRamp": [
+          "oklch(15.00% 0.06482 17.01)",
+          "oklch(26.43% 0.06482 17.01)",
+          "oklch(37.86% 0.06482 17.01)",
+          "oklch(49.29% 0.06482 17.01)",
+          "oklch(60.71% 0.06482 17.01)",
+          "oklch(72.14% 0.06482 17.01)",
+          "oklch(83.57% 0.06482 17.01)",
+          "oklch(95.00% 0.06482 17.01)"
+        ]
+      },
+      "editor-danger-text": {
+        "role": "neutral",
+        "displayName": "Editor Danger Text",
+        "tonalRamp": [
+          "oklch(15.00% 0.07429 22.94)",
+          "oklch(26.43% 0.07429 22.94)",
+          "oklch(37.86% 0.07429 22.94)",
+          "oklch(49.29% 0.07429 22.94)",
+          "oklch(60.71% 0.07429 22.94)",
+          "oklch(72.14% 0.07429 22.94)",
+          "oklch(83.57% 0.07429 22.94)",
+          "oklch(95.00% 0.07429 22.94)"
+        ]
+      },
+      "editor-warning-bg": {
+        "role": "neutral",
+        "displayName": "Editor Warning Bg",
+        "tonalRamp": [
+          "oklch(15.00% 0.02305 89.48)",
+          "oklch(26.43% 0.02305 89.48)",
+          "oklch(37.86% 0.02305 89.48)",
+          "oklch(49.29% 0.02305 89.48)",
+          "oklch(60.71% 0.02305 89.48)",
+          "oklch(72.14% 0.02305 89.48)",
+          "oklch(83.57% 0.02305 89.48)",
+          "oklch(95.00% 0.02305 89.48)"
+        ]
+      },
+      "editor-warning-text": {
+        "role": "neutral",
+        "displayName": "Editor Warning Text",
+        "tonalRamp": [
+          "oklch(15.00% 0.08406 86.72)",
+          "oklch(26.43% 0.08406 86.72)",
+          "oklch(37.86% 0.08406 86.72)",
+          "oklch(49.29% 0.08406 86.72)",
+          "oklch(60.71% 0.08406 86.72)",
+          "oklch(72.14% 0.08406 86.72)",
+          "oklch(83.57% 0.08406 86.72)",
+          "oklch(95.00% 0.08406 86.72)"
+        ]
+      },
+      "editor-success-bg": {
+        "role": "neutral",
+        "displayName": "Editor Success Bg",
+        "tonalRamp": [
+          "oklch(15.00% 0.03140 165.84)",
+          "oklch(26.43% 0.03140 165.84)",
+          "oklch(37.86% 0.03140 165.84)",
+          "oklch(49.29% 0.03140 165.84)",
+          "oklch(60.71% 0.03140 165.84)",
+          "oklch(72.14% 0.03140 165.84)",
+          "oklch(83.57% 0.03140 165.84)",
+          "oklch(95.00% 0.03140 165.84)"
+        ]
+      },
+      "editor-success-text": {
+        "role": "neutral",
+        "displayName": "Editor Success Text",
+        "tonalRamp": [
+          "oklch(15.00% 0.06074 153.86)",
+          "oklch(26.43% 0.06074 153.86)",
+          "oklch(37.86% 0.06074 153.86)",
+          "oklch(49.29% 0.06074 153.86)",
+          "oklch(60.71% 0.06074 153.86)",
+          "oklch(72.14% 0.06074 153.86)",
+          "oklch(83.57% 0.06074 153.86)",
+          "oklch(95.00% 0.06074 153.86)"
+        ]
+      },
+      "map-ocean": {
+        "role": "neutral",
+        "displayName": "Map Ocean",
+        "tonalRamp": [
+          "oklch(15.00% 0.03779 241.71)",
+          "oklch(26.43% 0.03779 241.71)",
+          "oklch(37.86% 0.03779 241.71)",
+          "oklch(49.29% 0.03779 241.71)",
+          "oklch(60.71% 0.03779 241.71)",
+          "oklch(72.14% 0.03779 241.71)",
+          "oklch(83.57% 0.03779 241.71)",
+          "oklch(95.00% 0.03779 241.71)"
+        ]
+      },
+      "map-coast": {
+        "role": "neutral",
+        "displayName": "Map Coast",
+        "tonalRamp": [
+          "oklch(15.00% 0.03337 248.88)",
+          "oklch(26.43% 0.03337 248.88)",
+          "oklch(37.86% 0.03337 248.88)",
+          "oklch(49.29% 0.03337 248.88)",
+          "oklch(60.71% 0.03337 248.88)",
+          "oklch(72.14% 0.03337 248.88)",
+          "oklch(83.57% 0.03337 248.88)",
+          "oklch(95.00% 0.03337 248.88)"
+        ]
+      },
+      "map-country-border": {
+        "role": "neutral",
+        "displayName": "Map Country Border",
+        "tonalRamp": [
+          "oklch(15.00% 0.01234 258.37)",
+          "oklch(26.43% 0.01234 258.37)",
+          "oklch(37.86% 0.01234 258.37)",
+          "oklch(49.29% 0.01234 258.37)",
+          "oklch(60.71% 0.01234 258.37)",
+          "oklch(72.14% 0.01234 258.37)",
+          "oklch(83.57% 0.01234 258.37)",
+          "oklch(95.00% 0.01234 258.37)"
+        ]
+      },
+      "map-region-border": {
+        "role": "neutral",
+        "displayName": "Map Region Border",
+        "tonalRamp": [
+          "oklch(15.00% 0.01234 258.37)",
+          "oklch(26.43% 0.01234 258.37)",
+          "oklch(37.86% 0.01234 258.37)",
+          "oklch(49.29% 0.01234 258.37)",
+          "oklch(60.71% 0.01234 258.37)",
+          "oklch(72.14% 0.01234 258.37)",
+          "oklch(83.57% 0.01234 258.37)",
+          "oklch(95.00% 0.01234 258.37)"
+        ]
+      },
+      "map-label": {
+        "role": "neutral",
+        "displayName": "Map Label",
+        "tonalRamp": [
+          "oklch(15.00% 0.01315 253.03)",
+          "oklch(26.43% 0.01315 253.03)",
+          "oklch(37.86% 0.01315 253.03)",
+          "oklch(49.29% 0.01315 253.03)",
+          "oklch(60.71% 0.01315 253.03)",
+          "oklch(72.14% 0.01315 253.03)",
+          "oklch(83.57% 0.01315 253.03)",
+          "oklch(95.00% 0.01315 253.03)"
+        ]
+      },
+      "map-label-outline": {
+        "role": "neutral",
+        "displayName": "Map Label Outline",
+        "tonalRamp": [
+          "oklch(15.00% 0.01371 97.46)",
+          "oklch(26.43% 0.01371 97.46)",
+          "oklch(37.86% 0.01371 97.46)",
+          "oklch(49.29% 0.01371 97.46)",
+          "oklch(60.71% 0.01371 97.46)",
+          "oklch(72.14% 0.01371 97.46)",
+          "oklch(83.57% 0.01371 97.46)",
+          "oklch(95.00% 0.01371 97.46)"
+        ]
+      },
+      "map-ocean-label": {
+        "role": "neutral",
+        "displayName": "Map Ocean Label",
+        "tonalRamp": [
+          "oklch(15.00% 0.00415 157.18)",
+          "oklch(26.43% 0.00415 157.18)",
+          "oklch(37.86% 0.00415 157.18)",
+          "oklch(49.29% 0.00415 157.18)",
+          "oklch(60.71% 0.00415 157.18)",
+          "oklch(72.14% 0.00415 157.18)",
+          "oklch(83.57% 0.00415 157.18)",
+          "oklch(95.00% 0.00415 157.18)"
+        ]
+      },
+      "map-graticule": {
+        "role": "neutral",
+        "displayName": "Map Graticule",
+        "tonalRamp": [
+          "oklch(15.00% 0.01295 228.95)",
+          "oklch(26.43% 0.01295 228.95)",
+          "oklch(37.86% 0.01295 228.95)",
+          "oklch(49.29% 0.01295 228.95)",
+          "oklch(60.71% 0.01295 228.95)",
+          "oklch(72.14% 0.01295 228.95)",
+          "oklch(83.57% 0.01295 228.95)",
+          "oklch(95.00% 0.01295 228.95)"
+        ]
+      },
+      "map-country-olive": {
+        "role": "secondary",
+        "displayName": "Map Country Olive",
+        "tonalRamp": [
+          "oklch(15.00% 0.01941 117.53)",
+          "oklch(26.43% 0.01941 117.53)",
+          "oklch(37.86% 0.01941 117.53)",
+          "oklch(49.29% 0.01941 117.53)",
+          "oklch(60.71% 0.01941 117.53)",
+          "oklch(72.14% 0.01941 117.53)",
+          "oklch(83.57% 0.01941 117.53)",
+          "oklch(95.00% 0.01941 117.53)"
+        ]
+      },
+      "map-country-blue": {
+        "role": "secondary",
+        "displayName": "Map Country Blue",
+        "tonalRamp": [
+          "oklch(15.00% 0.04808 256.82)",
+          "oklch(26.43% 0.04808 256.82)",
+          "oklch(37.86% 0.04808 256.82)",
+          "oklch(49.29% 0.04808 256.82)",
+          "oklch(60.71% 0.04808 256.82)",
+          "oklch(72.14% 0.04808 256.82)",
+          "oklch(83.57% 0.04808 256.82)",
+          "oklch(95.00% 0.04808 256.82)"
+        ]
+      },
+      "map-country-rose": {
+        "role": "secondary",
+        "displayName": "Map Country Rose",
+        "tonalRamp": [
+          "oklch(15.00% 0.05496 20.20)",
+          "oklch(26.43% 0.05496 20.20)",
+          "oklch(37.86% 0.05496 20.20)",
+          "oklch(49.29% 0.05496 20.20)",
+          "oklch(60.71% 0.05496 20.20)",
+          "oklch(72.14% 0.05496 20.20)",
+          "oklch(83.57% 0.05496 20.20)",
+          "oklch(95.00% 0.05496 20.20)"
+        ]
+      },
+      "map-country-sand": {
+        "role": "secondary",
+        "displayName": "Map Country Sand",
+        "tonalRamp": [
+          "oklch(15.00% 0.05031 92.69)",
+          "oklch(26.43% 0.05031 92.69)",
+          "oklch(37.86% 0.05031 92.69)",
+          "oklch(49.29% 0.05031 92.69)",
+          "oklch(60.71% 0.05031 92.69)",
+          "oklch(72.14% 0.05031 92.69)",
+          "oklch(83.57% 0.05031 92.69)",
+          "oklch(95.00% 0.05031 92.69)"
+        ]
+      },
+      "map-country-sage": {
+        "role": "secondary",
+        "displayName": "Map Country Sage",
+        "tonalRamp": [
+          "oklch(15.00% 0.03543 174.25)",
+          "oklch(26.43% 0.03543 174.25)",
+          "oklch(37.86% 0.03543 174.25)",
+          "oklch(49.29% 0.03543 174.25)",
+          "oklch(60.71% 0.03543 174.25)",
+          "oklch(72.14% 0.03543 174.25)",
+          "oklch(83.57% 0.03543 174.25)",
+          "oklch(95.00% 0.03543 174.25)"
+        ]
+      },
+      "map-country-violet": {
+        "role": "secondary",
+        "displayName": "Map Country Violet",
+        "tonalRamp": [
+          "oklch(15.00% 0.03308 306.87)",
+          "oklch(26.43% 0.03308 306.87)",
+          "oklch(37.86% 0.03308 306.87)",
+          "oklch(49.29% 0.03308 306.87)",
+          "oklch(60.71% 0.03308 306.87)",
+          "oklch(72.14% 0.03308 306.87)",
+          "oklch(83.57% 0.03308 306.87)",
+          "oklch(95.00% 0.03308 306.87)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "map-country": {
+        "displayName": "Map Country",
+        "purpose": "Map text."
+      },
+      "map-ocean": {
+        "displayName": "Map Ocean",
+        "purpose": "Map text."
+      },
+      "editor-body": {
+        "displayName": "Editor Body",
+        "purpose": "Existing editor text."
+      },
+      "editor-title": {
+        "displayName": "Editor Title",
+        "purpose": "Existing editor text."
+      },
+      "editor-headline": {
+        "displayName": "Editor Headline",
+        "purpose": "Existing editor text."
+      },
+      "editor-label": {
+        "displayName": "Editor Label",
+        "purpose": "Existing editor text."
+      },
+      "editor-wordmark": {
+        "displayName": "Editor Wordmark",
+        "purpose": "Existing editor text."
+      }
+    },
+    "shadows": [
+      {
+        "name": "chrome",
+        "value": "0 1px 0 rgba(200, 172, 115, 0.06), 0 8px 24px rgba(4, 12, 16, 0.16)",
+        "purpose": "Existing editor chrome depth."
+      },
+      {
+        "name": "panel",
+        "value": "-12px 0 32px rgba(4, 12, 16, 0.18)",
+        "purpose": "Existing editor panel depth."
+      },
+      {
+        "name": "dialog",
+        "value": "0 24px 80px rgba(4, 12, 16, 0.5)",
+        "purpose": "Existing editor dialog depth."
+      }
+    ],
+    "motion": [
+      {
+        "name": "editor-control-state",
+        "value": "130ms ease",
+        "purpose": "Existing button and field state changes."
+      },
+      {
+        "name": "map-region-state",
+        "value": "120ms ease",
+        "purpose": "Fill, opacity, and region border changes."
+      },
+      {
+        "name": "map-transfer",
+        "value": "1450ms linear",
+        "purpose": "Existing transfer feedback; keep reduced-motion overrides."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "stacked-editor",
+        "value": "900px"
+      },
+      {
+        "name": "compact-editor",
+        "value": "640px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Editor standard button",
+      "kind": "button",
+      "refersTo": "editor-button",
+      "description": "Existing editor action.",
+      "html": "<button class=\"ds-button\">Present map</button>",
+      "css": ".ds-button{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:var(--control-height,38px);padding:0 11px;border:1px solid var(--color-border-strong);border-radius:4px;background:var(--color-surface-elevated);color:var(--color-text);cursor:pointer;transition:background-color 130ms ease,border-color 130ms ease,color 130ms ease}.ds-button:hover{background:var(--color-surface-muted);border-color:var(--color-primary)}.ds-button:active{background:var(--color-primary-soft)}.ds-button:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}.ds-button:disabled{opacity:.54;cursor:not-allowed}"
+    },
+    {
+      "name": "Editor primary button",
+      "kind": "button",
+      "refersTo": "editor-button-primary",
+      "description": "Existing main editor action.",
+      "html": "<button class=\"ds-button ds-primary\">Share</button>",
+      "css": ".ds-button{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:var(--control-height,38px);padding:0 11px;border:1px solid var(--color-border-strong);border-radius:4px;background:var(--color-surface-elevated);color:var(--color-text);cursor:pointer;transition:background-color 130ms ease,border-color 130ms ease,color 130ms ease}.ds-button:hover{background:var(--color-surface-muted);border-color:var(--color-primary)}.ds-button:active{background:var(--color-primary-soft)}.ds-button:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}.ds-button:disabled{opacity:.54;cursor:not-allowed}.ds-primary{background:var(--color-primary);border-color:var(--color-primary);color:var(--color-primary-ink);font-weight:700}.ds-primary:hover{background:var(--color-primary-hover);border-color:var(--color-primary-hover)}.ds-primary:active{background:var(--color-primary)}"
+    },
+    {
+      "name": "Editor text field",
+      "kind": "input",
+      "refersTo": "editor-input",
+      "description": "Existing country name or text field.",
+      "html": "<label class=\"ds-field\"><span>Country name</span><input aria-label=\"Country name\" value=\"France\" /></label>",
+      "css": ".ds-field{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;display:grid;gap:6px;color:var(--color-muted);font-size:12px;font-weight:650}.ds-field input{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;background:var(--color-surface-elevated);color:var(--color-text);border:1px solid var(--color-input-border);border-radius:4px;min-height:var(--control-height,38px);padding:7px 9px;caret-color:var(--color-primary-hover);transition:border-color 130ms ease}.ds-field input:hover,.ds-field input:focus{border-color:var(--color-primary)}.ds-field input:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}.ds-field input::placeholder{color:var(--color-subtle);opacity:1}"
+    },
+    {
+      "name": "Editor mode navigation",
+      "kind": "nav",
+      "refersTo": "editor-mode-nav",
+      "description": "The current editing mode has a gold bottom mark.",
+      "html": "<nav class=\"ds-modes\" aria-label=\"Editor modes\"><button aria-pressed=\"true\">Inspect</button><button>Transfer</button><button>Divide</button><button>Merge</button></nav>",
+      "css": ".ds-modes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;padding:3px;background:var(--color-app-bg);border:1px solid var(--color-border);border-radius:4px}.ds-modes button{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;font-size:12px;min-height:34px;padding:0 5px;color:var(--color-text);background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer;transition:background-color 150ms ease,color 150ms ease}.ds-modes button:hover{background:var(--color-surface-muted);border-color:var(--color-primary)}.ds-modes button:active{background:var(--color-primary-soft)}.ds-modes button[aria-pressed=\"true\"]{background:var(--color-primary-soft);box-shadow:inset 0 -2px var(--color-primary);color:var(--color-primary-hover)}.ds-modes button:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}"
+    },
+    {
+      "name": "Editor tool card",
+      "kind": "card",
+      "refersTo": "editor-tool-card",
+      "description": "Existing container for tool controls.",
+      "html": "<section class=\"ds-card\"><strong>Divide country</strong><span>Draw a cut across the selected country.</span></section>",
+      "css": ".ds-card{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;display:grid;gap:12px;padding:12px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface-elevated);color:var(--color-text)}"
+    },
+    {
+      "name": "Editor country swatch",
+      "kind": "custom",
+      "refersTo": "editor-country-swatch",
+      "description": "Shows the country color in the editor.",
+      "html": "<span class=\"ds-swatch\" role=\"img\" aria-label=\"Blue country color\"></span>",
+      "css": ".ds-swatch{display:block;width:34px;height:34px;background:#7a8eaa;border:1px solid rgba(16,22,20,.22);border-radius:5px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}"
+    },
+    {
+      "name": "Political Command map sample",
+      "kind": "custom",
+      "refersTo": "political-map",
+      "description": "Style sample for country fill, sea, border, and country name. Geometry here is illustrative.",
+      "html": "<svg class=\"ds-map\" viewBox=\"0 0 320 160\" role=\"img\" aria-label=\"Political map style sample\"><rect width=\"320\" height=\"160\"/><path d=\"M55 28 L190 18 L258 60 L236 131 L117 144 L45 100 Z\"/><text x=\"155\" y=\"84\" text-anchor=\"middle\">COUNTRY</text></svg>",
+      "css": ".ds-map{display:block;width:100%;max-width:480px;background:var(--color-map-ocean)}.ds-map rect{fill:var(--color-map-ocean)}.ds-map path{fill:#85887b;stroke:var(--color-map-country-border);stroke-width:1.55;stroke-linejoin:round;vector-effect:non-scaling-stroke}.ds-map text{font-family:var(--font-map-country);font-size:18px;font-weight:700;letter-spacing:1px;fill:var(--color-map-label);stroke:var(--color-map-label-outline);stroke-width:.1em;stroke-linejoin:round;paint-order:stroke fill}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Political Command — map only",
+    "overview": "The map uses muted country colors, a dark slate-blue sea, strong country borders, and uppercase country names. The user selected Political Command from working map previews. The map is drawn with SVG and code. This change adds no shipping raster images.\n\nThe editor keeps its existing dark surfaces, warm gold actions, serif titles, and compact controls. The map direction does not replace the editor identity. The map must remain easy to read while the user changes countries and regions.",
+    "keyCharacteristics": [
+      "Strong country borders with less visible region borders at low zoom.",
+      "Six default country colors with exact custom scenario colors.",
+      "Uppercase sans-serif country names without map flags.",
+      "Existing dark editor with warm gold controls."
+    ],
+    "rules": [
+      {
+        "name": "The Map Scope Rule",
+        "body": "Apply Political Command to the map. Keep the existing editor identity.",
+        "section": "colors"
+      },
+      {
+        "name": "The Scenario Color Rule",
+        "body": "Apply the default palette before scenario colors. Keep every explicit scenario color exact.",
+        "section": "colors"
+      },
+      {
+        "name": "The Map Name Rule",
+        "body": "Use uppercase sans-serif country names on the map. Keep flags in the editor.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "Do use the six map country colors for the default map.",
+      "Do keep custom country colors exact when a scenario is restored.",
+      "Do show more region detail as the user zooms in.",
+      "Do keep ocean labels at full opacity where they are visible.",
+      "Do keep selection feedback, keyboard focus, and reduced-motion behavior."
+    ],
+    "donts": [
+      "Don't apply the map palette or country font to editor controls.",
+      "Don't add flags to country names on the map.",
+      "Don't use the default palette to replace explicit scenario colors.",
+      "Don't add raster textures as part of this map direction."
+    ]
+  }
+}

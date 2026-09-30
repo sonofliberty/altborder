@@ -1,10 +1,5 @@
 import type { Geometry, Position } from "geojson";
-import {
-  countryFlagGapRatio,
-  countryFlagHeightRatio,
-  countryFlagWidthRatio,
-  countryLabelCharWidthRatio,
-} from "./labelConstants";
+import { countryLabelCharWidthRatio } from "./labelConstants";
 
 export type ProjectPoint = (position: Position) => [number, number] | null | undefined;
 
@@ -16,10 +11,6 @@ export type FittedCountryLabel = {
   fontSize: number;
   letterSpacing: number;
   textLength: number;
-  contentWidth: number;
-  flagWidth: number;
-  flagHeight: number;
-  flagGap: number;
   width: number;
   height: number;
   angle: number;
@@ -91,10 +82,6 @@ export function layoutCountryLabel(input: CountryLabelInput): FittedCountryLabel
     fontSize: label.fontSize,
     letterSpacing: label.letterSpacing,
     textLength: label.textLength,
-    contentWidth: label.contentWidth,
-    flagWidth: label.flagWidth,
-    flagHeight: label.flagHeight,
-    flagGap: label.flagGap,
     width: label.width,
     height: label.height,
     angle: label.angle,
@@ -106,11 +93,11 @@ function fitLabel(
   displayName: string,
   cluster: PolygonCluster,
   candidates: Point[],
-): Pick<FittedCountryLabel, "x" | "y" | "fontSize" | "letterSpacing" | "textLength" | "contentWidth" | "flagWidth" | "flagHeight" | "flagGap" | "width" | "height" | "angle"> | null {
+): Pick<FittedCountryLabel, "x" | "y" | "fontSize" | "letterSpacing" | "textLength" | "width" | "height" | "angle"> | null {
   const boundsWidth = cluster.bounds.maxX - cluster.bounds.minX;
   const boundsHeight = cluster.bounds.maxY - cluster.bounds.minY;
   const contentWidthRatio =
-    displayName.length * countryLabelCharWidthRatio + countryFlagWidthRatio + countryFlagGapRatio;
+    displayName.length * countryLabelCharWidthRatio;
   const widthLimitedFont = (boundsWidth * 0.92) / Math.max(contentWidthRatio, 1);
   const heightLimitedFont = boundsHeight * heightFontRatio;
   const areaLimitedFont = Math.sqrt(cluster.area) * areaFontRatio;
@@ -123,11 +110,7 @@ function fitLabel(
       const textLength =
         displayName.length * countryLabelCharWidthRatio * fontSize +
         Math.max(0, displayName.length - 1) * letterSpacing;
-      const flagWidth = fontSize * countryFlagWidthRatio;
-      const flagHeight = fontSize * countryFlagHeightRatio;
-      const flagGap = fontSize * countryFlagGapRatio;
-      const contentWidth = flagWidth + flagGap + textLength;
-      const width = contentWidth + fontSize * labelHorizontalSafetyRatio;
+      const width = textLength + fontSize * labelHorizontalSafetyRatio;
       const height = fontSize * labelVerticalSafetyRatio;
       for (const point of candidates) {
         if (labelRectangleFitsCluster(cluster, point, width, height, angle)) {
@@ -137,10 +120,6 @@ function fitLabel(
             fontSize,
             letterSpacing,
             textLength,
-            contentWidth,
-            flagWidth,
-            flagHeight,
-            flagGap,
             width,
             height,
             angle,

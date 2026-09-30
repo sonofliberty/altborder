@@ -15,11 +15,15 @@ export function findRegionAtProjectedPoint(
   point: Point,
   regions: HitTestRegion[],
   project: ProjectPoint,
+  regionOwners?: Readonly<Record<string, string>>,
 ): string | null {
   let bestRegionId: string | null = null;
   let bestBoundsArea = Number.POSITIVE_INFINITY;
 
   for (const region of regions) {
+    // Dividing retires the original regions without removing their base
+    // geometry. They must not intercept clicks on either replacement region.
+    if (regionOwners && !regionOwners[region.id]) continue;
     if (!region.bounds || !boundsContainPoint(region.bounds, point)) continue;
     if (!projectedGeometryContainsPoint(region.geometry, point, project)) continue;
 

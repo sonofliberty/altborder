@@ -16,6 +16,21 @@ export type ZoomState = {
   k: number;
 };
 
+export function interpolateZoom(start: ZoomState, end: ZoomState, progress: number): ZoomState {
+  if (progress <= 0) return start;
+  if (progress >= 1) return end;
+  const k = start.k * Math.pow(end.k / start.k, progress);
+  // Translation follows scale so a zoom's anchor does not drift during the flight.
+  const positionProgress = Math.abs(end.k - start.k) < 0.000001
+    ? progress
+    : (k - start.k) / (end.k - start.k);
+  return {
+    k,
+    x: start.x + (end.x - start.x) * positionProgress,
+    y: start.y + (end.y - start.y) * positionProgress,
+  };
+}
+
 export function zoomToBounds(bounds: ProjectedBounds, padding: number): ZoomState {
   const width = Math.max(0.001, bounds.maxX - bounds.minX);
   const height = Math.max(0.001, bounds.maxY - bounds.minY);

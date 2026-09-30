@@ -30,7 +30,6 @@ import type {
 } from "./types";
 import {
   getCountryFlag,
-  getCountryFlagUrl,
   makeFlagOptions,
   neutralCountryFlag,
 } from "./countryFlags";
@@ -61,14 +60,15 @@ import type {
   GeometryWorkerResponse,
 } from "./geometryWorker";
 import type { FittedCountryLabel } from "./labelLayout";
-import { countryLabelMinScreenFontSize } from "./labelConstants";
+import { countryLabelMaxScreenFontSize, countryLabelMinScreenFontSize } from "./labelConstants";
 import {
   filterLabels,
   getCountryLabelMinScreenFontSize,
+  getCountryLabelScale,
   getLabelBox,
 } from "./mapLabelDisplay";
-import { zoomToBounds, type ProjectedBounds } from "./mapZoom";
-import { getAdministrativeBorderZoomClass, getCountryBorderStrokeWidth } from "./mapVisualStyle";
+import { interpolateZoom, zoomToBounds, type ProjectedBounds } from "./mapZoom";
+import { applyPoliticalMapPalette, getAdministrativeBorderZoomClass, getCountryBorderStrokeWidth } from "./mapVisualStyle";
 import { boundsIntersect, projectedViewportBounds, shouldCullPaths } from "./mapCulling";
 import { findRegionAtProjectedPoint } from "./geometryHitTest";
 import { customCountryAccentColor, getFallbackCountryColor } from "./colorRuntime";
@@ -82,6 +82,7 @@ import {
 import { batchBoundaryPaths, type ProjectedBoundaryEdge } from "./boundaryEdges";
 import { buildSelectedRegionAdjacency } from "./regionAdjacency";
 import { EditorSidePanel } from "./EditorSidePanel";
+import { mapInBatches, yieldToMainThread } from "./mapWork";
 import { decodePackedMapData } from "./mapDataPacking";
 import {
   geometryToSvgPath,
@@ -89,7 +90,7 @@ import {
   projectedGeometryBounds,
   type ProjectedPathData,
 } from "./projectedPath";
-import { getCountryLabelGeometry } from "./countryLabelGeometry";
+import { getCountryLabelCacheKey, getCountryLabelGeometry } from "./countryLabelGeometry";
 import {
   removePolygonalGeometryHoles,
   removeSmallPolygonalGeometryComponents,
@@ -117,7 +118,6 @@ const svgPathCoordinatePrecision = 2;
 const simplifiedCountryLayerMaxZoom = 1.35;
 const wheelZoomMaxDelta = 80;
 const wheelZoomSensitivity = 0.001;
-const countryFlagImageRasterScale = 16;
 const regionLabelScreenFontSize = 11;
 const oceanLabels = [
   { name: "Pacific Ocean", coordinates: [-132, 0] as [number, number] },
@@ -213,6 +213,7 @@ export default function App() {
   const [mapViewScale, setMapViewScale] = useState(1);
   const [settledZoom, setSettledZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
   const [isMapMoving, setIsMapMoving] = useState(false);
+  const [projectedBoundaryEdges, setProjectedBoundaryEdges] = useState<ProjectedBoundaryEdgeWithBounds[]>([]);
   const [countryUnderlays, setCountryUnderlays] = useState<CountryUnderlay[]>([]);
   const [countryLabelLayouts, setCountryLabelLayouts] = useState<FittedCountryLabel[]>([]);
   const [customBoundaryEdges, setCustomBoundaryEdges] = useState<BoundaryEdgeRecord[]>([]);
@@ -222,6 +223,7 @@ export default function App() {
   const [divideWorkerResult, setDivideWorkerResult] = useState<DivideWorkerResult>(emptyDivideWorkerResult);
   const mapSvgRef = useRef<SVGSVGElement | null>(null);
   const mapContentRef = useRef<SVGGElement | null>(null);
+  const countryLabelsRef = useRef<SVGGElement | null>(null);
   const oceanLabelRefs = useRef<(SVGTextElement | null)[]>([]);
   const presentationToggleRef = useRef<HTMLButtonElement | null>(null);
   const actionsMenuRef = useRef<HTMLDetailsElement | null>(null);
@@ -231,6 +233,7 @@ export default function App() {
   const zoomRef = useRef<ZoomState>({ x: 0, y: 0, k: 1 });
   const pendingZoomFrameRef = useRef<number | null>(null);
   const zoomAnimationFrameRef = useRef<number | null>(null);
+  const zoomAnimationTargetRef = useRef<ZoomState | null>(null);
   const mapMovingTimerRef = useRef<number | null>(null);
   const isMapMovingRef = useRef(false);
   const panRef = useRef<{
@@ -286,6 +289,8 @@ export default function App() {
 
   const applyZoomToDom = useCallback((nextZoom: ZoomState) => {
     mapContentRef.current?.setAttribute("transform", formatZoomTransform(nextZoom));
+    // Only country labels use this value. Keep it out of the geometry subtree.
+    countryLabelsRef.current?.style.setProperty("--map-camera-scale", String(nextZoom.k));
     for (const label of oceanLabelRefs.current) {
       label?.setAttribute("transform", `scale(${1 / nextZoom.k})`);
     }
@@ -359,7 +364,7 @@ export default function App() {
         if (!response.ok) {
           throw new Error(`${response.status} ${response.statusText}`);
         }
-        const mapData = decodePackedMapData(await response.json());
+        const mapData = applyPoliticalMapPalette(decodePackedMapData(await response.json()));
         const encoded = readShareFromHash(window.location.hash);
         let initial = createInitialSnapshot(mapData);
         let shouldReadOnly = false;
@@ -612,19 +617,24 @@ export default function App() {
     return bounds;
   }, [customProjectedRegionById, projection, regionById, renderRegionGeometryById]);
 
-  const projectedBoundaryEdges = useMemo(() => {
-    const projectedEdges: ProjectedBoundaryEdgeWithBounds[] = [];
-    for (const edge of [...(data?.boundaryEdges ?? []), ...customBoundaryEdges]) {
-      const projected = projectGeometryToPathData(edge.geometry, projection, getProjectedPathOptions());
-      if (!projected) continue;
-      projectedEdges.push({
-        id: edge.id,
-        regionIds: edge.regionIds,
-        pathData: projected.strokePathData,
-        bounds: projected.bounds,
-      });
-    }
-    return projectedEdges;
+  useEffect(() => {
+    let cancelled = false;
+    void mapInBatches(
+      [...(data?.boundaryEdges ?? []), ...customBoundaryEdges],
+      (edge): ProjectedBoundaryEdgeWithBounds | null => {
+        const projected = projectGeometryToPathData(edge.geometry, projection, getProjectedPathOptions());
+        return projected ? {
+          id: edge.id,
+          regionIds: edge.regionIds,
+          pathData: projected.strokePathData,
+          bounds: projected.bounds,
+        } : null;
+      },
+      () => cancelled,
+    ).then((edges) => {
+      if (!cancelled && edges) setProjectedBoundaryEdges(edges.filter((edge): edge is ProjectedBoundaryEdgeWithBounds => edge !== null));
+    });
+    return () => { cancelled = true; };
   }, [customBoundaryEdges, data?.boundaryEdges, projection]);
 
   const settledViewportBounds = useMemo(() => {
@@ -659,8 +669,9 @@ export default function App() {
         bounds: getRegionBounds(region.id),
       })),
       (position) => projection([position[0], position[1]]),
+      regionOwners ?? {},
     );
-  }, [getRegionBounds, projection, visibleRegions]);
+  }, [getRegionBounds, projection, regionOwners, visibleRegions]);
 
   const regionIdsByEntityId = useMemo(() => {
     const grouped = new Map<string, string[]>();
@@ -678,18 +689,6 @@ export default function App() {
     return [...regionIdsByEntityId.keys()].sort((a, b) => a.localeCompare(b));
   }, [regionIdsByEntityId]);
   const activeEntityIdSet = useMemo(() => new Set(activeEntityIds), [activeEntityIds]);
-
-  const changedRegionIds = useMemo(() => {
-    const changed = new Set<string>();
-    if (!regionOwners) return changed;
-    for (const [regionId, ownerId] of Object.entries(regionOwners)) {
-      const baseOwnerId = baseOwnerByRegionId.get(regionId);
-      if (baseOwnerId && baseOwnerId !== ownerId) {
-        changed.add(regionId);
-      }
-    }
-    return changed;
-  }, [baseOwnerByRegionId, regionOwners]);
 
   const entityOptions = useMemo(() => {
     if (!entities) return [];
@@ -804,7 +803,13 @@ export default function App() {
         let unionGeoJsonGeometriesClosingGaps: GeometrySplitModule["unionGeoJsonGeometriesClosingGaps"] | null =
           null;
 
+        let chunkDeadline = performance.now() + 8;
         for (const entityId of activeEntityIds) {
+          if (performance.now() >= chunkDeadline) {
+            await yieldToMainThread();
+            chunkDeadline = performance.now() + 8;
+          }
+          if (cancelled) return;
           const regionIds = regionIdsByEntityId.get(entityId) ?? [];
           const cacheKey = `${projectedPathCacheVersion}|${entityId}|${regionIds.join(",")}`;
           activeCacheKeys.add(cacheKey);
@@ -838,10 +843,14 @@ export default function App() {
             continue;
           }
 
+          const hasOwnershipChanges = hasTransferredOwnershipChanges(
+            entityId, regionIds, baseEntityById, baseOwnerByRegionId,
+          );
           const geometry = await (async () => {
             if (
               shouldUseStableBaseRenderGeometry(entityId, regionIds, baseEntityById, baseCountryByEntityId)
             ) {
+              if (!hasOwnershipChanges) return baseCountryByEntityId.get(entityId)?.geometry;
               subtractGeoJsonGeometries ??= (await import("./geometrySplit")).subtractGeoJsonGeometries;
               unionGeoJsonGeometries ??= (await import("./geometrySplit")).unionGeoJsonGeometries;
               unionGeoJsonGeometriesClosingGaps ??= (await import("./geometrySplit")).unionGeoJsonGeometriesClosingGaps;
@@ -877,12 +886,6 @@ export default function App() {
           if (cancelled) return;
           if (!geometry) continue;
 
-          const hasOwnershipChanges = hasTransferredOwnershipChanges(
-            entityId,
-            regionIds,
-            baseEntityById,
-            baseOwnerByRegionId,
-          );
           const displayGeometry = sliverProneBaseGeometryEntityIds.has(entityId)
             ? removeSmallPolygonalGeometryComponents(geometry, sliverComponentMinAreaRatio)
             : geometry;
@@ -988,40 +991,50 @@ export default function App() {
           const entity = entityMap[entityId];
           if (!entity) continue;
           const regionIds = regionIdsByEntityId.get(entity.id) ?? [];
-          const fallbackGeometries = renderGeometriesByEntityId.get(entity.id) ?? [];
-          subtractGeoJsonGeometries ??= (await import("./geometrySplit")).subtractGeoJsonGeometries;
-          unionGeoJsonGeometriesClosingGaps ??= (await import("./geometrySplit")).unionGeoJsonGeometriesClosingGaps;
-          const labelGeometry = getCountryLabelGeometry({
-            baseCountryByEntityId,
-            baseEntityById,
-            baseOwnerByRegionId,
-            entityId: entity.id,
-            entityName: entity.name,
-            fallbackGeometries,
-            regionById,
-            regionIds,
-            subtractGeoJsonGeometries,
-            unionGeoJsonGeometriesClosingGaps,
-            unionGapTolerance: acquiredRegionRenderGapTolerance,
-          });
-
-          if (labelGeometry.geometries.length === 0) continue;
-
-          activeCacheKeys.add(labelGeometry.cacheKey);
-          const cached = countryLabelLayoutCacheRef.current.get(labelGeometry.cacheKey);
+          const cacheKey = getCountryLabelCacheKey(entity.id, entity.name, regionIds);
+          activeCacheKeys.add(cacheKey);
+          const cached = countryLabelLayoutCacheRef.current.get(cacheKey);
           if (cached) {
             labels.push(cached);
             continue;
           }
 
+          const baseCountry = baseCountryByEntityId.get(entity.id);
+          let geometries: Geometry[];
+          if (baseCountry && baseEntityById.has(entity.id) && !hasTransferredOwnershipChanges(
+            entity.id, regionIds, baseEntityById, baseOwnerByRegionId,
+          )) {
+            geometries = [baseCountry.geometry];
+          } else if (!baseCountry || !baseEntityById.has(entity.id)) {
+            geometries = renderGeometriesByEntityId.get(entity.id) ?? [];
+          } else {
+            subtractGeoJsonGeometries ??= (await import("./geometrySplit")).subtractGeoJsonGeometries;
+            unionGeoJsonGeometriesClosingGaps ??= (await import("./geometrySplit")).unionGeoJsonGeometriesClosingGaps;
+            if (cancelled) return;
+            geometries = getCountryLabelGeometry({
+              baseCountryByEntityId,
+              baseEntityById,
+              baseOwnerByRegionId,
+              entityId: entity.id,
+              entityName: entity.name,
+              fallbackGeometries: renderGeometriesByEntityId.get(entity.id) ?? [],
+              regionById,
+              regionIds,
+              subtractGeoJsonGeometries,
+              unionGeoJsonGeometriesClosingGaps,
+              unionGapTolerance: acquiredRegionRenderGapTolerance,
+            }).geometries;
+          }
+          if (geometries.length === 0) continue;
+
           const label = layoutCountryLabelFn({
             id: entity.id,
             name: entity.name,
-            geometries: labelGeometry.geometries,
+            geometries,
             project: (position) => projection([position[0], position[1]]),
           });
           if (label) {
-            countryLabelLayoutCacheRef.current.set(labelGeometry.cacheKey, label);
+            countryLabelLayoutCacheRef.current.set(cacheKey, label);
             labels.push(label);
           }
         }
@@ -1057,21 +1070,19 @@ export default function App() {
   ]);
 
   const countryLabels = useMemo(() => {
-    if (isMapMoving) return [];
-
-    const displayScale = zoom.k;
-    const minScreenFontSize = getCountryLabelMinScreenFontSize(countryLabelMinScreenFontSize, zoom.k);
+    const displayScale = settledZoom.k;
+    const minScreenFontSize = getCountryLabelMinScreenFontSize(countryLabelMinScreenFontSize, displayScale);
     const rawLabels = countryLabelLayouts.filter((label) => label.fontSize * displayScale >= minScreenFontSize);
 
-    return filterLabels(rawLabels, zoom, {
-      maxLabels: zoom.k < 1.8 ? 44 : zoom.k < 4 ? 120 : 240,
-      minGap: zoom.k < 2.2 ? 5 : zoom.k < 4 ? 1.5 : 0,
+    return filterLabels(rawLabels, settledZoom, {
+      maxLabels: displayScale < 1.8 ? 44 : displayScale < 4 ? 120 : 240,
+      minGap: displayScale < 2.2 ? 5 : displayScale < 4 ? 1.5 : 0,
       viewportWidth,
       viewportHeight,
       getSortText: (label) => label.displayName,
-      getBoxSize: (label) => getCountryLabelBoxSize(label, displayScale),
+      getBoxSize: (label) => getCountryLabelBoxSize(label, displayScale, mapViewScale),
     });
-  }, [countryLabelLayouts, isMapMoving, zoom]);
+  }, [countryLabelLayouts, mapViewScale, settledZoom]);
 
   const regionLabels = useMemo<SimpleMapLabel[]>(() => {
     if (!regionOwners) return [];
@@ -1082,7 +1093,7 @@ export default function App() {
     const selectedOwnerIds = new Set(
       [...selectedRegions].map((regionId) => regionOwners[regionId]).filter(Boolean),
     );
-    const shouldShowAllVisible = zoom.k >= 2.7;
+    const shouldShowAllVisible = zoom.k >= 5.5;
 
     const rawLabels: SimpleMapLabel[] = [];
     for (const region of visibleRegions) {
@@ -1112,7 +1123,7 @@ export default function App() {
       minGap: 4 / mapViewScale,
       viewportWidth,
       viewportHeight,
-      reservedBoxes: countryLabels.map((label) => getLabelBox(label, zoom, getCountryLabelBoxSize(label, zoom.k))),
+      reservedBoxes: countryLabels.map((label) => getLabelBox(label, zoom, getCountryLabelBoxSize(label, zoom.k, mapViewScale))),
       getSortText: (label) => label.name,
       getBoxSize: (label) => ({
         width: Math.max(18, label.name.length * regionLabelScreenFontSize * 0.6) / mapViewScale,
@@ -1231,13 +1242,6 @@ export default function App() {
 
   const useLowZoomTransferCountryLayer =
     mode === "transfer" && settledZoom.k < simplifiedCountryLayerMaxZoom;
-
-  const useSimplifiedCountryLayer =
-    !activeModeUsesRegions &&
-    mode !== "divide" &&
-    settledZoom.k < simplifiedCountryLayerMaxZoom &&
-    selectedRegions.size === 0 &&
-    !inspectFocusedRegionId;
 
   const addRegionByBrush = useCallback((regionId: string) => {
     if (!snapshot || readOnly || isPresenting || !brushEnabled || !isBrushDown || !activeModeUsesRegions) return;
@@ -1607,6 +1611,7 @@ export default function App() {
   }
 
   function cancelZoomAnimation() {
+    zoomAnimationTargetRef.current = null;
     if (zoomAnimationFrameRef.current === null) return;
     window.cancelAnimationFrame(zoomAnimationFrameRef.current);
     zoomAnimationFrameRef.current = null;
@@ -1614,25 +1619,22 @@ export default function App() {
 
   function animateZoomTo(nextZoom: ZoomState, duration = 380) {
     cancelZoomAnimation();
-    syncZoomStateNow();
+    flushZoomFrame();
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       applyZoom(nextZoom);
+      settleMapMoving(0);
       return;
     }
 
     const startZoom = { ...zoomRef.current };
+    zoomAnimationTargetRef.current = nextZoom;
     const startTime = window.performance.now();
     markMapMoving();
 
     const step = (time: number) => {
       const progress = Math.min(1, (time - startTime) / duration);
       const eased = 1 - Math.pow(1 - progress, 3);
-      const scaleRatio = nextZoom.k / Math.max(startZoom.k, 0.001);
-      const frameZoom = {
-        x: startZoom.x + (nextZoom.x - startZoom.x) * eased,
-        y: startZoom.y + (nextZoom.y - startZoom.y) * eased,
-        k: startZoom.k * Math.pow(scaleRatio, eased),
-      };
+      const frameZoom = interpolateZoom(startZoom, nextZoom, eased);
       zoomRef.current = frameZoom;
       applyZoomToDom(frameZoom);
 
@@ -1642,6 +1644,7 @@ export default function App() {
       }
 
       zoomAnimationFrameRef.current = null;
+      zoomAnimationTargetRef.current = null;
       zoomRef.current = nextZoom;
       applyZoomToDom(nextZoom);
       settleMapMoving(0);
@@ -1651,15 +1654,12 @@ export default function App() {
   }
 
   function zoomBy(factor: number) {
-    markMapMoving();
-    queueZoomUpdate(zoomAroundPoint(zoomRef.current, { x: viewportWidth / 2, y: viewportHeight / 2 }, factor));
-    settleMapMoving(180);
+    const current = zoomAnimationTargetRef.current ?? zoomRef.current;
+    animateZoomTo(zoomAroundPoint(current, { x: viewportWidth / 2, y: viewportHeight / 2 }, factor), 220);
   }
 
   function resetMapView() {
-    markMapMoving();
-    queueZoomUpdate({ x: 0, y: 0, k: 1 });
-    settleMapMoving(180);
+    animateZoomTo({ x: 0, y: 0, k: 1 });
   }
 
   function zoomToRegion(regionId: string) {
@@ -1931,6 +1931,10 @@ export default function App() {
 
   function addMergeCountry(entityId: string) {
     if (!snapshot || !snapshot.entities[entityId] || readOnly) return;
+    const selection = new Set(mergeSelection).add(entityId);
+    const geometries = [...selection].flatMap((id) => renderGeometriesByEntityId.get(id) ?? []);
+    const bounds = projectedGeometriesBounds(geometries, projection);
+    if (bounds) animateZoomTo(zoomToBounds(bounds, 44));
     setMergeSelection((current) => {
       if (current.has(entityId)) return current;
       const next = new Set(current).add(entityId);
@@ -2226,12 +2230,16 @@ export default function App() {
     });
   }
 
-  function syncZoomStateNow() {
+  function flushZoomFrame() {
     if (pendingZoomFrameRef.current !== null) {
       window.cancelAnimationFrame(pendingZoomFrameRef.current);
       pendingZoomFrameRef.current = null;
     }
     applyZoomToDom(zoomRef.current);
+  }
+
+  function syncZoomStateNow() {
+    flushZoomFrame();
     setZoom(zoomRef.current);
   }
 
@@ -2263,6 +2271,11 @@ export default function App() {
   }
 
   function handlePointerDown(event: React.PointerEvent<SVGSVGElement>) {
+    if (zoomAnimationFrameRef.current !== null) {
+      cancelZoomAnimation();
+      syncZoomStateNow();
+      settleMapMoving();
+    }
     if (event.button === 1 || (isPresenting && event.button === 0)) {
       event.preventDefault();
       panRef.current = {
@@ -2393,7 +2406,7 @@ export default function App() {
     setIsBrushDown(false);
     if (panRef.current) {
       const { entityId, moved, regionId, selectOnRelease } = panRef.current;
-      if (!moved && selectOnRelease) {
+      if (!moved && selectOnRelease && event.type !== "pointercancel") {
         if (regionId) {
           handleRegionClick(regionId);
         } else if (entityId) {
@@ -2425,6 +2438,8 @@ export default function App() {
     const cursor = getSvgPoint(event.currentTarget, event.clientX, event.clientY);
     const clampedDeltaY = clamp(deltaY, -wheelZoomMaxDelta, wheelZoomMaxDelta);
     const factor = Math.exp(-clampedDeltaY * wheelZoomSensitivity);
+    // Wheel input already supplies a stream of small steps. Repeated easing
+    // makes the camera lag behind it and continue moving after the user stops.
     queueZoomUpdate(zoomAroundPoint(zoomRef.current, cursor, factor));
     settleMapMoving(180);
   }
@@ -2450,7 +2465,7 @@ export default function App() {
           className={[
             "country-underlay",
             underlay.sealInternalSeams ? "country-underlay-composed" : "",
-            useSimplifiedCountryLayer || useLowZoomTransferCountryLayer ? "country-underlay-interactive" : "",
+            !activeModeUsesRegions || useLowZoomTransferCountryLayer ? "country-underlay-interactive" : "",
           ].join(" ")}
           data-entity-id={underlay.id}
           d={underlay.pathData}
@@ -2463,9 +2478,9 @@ export default function App() {
       );
     });
   }, [
+    activeModeUsesRegions,
     entities,
     useLowZoomTransferCountryLayer,
-    useSimplifiedCountryLayer,
     visibleCountryUnderlays,
   ]);
 
@@ -2474,17 +2489,17 @@ export default function App() {
 
   const regionsToRender = useMemo(() => {
     if (!regionOwners) return [];
-    return useSimplifiedCountryLayer
-      ? visibleRegions.filter((region) => changedRegionIds.has(region.id))
-      : useLowZoomTransferCountryLayer
-        ? visibleRegions.filter((region) => selectedEntityId && regionOwners[region.id] === selectedEntityId)
-        : visibleRegions;
+    if (!activeModeUsesRegions) {
+      return visibleRegions.filter((region) => selectedEntityId && regionOwners[region.id] === selectedEntityId);
+    }
+    return useLowZoomTransferCountryLayer
+      ? visibleRegions.filter((region) => selectedEntityId && regionOwners[region.id] === selectedEntityId)
+      : visibleRegions;
   }, [
-    changedRegionIds,
+    activeModeUsesRegions,
     regionOwners,
     selectedEntityId,
     useLowZoomTransferCountryLayer,
-    useSimplifiedCountryLayer,
     visibleRegions,
   ]);
 
@@ -2769,7 +2784,11 @@ export default function App() {
           <svg
             ref={mapSvgRef}
             viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}
-            style={{ "--map-region-label-size": `${regionLabelScreenFontSize / mapViewScale}px` } as CSSProperties}
+            style={{
+              "--map-region-label-size": `${regionLabelScreenFontSize / mapViewScale}px`,
+              "--map-view-scale": mapViewScale,
+              "--map-country-label-max": countryLabelMaxScreenFontSize,
+            } as CSSProperties}
             className={[
               "map",
               administrativeBorderZoomClass,
@@ -2936,46 +2955,31 @@ export default function App() {
                   aria-hidden="true"
                 />
               ) : null}
-              <g className="country-labels">
+              <g
+                ref={countryLabelsRef}
+                className="country-labels"
+                style={{ "--map-camera-scale": zoom.k } as CSSProperties}
+              >
                 {countryLabels.map((label) => (
                   <g
                     key={label.id}
                     transform={`translate(${label.x} ${label.y}) rotate(${label.angle})`}
                   >
-                      <image
-                        className="country-flag"
-                        href={getCountryFlagUrl(getCountryFlag(entities?.[label.id]))}
-                        x={(-label.contentWidth / 2) * countryFlagImageRasterScale}
-                        y={(-label.flagHeight / 2) * countryFlagImageRasterScale}
-                        width={label.flagWidth * countryFlagImageRasterScale}
-                        height={label.flagHeight * countryFlagImageRasterScale}
-                        transform={`scale(${1 / countryFlagImageRasterScale})`}
-                      preserveAspectRatio="xMidYMid meet"
-                      aria-hidden="true"
-                    />
-                    <rect
-                      className="country-flag-border"
-                      x={-label.contentWidth / 2}
-                      y={-label.flagHeight / 2}
-                      width={label.flagWidth}
-                      height={label.flagHeight}
-                      rx={label.fontSize * 0.06}
-                      strokeWidth={label.fontSize * 0.06}
-                      aria-hidden="true"
-                    />
-                    <text
-                      className="country-label"
-                      x={-label.contentWidth / 2 + label.flagWidth + label.flagGap + label.textLength / 2}
-                      y={0}
-                      fontSize={label.fontSize}
-                      letterSpacing={label.letterSpacing}
-                      textLength={label.textLength}
-                      lengthAdjust="spacingAndGlyphs"
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                    >
-                      {label.displayName}
-                    </text>
+                    <g className="country-label-content" style={{ "--country-label-size": label.fontSize } as CSSProperties}>
+                      <text
+                        className="country-label"
+                        x={0}
+                        y={0}
+                        fontSize={label.fontSize}
+                        letterSpacing={label.letterSpacing}
+                        textLength={label.textLength}
+                        lengthAdjust="spacingAndGlyphs"
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                      >
+                        {label.displayName}
+                      </text>
+                    </g>
                   </g>
                 ))}
               </g>
@@ -3247,7 +3251,8 @@ function getTransferReveal(
   return { kind: "edge", path, extent: depth * 2 + 4 };
 }
 
-function getCountryLabelBoxSize(label: FittedCountryLabel, scale: number) {
+function getCountryLabelBoxSize(label: FittedCountryLabel, scale: number, viewScale: number) {
+  scale *= getCountryLabelScale(label.fontSize, scale, viewScale);
   const angle = (label.angle * Math.PI) / 180;
   const cos = Math.abs(Math.cos(angle));
   const sin = Math.abs(Math.sin(angle));

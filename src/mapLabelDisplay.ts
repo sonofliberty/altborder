@@ -1,3 +1,9 @@
+import { countryLabelMaxScreenFontSize } from "./labelConstants";
+
+export function getCountryLabelScale(fontSize: number, zoomScale: number, viewScale: number): number {
+  return Math.min(1, countryLabelMaxScreenFontSize / (fontSize * zoomScale * viewScale));
+}
+
 export type LabelZoomState = {
   x: number;
   y: number;

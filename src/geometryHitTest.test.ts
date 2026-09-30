@@ -9,6 +9,36 @@ const identityProject = (position: Position) => [position[0], position[1]] as [n
 type HitTestRegion = Parameters<typeof findRegionAtProjectedPoint>[1][number];
 
 describe("findRegionAtProjectedPoint", () => {
+  it("selects both divided territories instead of retired base regions, including after undo and redo", () => {
+    const rectangle = (id: string, minX: number, minY: number, maxX: number, maxY: number): HitTestRegion => ({
+      id,
+      bounds: { minX, minY, maxX, maxY },
+      geometry: {
+        type: "Polygon",
+        coordinates: [[[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY], [minX, minY]]],
+      },
+    });
+    const regions = [
+      rectangle("original-north", 0, 0, 4, 4),
+      rectangle("original-south", 0, 6, 4, 10),
+      rectangle("remainder", 0, 0, 10, 5),
+      rectangle("new-country", 0, 5, 10, 10),
+    ];
+    const dividedOwners = {
+      "original-north": "", "original-south": "", remainder: "A", "new-country": "B",
+    };
+    const originalOwners = { "original-north": "A", "original-south": "A" };
+
+    for (const owners of [dividedOwners, originalOwners, dividedOwners]) {
+      const divided = owners === dividedOwners;
+      expect(findRegionAtProjectedPoint([2, 2], regions, identityProject, owners))
+        .toBe(divided ? "remainder" : "original-north");
+      expect(findRegionAtProjectedPoint([2, 8], regions, identityProject, owners))
+        .toBe(divided ? "new-country" : "original-south");
+    }
+    expect(findRegionAtProjectedPoint([2, 2], regions, identityProject, {})).toBeNull();
+  });
+
   it("finds a polygon region by projected point", () => {
     const regions: HitTestRegion[] = [
       {

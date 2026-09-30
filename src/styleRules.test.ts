@@ -7,8 +7,8 @@ const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 
 describe("map style rules", () => {
   it("keeps administrative borders visible as the map zooms in", () => {
-    expect(styles).toMatch(/\.administrative-border-line \{[^}]*stroke-opacity: 0\.18;[^}]*stroke-width: 0\.36;/);
-    expect(styles).toMatch(/\.map-admin-borders-close \.administrative-border-line \{[^}]*stroke-opacity: 0\.43;[^}]*stroke-width: 0\.45;/);
+    expect(styles).toMatch(/\.administrative-border-line \{[^}]*stroke-opacity: 0\.08;[^}]*stroke-width: 0\.4;/);
+    expect(styles).toMatch(/\.map-admin-borders-close \.administrative-border-line \{[^}]*stroke-opacity: 0\.28;[^}]*stroke-width: 0\.4;/);
     expect(styles).toMatch(/\.map-admin-borders-detail \.administrative-border-line \{[^}]*stroke-opacity: 0\.58;[^}]*stroke-width: 0\.55;/);
     expect(styles).toMatch(/\.administrative-border-line\.administrative-border-active \{[^}]*stroke-opacity: 0\.7;/);
   });
@@ -16,7 +16,7 @@ describe("map style rules", () => {
   it("uses crisp non-scaling country and coastline strokes", () => {
     expect(styles).toMatch(/\.country-underlay \{[^}]*paint-order: stroke fill;[^}]*stroke-width: 1\.2;[^}]*vector-effect: non-scaling-stroke;/);
     expect(styles).not.toMatch(/\.country-border-line \{[^}]*stroke-width:/);
-    expect(styles).toMatch(/\.coastline-line \{[^}]*stroke-width: 0\.6;/);
+    expect(styles).toMatch(/\.coastline-line \{[^}]*stroke-width: 0\.7;/);
     expect(styles).toMatch(/\.coastline-line,[^}]*stroke-linecap: butt;/);
     expect(styles).toMatch(/\.coastline-line,[^}]*shape-rendering: geometricPrecision;/);
     expect(styles).toMatch(/\.coastline-line,[^}]*vector-effect: non-scaling-stroke;/);
@@ -31,14 +31,14 @@ describe("map style rules", () => {
   it("renders selected countries with a color-matched tint, aura, and crisp outline", () => {
     expect(styles).toMatch(/\.selected-country-overlay,[^}]*pointer-events: none;/);
     expect(styles).toMatch(/\.selected-country-tint \{[^}]*fill: currentColor;[^}]*fill-opacity: 0\.09;/);
-    expect(styles).toMatch(/\.selected-country-aura-outer \{[^}]*stroke-opacity: 0\.16;[^}]*stroke-width: 10;/);
-    expect(styles).toMatch(/\.selected-country-aura-inner \{[^}]*stroke-opacity: 0\.34;[^}]*stroke-width: 5;/);
+    expect(styles).toMatch(/\.selected-country-aura-outer \{[^}]*stroke-opacity: 0\.1;[^}]*stroke-width: 10;/);
+    expect(styles).toMatch(/\.selected-country-aura-inner \{[^}]*stroke-opacity: 0\.24;[^}]*stroke-width: 5;/);
     expect(styles).toMatch(/\.selected-country-outline \{[^}]*stroke: color-mix\(in srgb, currentColor 76%, #ffffff\);[^}]*stroke-width: 1\.35;/);
   });
 
-  it("uses a light label outline with a soft shadow", () => {
-    expect(styles).toMatch(/\.country-label \{[^}]*filter: drop-shadow\(0 0\.04em 0\.08em rgba\(3, 10, 9, 0\.3\)\);/);
-    expect(styles).toMatch(/\.country-label \{[^}]*stroke-width: 0\.055em;/);
+  it("uses a light label outline without a shadow", () => {
+    expect(styles).not.toMatch(/\.country-label \{[^}]*filter:/);
+    expect(styles).toMatch(/\.country-label \{[^}]*stroke-width: 0\.1em;/);
   });
 
   it("uses short interface motion with a reduced-motion fallback", () => {

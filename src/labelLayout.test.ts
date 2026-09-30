@@ -140,7 +140,7 @@ describe("layoutCountryLabel", () => {
     expect(long!.fontSize).toBeLessThan(short!.fontSize);
   });
 
-  it("includes the flag and gap in the fitted label footprint", () => {
+  it("fits country names with positive tracking and border clearance", () => {
     const label = layoutCountryLabel({
       id: "flagged",
       name: "Flagged",
@@ -149,10 +149,7 @@ describe("layoutCountryLabel", () => {
     });
 
     expect(label).not.toBeNull();
-    expect(label!.contentWidth).toBeCloseTo(label!.flagWidth + label!.flagGap + label!.textLength);
     expect(label!.letterSpacing).toBeGreaterThan(0);
-    expect(label!.flagHeight).toBeCloseTo(label!.fontSize * 0.8);
-    expect(label!.flagWidth / label!.flagHeight).toBeCloseTo(4 / 3);
     expect(label!.width).toBeGreaterThan(label!.textLength);
   });
 

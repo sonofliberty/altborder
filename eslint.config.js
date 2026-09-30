@@ -5,7 +5,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default [
-  { ignores: ["dist", "public/data/map-data.json"] },
+  { ignores: ["dist", "output", ".playwright-cli", "public/data/map-data.json"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

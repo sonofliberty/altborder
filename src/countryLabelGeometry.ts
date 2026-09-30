@@ -19,11 +19,15 @@ export type CountryLabelGeometryResult = {
   geometries: Geometry[];
 };
 
+export function getCountryLabelCacheKey(entityId: string, entityName: string, regionIds: string[]): string {
+  return [entityId, entityName, regionIds.join(",")].join("|");
+}
+
 export function getCountryLabelGeometry(input: CountryLabelGeometryInput & { entityName: string }): CountryLabelGeometryResult {
   const hasBaseCountryGeometry = input.baseEntityById.has(input.entityId) && input.baseCountryByEntityId.has(input.entityId);
 
   return {
-    cacheKey: [input.entityId, input.entityName, input.regionIds.join(",")].join("|"),
+    cacheKey: getCountryLabelCacheKey(input.entityId, input.entityName, input.regionIds),
     geometries: hasBaseCountryGeometry ? getCountryLabelGeometries(input) : input.fallbackGeometries,
   };
 }
