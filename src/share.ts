@@ -106,7 +106,11 @@ function optionalString(value: unknown): boolean {
 }
 
 function optionalPositiveInteger(value: unknown): boolean {
-  return value === undefined || (typeof value === "number" && Number.isInteger(value) && value >= 1);
+  return value === undefined || (
+    typeof value === "number" &&
+    Number.isSafeInteger(value) &&
+    value >= 1
+  );
 }
 
 function optionalEntityChanges(value: unknown): boolean {
@@ -114,7 +118,7 @@ function optionalEntityChanges(value: unknown): boolean {
     value === undefined ||
     (isRecord(value) &&
       Object.entries(value).every(([entityId, entity]) => {
-        if (!isNonBlankString(entityId)) return false;
+        if (!isSafeId(entityId)) return false;
         if (!isCountryEntity(entity)) return false;
         return entity.id === entityId;
       }))
@@ -124,7 +128,7 @@ function optionalEntityChanges(value: unknown): boolean {
 function optionalStringRecord(value: unknown): boolean {
   return (
     value === undefined ||
-    (isRecord(value) && Object.values(value).every((entry) => typeof entry === "string"))
+    (isRecord(value) && Object.entries(value).every(([id, entry]) => isSafeId(id) && typeof entry === "string"))
   );
 }
 
@@ -141,8 +145,8 @@ function optionalRegionOwnerChanges(value: unknown): boolean {
     !value.every((entry) =>
       Array.isArray(entry) &&
       entry.length === 2 &&
-      isNonBlankString(entry[0]) &&
-      (entry[1] === "" || isNonBlankString(entry[1])),
+      isSafeId(entry[0]) &&
+      (entry[1] === "" || isSafeId(entry[1])),
     )
   ) {
     return false;
@@ -201,12 +205,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isCountryEntity(value: unknown): value is { id: string } {
   if (!isRecord(value)) return false;
   return (
-    isNonBlankString(value.id) &&
+    isSafeId(value.id) &&
     typeof value.name === "string" &&
     typeof value.color === "string" &&
     isHexColor(value.color) &&
     Array.isArray(value.regionIds) &&
-    value.regionIds.every(isNonBlankString) &&
+    value.regionIds.every(isSafeId) &&
     optionalBoolean(value.isCustom) &&
     (value.flag === undefined || isCountryFlag(value.flag))
   );
@@ -215,9 +219,9 @@ function isCountryEntity(value: unknown): value is { id: string } {
 function isRegionRecord(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return (
-    isNonBlankString(value.id) &&
+    isSafeId(value.id) &&
     typeof value.name === "string" &&
-    isNonBlankString(value.ownerId) &&
+    isSafeId(value.ownerId) &&
     isNonBlankString(value.type) &&
     isGeometry(value.geometry)
   );
@@ -225,6 +229,10 @@ function isRegionRecord(value: unknown): boolean {
 
 function isNonBlankString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.trim() === value;
+}
+
+function isSafeId(value: unknown): value is string {
+  return isNonBlankString(value) && !Object.prototype.hasOwnProperty.call(Object.prototype, value);
 }
 
 function isGeometry(value: unknown): boolean {

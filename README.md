@@ -99,9 +99,9 @@ To rebuild the map data:
 pnpm prepare:data
 ```
 
-This runs `scripts/build-map-data.mjs`, which downloads and caches geoBoundaries data under `.cache/geoboundaries`, combines it with fallback country geometry, simplifies it, and writes the app-ready JSON bundle.
+This runs `scripts/build-map-data.mjs`, which downloads and caches geoBoundaries data under `.cache/geoboundaries`, combines it with fallback country geometry, simplifies it, and writes the JSON bundle. It then adds country flag IDs, copies flag assets, and creates `public/data/map-data.packed.json`, which the app loads.
 
-Country flag SVG files come from the MIT-licensed `flag-icons` package, with documented local additions for special map entities. Run `pnpm prepare:flags` to refresh the required assets and country flag IDs without rebuilding geometry.
+Country flag SVG files come from the MIT-licensed `flag-icons` package, with documented local additions for special map entities. Run `pnpm prepare:flags` to refresh the required assets and country flag IDs, then repack the map data without rebuilding geometry.
 
 ## Sharing Model
 

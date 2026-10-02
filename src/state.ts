@@ -179,7 +179,8 @@ export function separateRegionAsCountry(
   const trimmedName = name.trim();
   if (!sourceEntity || !trimmedName) return null;
 
-  const newEntityId = makeCustomEntityId(snapshot.customCounter);
+  const next = { ...snapshot };
+  const newEntityId = allocateCustomEntityId(next);
   const nextEntities = { ...snapshot.entities };
   nextEntities[sourceEntityId] = {
     ...sourceEntity,
@@ -202,8 +203,7 @@ export function separateRegionAsCountry(
   return {
     entityId: newEntityId,
     snapshot: {
-      ...snapshot,
-      customCounter: snapshot.customCounter + 1,
+      ...next,
       entities: nextEntities,
       customRegions: nextCustomRegions,
       regionOwners: {
@@ -214,8 +214,14 @@ export function separateRegionAsCountry(
   };
 }
 
-export function makeCustomEntityId(counter: number): string {
+function makeCustomEntityId(counter: number): string {
   return `CUSTOM_${String(counter).padStart(3, "0")}`;
+}
+
+export function allocateCustomEntityId(snapshot: EditorSnapshot): string {
+  const counter = findAvailableCustomCounter(getUsedCustomCounters(snapshot), snapshot.customCounter);
+  snapshot.customCounter = incrementCustomCounter(counter);
+  return makeCustomEntityId(counter);
 }
 
 export function createScenarioPayload(data: MapData, snapshot: EditorSnapshot): ScenarioPayload {
@@ -317,20 +323,39 @@ function withCurrentRegionOwner(region: RegionRecord, ownerId: string | undefine
 }
 
 function normalizeCustomCounter(snapshot: EditorSnapshot): EditorSnapshot {
-  const usedCustomIds = [...Object.keys(snapshot.entities), ...Object.keys(snapshot.customRegions)];
-  const nextCounter = usedCustomIds.reduce(
-    (counter, id) => Math.max(counter, getCustomCounterFloor(id)),
-    snapshot.customCounter,
-  );
+  const usedCounters = getUsedCustomCounters(snapshot);
+  let counter = Number.isSafeInteger(snapshot.customCounter) && snapshot.customCounter >= 1
+    ? snapshot.customCounter
+    : 1;
+  for (const usedCounter of usedCounters) {
+    if (usedCounter >= counter) counter = usedCounter;
+  }
+  if (usedCounters.has(counter)) counter = incrementCustomCounter(counter);
+  const nextCounter = findAvailableCustomCounter(usedCounters, counter);
 
   if (nextCounter === snapshot.customCounter) return snapshot;
   return { ...snapshot, customCounter: nextCounter };
 }
 
-function getCustomCounterFloor(id: string): number {
-  const match = /^CUSTOM_(\d+)(?:$|-)/.exec(id);
-  if (!match) return 0;
-  return Number(match[1]) + 1;
+function getUsedCustomCounters(snapshot: EditorSnapshot): Set<number> {
+  const counters = new Set<number>();
+  for (const id of [...Object.keys(snapshot.entities), ...Object.keys(snapshot.customRegions)]) {
+    const match = /^CUSTOM_(\d+)(?:$|-)/.exec(id);
+    if (!match) continue;
+    const counter = Number(match[1]);
+    if (Number.isSafeInteger(counter) && counter >= 1) counters.add(counter);
+  }
+  return counters;
+}
+
+function findAvailableCustomCounter(usedCounters: Set<number>, preferredCounter: number): number {
+  let counter = Number.isSafeInteger(preferredCounter) && preferredCounter >= 1 ? preferredCounter : 1;
+  while (usedCounters.has(counter)) counter = incrementCustomCounter(counter);
+  return counter;
+}
+
+function incrementCustomCounter(counter: number): number {
+  return counter === Number.MAX_SAFE_INTEGER ? 1 : counter + 1;
 }
 
 function pruneEmptyCustomEntities(entities: Record<string, CountryEntity>): void {

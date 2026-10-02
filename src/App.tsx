@@ -39,7 +39,7 @@ import {
   createInitialSnapshot,
   createScenarioPayload,
   getEntityRegionIds,
-  makeCustomEntityId,
+  allocateCustomEntityId,
   renameRegion,
   separateRegionAsCountry,
   transferRegions,
@@ -2049,8 +2049,7 @@ export default function App() {
     let newEntityId = "";
 
     commit((draft) => {
-      newEntityId = makeCustomEntityId(draft.customCounter);
-      draft.customCounter += 1;
+      newEntityId = allocateCustomEntityId(draft);
       const existingRegionId = `${newEntityId}-REMAINDER`;
       const newRegionId = `${newEntityId}-TERRITORY`;
       const sourceRegionIds = getEntityRegionIds(draft, selectedEntity.id);
@@ -2102,8 +2101,7 @@ export default function App() {
     let newEntityId = "";
 
     commit((draft) => {
-      newEntityId = makeCustomEntityId(draft.customCounter);
-      draft.customCounter += 1;
+      newEntityId = allocateCustomEntityId(draft);
       const regionIds = Object.entries(draft.regionOwners)
         .filter(([, ownerId]) => members.includes(ownerId))
         .map(([regionId]) => regionId);

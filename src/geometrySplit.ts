@@ -275,7 +275,7 @@ function splitPolygonComponent(
   if (!RelateOp.intersects(component, originalLine) || lineLength(cutLineCoordinates) < minimumCutLength(bounds)) {
     return null;
   }
-  if (lineStaysInsideComponent(component, cutLineCoordinates)) {
+  if (lineStaysInsideComponent(component, originalLine, cutLineCoordinates)) {
     return null;
   }
 
@@ -340,32 +340,15 @@ function groupSplitCandidatesByCutSide(
 ): [JstsGeometry, JstsGeometry] | null {
   const left: JstsGeometry[] = [];
   const right: JstsGeometry[] = [];
-  let leftArea = 0;
-  let rightArea = 0;
-  const ambiguousArtifacts: SplitCandidate[] = [];
 
   for (const piece of pieces) {
     const side = classifyGeometrySide(piece.geoJson, cutLineCoordinates);
     if (side < 0) {
       left.push(piece.geometry);
-      leftArea += piece.area;
     } else if (side > 0) {
       right.push(piece.geometry);
-      rightArea += piece.area;
-    } else if (piece.area <= artifactArea) {
-      ambiguousArtifacts.push(piece);
     } else {
       return null;
-    }
-  }
-
-  for (const artifact of ambiguousArtifacts) {
-    if (leftArea >= rightArea) {
-      left.push(artifact.geometry);
-      leftArea += artifact.area;
-    } else {
-      right.push(artifact.geometry);
-      rightArea += artifact.area;
     }
   }
 
@@ -398,10 +381,18 @@ function validateSplitPair(
   return pair;
 }
 
-function lineStaysInsideComponent(component: JstsGeometry, cutLineCoordinates: Position[]): boolean {
+function lineStaysInsideComponent(
+  component: JstsGeometry,
+  line: JstsGeometry,
+  cutLineCoordinates: Position[],
+): boolean {
   const componentGeometry = rawWriteGeometry(component);
   if (!isPolygonalGeometry(componentGeometry)) return false;
-  return cutLineCoordinates.every((position) => polygonalGeometryInteriorContainsPoint(componentGeometry, position));
+  if (!cutLineCoordinates.every((position) => polygonalGeometryInteriorContainsPoint(componentGeometry, position))) {
+    return false;
+  }
+  // Interior vertices can still be joined by a segment that crosses a bay or hole.
+  return (OverlayOp.difference(line, component) as JstsGeometry).isEmpty();
 }
 
 function artifactAreaThreshold(componentArea: number): number {

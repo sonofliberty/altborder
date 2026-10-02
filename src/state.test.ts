@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MapData, RegionRecord, ScenarioPayload } from "./types";
 import {
+  allocateCustomEntityId,
   applyScenarioPayload,
   createInitialSnapshot,
   createScenarioPayload,
@@ -474,6 +475,43 @@ describe("country flags", () => {
 });
 
 describe("region transfers", () => {
+  it("allocates consecutive countries across the safe integer boundary without changing past state", () => {
+    const snapshot = createInitialSnapshot(makeMapData());
+    snapshot.customCounter = Number.MAX_SAFE_INTEGER - 1;
+
+    const first = separateRegionAsCountry(snapshot, "BBB_1", "First", "#A85F4F")!;
+    const second = separateRegionAsCountry(first.snapshot, "BBB_2", "Second", "#A85F4F")!;
+    const third = separateRegionAsCountry(second.snapshot, "CCC_ALL", "Third", "#A85F4F")!;
+
+    expect([first.entityId, second.entityId, third.entityId]).toEqual([
+      `CUSTOM_${Number.MAX_SAFE_INTEGER - 1}`,
+      `CUSTOM_${Number.MAX_SAFE_INTEGER}`,
+      "CUSTOM_001",
+    ]);
+    expect(snapshot.customCounter).toBe(Number.MAX_SAFE_INTEGER - 1);
+    expect(first.snapshot.customCounter).toBe(Number.MAX_SAFE_INTEGER);
+    expect(second.snapshot.customCounter).toBe(1);
+    expect(third.snapshot.customCounter).toBe(2);
+    expect(first.snapshot.entities[first.entityId].name).toBe("First");
+    expect(third.snapshot.regionOwners.BBB_1).toBe(first.entityId);
+    expect(third.snapshot.regionOwners.BBB_2).toBe(second.entityId);
+  });
+
+  it("skips occupied entity and custom-region prefixes after the allocator wraps", () => {
+    const snapshot = createInitialSnapshot(makeMapData());
+    snapshot.customCounter = Number.MAX_SAFE_INTEGER;
+    for (const id of [`CUSTOM_${Number.MAX_SAFE_INTEGER}`, "CUSTOM_0001"]) {
+      snapshot.entities[id] = { id, name: id, color: "#A85F4F", regionIds: [], isCustom: true };
+    }
+    snapshot.customRegions["CUSTOM_0002-REMAINDER"] = {
+      ...makeMapData().regions[0],
+      id: "CUSTOM_0002-REMAINDER",
+    };
+
+    expect(allocateCustomEntityId(snapshot)).toBe("CUSTOM_003");
+    expect(snapshot.customCounter).toBe(4);
+  });
+
   it("updates only moved region owners and affected entity region lists", () => {
     const data = makeMapData();
     const snapshot = createInitialSnapshot(data);

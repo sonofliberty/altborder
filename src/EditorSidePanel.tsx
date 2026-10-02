@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeftRight,
   Brush,
@@ -627,6 +627,17 @@ function FlagEditor({
 }) {
   const currentFlag = getCountryFlag(entity);
   const [uploadError, setUploadError] = useState("");
+  const uploadRequestRef = useRef(0);
+  const onChangeRef = useRef(onChange);
+
+  useLayoutEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useLayoutEffect(() => {
+    // Discard pending uploads when their country or flag is no longer current.
+    return () => { uploadRequestRef.current += 1; };
+  }, [entity.id, currentFlag, disabled]);
 
   useEffect(() => setUploadError(""), [entity.id]);
 
@@ -647,6 +658,7 @@ function FlagEditor({
         options={options}
         onChange={(flagId) => {
           if (!flagId) return;
+          uploadRequestRef.current += 1;
           setUploadError("");
           onChange(builtinCountryFlag(flagId));
         }}
@@ -666,10 +678,14 @@ function FlagEditor({
               const file = event.target.files?.[0];
               event.target.value = "";
               if (!file) return;
+              const requestId = ++uploadRequestRef.current;
               setUploadError("");
               void normalizeFlagUpload(file)
-                .then(onChange)
+                .then((flag) => {
+                  if (requestId === uploadRequestRef.current) onChangeRef.current(flag);
+                })
                 .catch((error: unknown) => {
+                  if (requestId !== uploadRequestRef.current) return;
                   setUploadError(error instanceof Error ? error.message : "The image could not be processed.");
                 });
             }}
@@ -680,6 +696,7 @@ function FlagEditor({
           className="compact"
           disabled={disabled || countryFlagEquals(currentFlag, defaultFlag)}
           onClick={() => {
+            uploadRequestRef.current += 1;
             setUploadError("");
             onReset();
           }}

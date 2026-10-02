@@ -3,6 +3,9 @@ import { geoNaturalEarth1 } from "d3-geo";
 import type { Geometry, Position } from "geojson";
 import mapDataFixture from "../public/data/map-data.json";
 import { findRegionAtProjectedPoint } from "./geometryHitTest";
+import { projectedGeometryBounds } from "./projectedPath";
+import { decodeSharePayload, encodeSharePayload } from "./share";
+import { applyScenarioPayload } from "./state";
 import type { MapData } from "./types";
 
 const identityProject = (position: Position) => [position[0], position[1]] as [number, number];
@@ -173,6 +176,82 @@ describe("findRegionAtProjectedPoint", () => {
         (position) => projection([position[0], position[1]]),
       ),
     ).toBe("DEU-DE-NI");
+  });
+
+  it("selects Fiji at both sides of the map seam without selecting distant ocean", () => {
+    const data = mapDataFixture as MapData;
+    const fiji = data.regions.find((region) => region.id === "NE-242-ALL");
+    if (!fiji) throw new Error("Missing Fiji test data");
+    const projection = geoNaturalEarth1();
+    const regions = [{ ...fiji, bounds: projectedGeometryBounds(fiji.geometry, projection) }];
+    const hit = (longitude: number, latitude: number) => findRegionAtProjectedPoint(
+      projection([longitude, latitude])!,
+      regions,
+      (position) => projection([position[0], position[1]]),
+    );
+
+    for (const longitude of [-100, 0, 100]) {
+      expect(hit(longitude, -16.52)).toBeNull();
+    }
+    expect(hit(179.99, -16.52)).toBe(fiji.id);
+    expect(hit(-179.999, -16.52)).toBe(fiji.id);
+    expect(hit(178, -17.8)).toBe(fiji.id);
+  });
+
+  it.each([1e20, -1e20])("skips unsafe longitude-copy indices from a shared map at %s", async (longitude) => {
+    const decoded = await decodeSharePayload(await encodeSharePayload({
+      version: 1,
+      title: "Extreme coordinates",
+      customCounter: 1,
+      entityChanges: {},
+      regionOwnerChanges: [],
+      customRegions: [{
+        id: "CUSTOM_001-TERRITORY",
+        name: "Test",
+        ownerId: "BRA",
+        type: "Custom divided territory",
+        geometry: {
+          type: "Polygon",
+          coordinates: [[
+            [longitude, 0], [longitude + 1e6, 0], [90, 10],
+            [longitude, 10], [longitude, 0],
+          ]],
+        },
+      }],
+    }));
+    if (!decoded.ok) throw new Error(decoded.error);
+    const snapshot = applyScenarioPayload(mapDataFixture as MapData, decoded.payload);
+    const region = snapshot.customRegions["CUSTOM_001-TERRITORY"];
+    const projection = geoNaturalEarth1();
+    const bounds = projectedGeometryBounds(region.geometry, projection);
+    if (!bounds) throw new Error("Expected projected bounds for the shared region");
+
+    expect(findRegionAtProjectedPoint(
+      [(bounds.minX + bounds.maxX) / 2, (bounds.minY + bounds.maxY) / 2],
+      [{ ...region, bounds }],
+      (position) => projection([position[0], position[1]]),
+      snapshot.regionOwners,
+    )).toBeNull();
+  });
+
+  it("preserves holes in polygons that cross the map seam", () => {
+    const regions: HitTestRegion[] = [{
+      id: "seam",
+      bounds: { minX: -180, minY: 0, maxX: 180, maxY: 10 },
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [[170, 0], [-170, 0], [-170, 10], [170, 10], [170, 0]],
+          [[175, 3], [-175, 3], [-175, 7], [175, 7], [175, 3]],
+        ],
+      },
+    }];
+
+    expect(findRegionAtProjectedPoint([172, 5], regions, identityProject)).toBe("seam");
+    expect(findRegionAtProjectedPoint([-172, 5], regions, identityProject)).toBe("seam");
+    expect(findRegionAtProjectedPoint([179, 5], regions, identityProject)).toBeNull();
+    expect(findRegionAtProjectedPoint([-179, 5], regions, identityProject)).toBeNull();
+    expect(findRegionAtProjectedPoint([0, 5], regions, identityProject)).toBeNull();
   });
 });
 

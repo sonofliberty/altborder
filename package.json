@@ -12,9 +12,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "deadcode": "knip --reporter compact",
-    "prepare:data": "node scripts/build-map-data.mjs && node scripts/pack-map-data.mjs && node scripts/sync-flag-assets.mjs",
+    "prepare:data": "node scripts/build-map-data.mjs && node scripts/sync-flag-assets.mjs && node scripts/pack-map-data.mjs",
     "prepare:pack": "node scripts/pack-map-data.mjs",
-    "prepare:flags": "node scripts/sync-flag-assets.mjs"
+    "prepare:flags": "node scripts/sync-flag-assets.mjs && node scripts/pack-map-data.mjs"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",

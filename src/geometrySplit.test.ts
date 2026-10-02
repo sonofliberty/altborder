@@ -130,6 +130,26 @@ describe("splitCountryGeometry", () => {
     expect(result.reason).toBe("Draw the line so it clearly enters and exits the selected country.");
   });
 
+  it("cuts across a bay when interior endpoints are joined without an exterior sample", () => {
+    const bay: Geometry = {
+      type: "Polygon",
+      coordinates: [[
+        [0, 0], [10, 0], [10, 10], [8, 10], [8, 2],
+        [2, 2], [2, 10], [0, 10], [0, 0],
+      ]],
+    };
+    const regions = [region("bay", bay)];
+    const sparse = splitCountryGeometry(regions, [[1, 5], [9, 5]]);
+    const sampled = splitCountryGeometry(regions, [[1, 5], [5, 5], [9, 5]]);
+
+    expect(sparse.ok).toBe(true);
+    expect(sampled.ok).toBe(true);
+    if (!sparse.ok || !sampled.ok) return;
+    expect(sparse.pieces.map((piece) => piece.area).sort((a, b) => a - b))
+      .toEqual(sampled.pieces.map((piece) => piece.area).sort((a, b) => a - b));
+    expect(sparse.pieces.reduce((total, piece) => total + piece.area, 0)).toBeCloseTo(52);
+  });
+
   it("keeps untouched multipolygon components with the existing country", () => {
     const result = splitCountryGeometry(
       [region("multi", multiSquare([squareCoordinates(0, 0, 10, 10), squareCoordinates(20, 0, 30, 10)]))],

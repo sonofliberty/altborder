@@ -213,6 +213,7 @@ async function main() {
   const baseCountries = [];
   const countryNameToId = new Map();
   const errors = [];
+  const adm1Errors = [];
   const usedRegionIds = new Set();
   const usedWorldFeatureIds = new Set();
   const nonSovereignFallbacks = new Map();
@@ -223,6 +224,9 @@ async function main() {
         `https://www.geoboundaries.org/api/current/gbOpen/${country.iso3}/ADM1/`,
       );
       const geojson = await fetchCachedJson(meta.gjDownloadURL || meta.simplifiedGeometryGeoJSON);
+      if (!Array.isArray(geojson?.features) || geojson.features.length === 0) {
+        throw new Error("No ADM1 features were returned.");
+      }
       const regionIds = [];
 
       for (const [featureIndex, regionFeature] of geojson.features.entries()) {
@@ -256,8 +260,14 @@ async function main() {
       }
       console.log(`Loaded ${country.iso3}: ${regionIds.length} ADM1 regions`);
     } catch (error) {
-      errors.push(`${country.iso3}: ${error instanceof Error ? error.message : String(error)}`);
+      adm1Errors.push(`${country.iso3}: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  if (adm1Errors.length > 0) {
+    throw new Error(
+      `Map data was not written because ${adm1Errors.length} ADM1 sources failed:\n${adm1Errors.map((error) => `- ${error}`).join("\n")}`,
+    );
   }
 
   for (const [worldIndex, worldFeature] of worldCountries.entries()) {

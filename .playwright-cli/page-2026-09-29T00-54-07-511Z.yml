@@ -1,0 +1,70 @@
+- main [ref=f3e3]:
+  - generic [ref=f3e4]:
+    - generic [ref=f3e5]:
+      - generic [ref=f3e12]:
+        - strong [ref=f3e13]: AltBorder
+        - generic [ref=f3e14]: History is optional.
+      - textbox "Scenario" [ref=f3e16]: Untitled Border Experiment
+    - generic [ref=f3e17]:
+      - button "Present map" [ref=f3e18] [cursor=pointer]
+      - generic [ref=f3e25]:
+        - button "Undo" [ref=f3e26] [cursor=pointer]
+        - button "Redo" [disabled] [ref=f3e30]
+      - group [ref=f3e34]:
+        - generic "More actions" [ref=f3e35] [cursor=pointer]
+      - button "Share" [ref=f3e40] [cursor=pointer]
+  - generic [ref=f3e47]:
+    - region "World map editor" [ref=f3e48]:
+      - img "Editable world map" [ref=f3e49]:
+        - generic [ref=f3e51]:
+          - generic [aria-hidden]:
+            - generic: Pacific Ocean
+            - generic: North Atlantic
+            - generic: South Atlantic
+            - generic: Indian Ocean
+          - generic [ref=f3e290]:
+            - generic "Baden-Württemberg · France" [ref=f3e3244]
+            - generic "Auvergne-Rhône-Alpes · France" [ref=f3e2954]
+            - generic "Bourgogne-Franche-Comté · France" [ref=f3e2956]
+            - generic "Bretagne · France" [ref=f3e2958]
+            - generic "Centre-Val de Loire · France" [ref=f3e2960]
+            - generic "Grand Est · France" [ref=f3e2962]
+            - generic "Hauts-de-France · France" [ref=f3e2964]
+            - generic "Île-de-France · France" [ref=f3e2966]
+            - generic "Nouvelle-Aquitaine · France" [ref=f3e2968]
+            - generic "Normandie · France" [ref=f3e2970]
+            - generic "Occitanie · France" [ref=f3e2972]
+            - generic "Provence-Alpes-Côte d'Azur · France" [ref=f3e2974]
+            - generic "Pays de la Loire · France" [ref=f3e2976]
+          - generic [ref=f3e329]:
+            - generic [ref=f3e2652]: AUSTRIA
+            - generic [ref=f3e2656]: BELGIUM
+            - generic [ref=f3e2662]: SWITZERLAND
+            - generic [ref=f3e2664]: CZECHIA
+            - generic [ref=f3e2666]: GERMANY
+            - generic [ref=f3e2672]: FRANCE
+            - generic [ref=f3e3219]: SLOVENIA
+      - group "Map zoom controls" [ref=f3e400]:
+        - button "Zoom in" [disabled] [ref=f3e401]
+        - button "Zoom out" [ref=f3e403] [cursor=pointer]
+        - button "Show whole world" [ref=f3e405] [cursor=pointer]
+    - complementary [ref=f3e411]:
+      - tablist "Editor mode" [ref=f3e413]:
+        - tab "Inspect" [ref=f3e414] [cursor=pointer]
+        - tab "Transfer" [ref=f3e415] [cursor=pointer]
+        - tab "Divide" [active] [selected] [ref=f3e416] [cursor=pointer]
+        - tab "Merge" [ref=f3e417] [cursor=pointer]
+      - generic [ref=f3e418]:
+        - tabpanel "Divide" [ref=f3e3245]:
+          - generic [ref=f3e3247]:
+            - generic [ref=f3e3249]:
+              - generic [ref=f3e3250]: Selected country
+              - heading "France" [level=2] [ref=f3e3251]
+              - generic [ref=f3e3252]: 20 regions
+            - button "Change country" [ref=f3e3255] [cursor=pointer]
+          - generic [ref=f3e3259]:
+            - generic [ref=f3e3260]: New country
+            - button "Cut with keyboard" [ref=f3e3262] [cursor=pointer]
+            - paragraph [ref=f3e3263]: Draw a cut across the country, or click a separate island.
+        - group [ref=f3e446]:
+          - generic "About map data" [ref=f3e447] [cursor=pointer]

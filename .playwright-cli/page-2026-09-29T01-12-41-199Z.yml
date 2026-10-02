@@ -1,0 +1,82 @@
+- main [ref=e3]:
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e19]:
+        - strong [ref=e20]: AltBorder
+        - generic [ref=e21]: History is optional.
+      - textbox "Scenario" [ref=e23]: Untitled Border Experiment
+    - generic [ref=e24]:
+      - button "Present map" [ref=e25] [cursor=pointer]
+      - generic [ref=e32]:
+        - button "Undo" [disabled] [ref=e33]
+        - button "Redo" [disabled] [ref=e37]
+      - group [ref=e41]:
+        - generic "More actions" [ref=e42] [cursor=pointer]
+      - button "Share" [ref=e47] [cursor=pointer]
+  - generic [ref=e54]:
+    - region "World map editor" [ref=e55]:
+      - img "Editable world map" [ref=e56]:
+        - generic [ref=e58]:
+          - generic [aria-hidden]:
+            - generic: Pacific Ocean
+            - generic: North Atlantic
+            - generic: South Atlantic
+            - generic: Indian Ocean
+          - generic [ref=e355]:
+            - generic "Brandenburg · Germany" [ref=e357]
+            - generic "Berlin · Germany" [ref=e359]
+            - generic "Baden-Württemberg · Germany" [ref=e361]
+            - generic "Bayern · Germany" [ref=e363]
+            - generic "Bremen · Germany" [ref=e365]
+            - generic "Hessen · Germany" [ref=e367]
+            - generic "Hamburg · Germany" [ref=e369]
+            - generic "Mecklenburg-Vorpommern · Germany" [ref=e371]
+            - generic "Niedersachsen · Germany" [ref=e373]
+            - generic "Nordrhein-Westfalen · Germany" [ref=e375]
+            - generic "Rheinland-Pfalz · Germany" [ref=e377]
+            - generic "Schleswig-Holstein · Germany" [ref=e379]
+            - generic "Saarland · Germany" [ref=e381]
+            - generic "Sachsen · Germany" [ref=e383]
+            - generic "Sachsen-Anhalt · Germany" [ref=e385]
+            - generic "Thüringen · Germany" [ref=e387]
+          - generic [ref=e297]:
+            - generic [ref=e388]: AUSTRIA
+            - generic [ref=e390]: BELGIUM
+            - generic [ref=e392]: SWITZERLAND
+            - generic [ref=e394]: CZECHIA
+            - generic [ref=e396]: GERMANY
+            - generic [ref=e398]: FRANCE
+            - generic [ref=e400]: UNITED KINGDOM
+            - generic [ref=e402]: HUNGARY
+            - generic [ref=e404]: NETHERLANDS
+            - generic [ref=e406]: POLAND
+            - generic [ref=e408]: SLOVAKIA
+      - group "Map zoom controls" [ref=e318]:
+        - button "Zoom in" [ref=e319] [cursor=pointer]
+        - button "Zoom out" [ref=e321] [cursor=pointer]
+        - button "Show whole world" [ref=e323] [cursor=pointer]
+    - complementary [ref=e329]:
+      - tablist "Editor mode" [ref=e331]:
+        - tab "Inspect" [selected] [ref=e332] [cursor=pointer]
+        - tab "Transfer" [ref=e333] [cursor=pointer]
+        - tab "Divide" [ref=e334] [cursor=pointer]
+        - tab "Merge" [ref=e335] [cursor=pointer]
+      - generic [ref=e336]:
+        - tabpanel "Inspect" [ref=e337]:
+          - generic [ref=e338]:
+            - generic [ref=e410]:
+              - generic [ref=e412]:
+                - generic [ref=e413]: Selected country
+                - heading "Germany" [level=2] [ref=e414]
+                - generic [ref=e415]: 16 regions
+              - button "Change country" [ref=e418] [cursor=pointer]
+            - group [ref=e422]:
+              - generic "Appearance Edit name, color, and flag" [ref=e423] [cursor=pointer]:
+                - generic [ref=e424]: Appearance
+                - generic [ref=e425]: Edit name, color, and flag
+          - group [ref=e429]:
+            - generic "Regions 16" [ref=e430] [cursor=pointer]:
+              - generic [ref=e431]: Regions
+              - generic [ref=e432]: "16"
+        - group [ref=e347]:
+          - generic "About map data" [ref=e348] [cursor=pointer]

@@ -1,0 +1,129 @@
+- main [ref=e3]:
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - img [ref=e14]
+        - generic [ref=e19]:
+          - strong [ref=e20]: AltBorder
+          - generic [ref=e21]: History is optional.
+      - textbox "Scenario" [ref=e23]: Untitled Border Experiment
+    - generic [ref=e24]:
+      - button "Present map" [ref=e25] [cursor=pointer]:
+        - img [ref=e26]
+        - generic [ref=e31]: Present map
+      - generic [ref=e32]:
+        - button "Undo" [disabled] [ref=e33]:
+          - img [ref=e34]
+        - button "Redo" [disabled] [ref=e37]:
+          - img [ref=e38]
+      - group [ref=e41]:
+        - generic "More actions" [ref=e42] [cursor=pointer]:
+          - img [ref=e43]
+      - button "Share" [ref=e47] [cursor=pointer]:
+        - img [ref=e48]
+        - text: Share
+  - generic [ref=e54]:
+    - region "World map editor" [ref=e55]:
+      - img "Editable world map" [ref=e56]:
+        - generic [ref=e58]:
+          - generic:
+            - generic:
+              - generic: Pacific Ocean
+            - generic:
+              - generic: North Atlantic
+            - generic:
+              - generic: South Atlantic
+            - generic:
+              - generic: Indian Ocean
+          - generic [ref=e355]:
+            - generic "Acre · Brazil" [ref=e357]
+            - generic "Alagoas · Brazil" [ref=e359]
+            - generic "Amazonas · Brazil" [ref=e361]
+            - generic "Amapa · Brazil" [ref=e363]
+            - generic "Bahia · Brazil" [ref=e365]
+            - generic "Ceara · Brazil" [ref=e367]
+            - generic "Distrito Federal · Brazil" [ref=e369]
+            - generic "Espirito Santo · Brazil" [ref=e371]
+            - generic "Goias · Brazil" [ref=e373]
+            - generic "Maranhao · Brazil" [ref=e375]
+            - generic "Minas Gerais · Brazil" [ref=e377]
+            - generic "Mato Grosso do Sul · Brazil" [ref=e379]
+            - generic "Mato Grosso · Brazil" [ref=e381]
+            - generic "Para · Brazil" [ref=e383]
+            - generic "Paraiba · Brazil" [ref=e385]
+            - generic "Pernambuco · Brazil" [ref=e387]
+            - generic "Piaui · Brazil" [ref=e389]
+            - generic "Parana · Brazil" [ref=e391]
+            - generic "Rio de Jeneiro · Brazil" [ref=e393]
+            - generic "Rio Granda do Norte · Brazil" [ref=e395]
+            - generic "Rondonia · Brazil" [ref=e397]
+            - generic "Roraima · Brazil" [ref=e399]
+            - generic "Rio Grande do Sul · Brazil" [ref=e401]
+            - generic "Santa Catarina · Brazil" [ref=e403]
+            - generic "Sergipe · Brazil" [ref=e405]
+            - generic "Sao Paulo · Brazil" [ref=e407]
+            - generic "Tocantins · Brazil" [ref=e409]
+          - generic [ref=e330]:
+            - generic [ref=e411]:
+              - generic: ARGENTINA
+            - generic [ref=e413]:
+              - generic: BOLIVIA
+            - generic [ref=e334]:
+              - generic: BRAZIL
+            - generic [ref=e415]:
+              - generic: COLOMBIA
+            - generic [ref=e417]:
+              - generic: ECUADOR
+            - generic [ref=e419]:
+              - generic: GUYANA
+            - generic [ref=e421]:
+              - generic: CÔTE D'IVOIRE
+            - generic [ref=e423]:
+              - generic: LIBERIA
+            - generic [ref=e425]:
+              - generic: PERU
+            - generic [ref=e427]:
+              - generic: PARAGUAY
+            - generic [ref=e429]:
+              - generic: SURINAME
+            - generic [ref=e431]:
+              - generic: URUGUAY
+            - generic [ref=e433]:
+              - generic: VENEZUELA
+      - group "Map zoom controls" [ref=e59]:
+        - button "Zoom in" [ref=e60] [cursor=pointer]:
+          - img [ref=e61]
+        - button "Zoom out" [ref=e62] [cursor=pointer]:
+          - img [ref=e63]
+        - button "Show whole world" [ref=e64] [cursor=pointer]:
+          - img [ref=e65]
+    - complementary [ref=e70]:
+      - tablist "Editor mode" [ref=e72]:
+        - tab "Inspect" [selected] [ref=e73] [cursor=pointer]
+        - tab "Transfer" [ref=e74] [cursor=pointer]
+        - tab "Divide" [ref=e75] [cursor=pointer]
+        - tab "Merge" [ref=e76] [cursor=pointer]
+      - generic [ref=e77]:
+        - tabpanel "Inspect" [ref=e78]:
+          - generic [ref=e79]:
+            - generic [ref=e434]:
+              - generic [ref=e436]:
+                - generic [ref=e437]: Selected country
+                - heading "Brazil" [level=2] [ref=e438]
+                - generic [ref=e441]: 27 regions
+              - button "Change country" [ref=e442] [cursor=pointer]:
+                - img [ref=e443]
+            - group [ref=e446]:
+              - generic "Appearance Edit name, color, and flag" [ref=e447] [cursor=pointer]:
+                - generic [ref=e448]: Appearance
+                - generic [ref=e449]: Edit name, color, and flag
+                - img [ref=e450]
+          - group [ref=e453]:
+            - generic "Regions 27" [ref=e454] [cursor=pointer]:
+              - generic [ref=e455]: Regions
+              - generic [ref=e456]: "27"
+              - img [ref=e457]
+        - group [ref=e88]:
+          - generic "About map data" [ref=e89] [cursor=pointer]:
+            - text: About map data
+            - img [ref=e90]

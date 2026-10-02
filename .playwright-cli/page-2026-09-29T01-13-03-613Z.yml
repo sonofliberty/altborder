@@ -1,0 +1,63 @@
+- main [ref=e3]:
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e19]:
+        - strong [ref=e20]: AltBorder
+        - generic [ref=e21]: History is optional.
+      - textbox "Scenario" [ref=e23]: Untitled Border Experiment
+    - generic [ref=e24]:
+      - button "Present map" [ref=e25] [cursor=pointer]
+      - generic [ref=e32]:
+        - button "Undo" [ref=e33] [cursor=pointer]
+        - button "Redo" [disabled] [ref=e37]
+      - group [ref=e41]:
+        - generic "More actions" [ref=e42] [cursor=pointer]
+      - button "Share" [ref=e47] [cursor=pointer]
+  - generic [ref=e54]:
+    - region "World map editor" [ref=e55]:
+      - img "Editable world map" [ref=e56]:
+        - generic [ref=e58]:
+          - generic [aria-hidden]:
+            - generic: Pacific Ocean
+            - generic: North Atlantic
+            - generic: South Atlantic
+            - generic: Indian Ocean
+          - generic "Split Test · Split Test" [ref=e474]
+          - generic [ref=e297]:
+            - generic [ref=e388]: AUSTRIA
+            - generic [ref=e390]: BELGIUM
+            - generic [ref=e392]: SWITZERLAND
+            - generic [ref=e475]: SPLIT TEST
+            - generic [ref=e394]: CZECHIA
+            - generic [ref=e396]: GERMANY
+            - generic [ref=e398]: FRANCE
+            - generic [ref=e400]: UNITED KINGDOM
+            - generic [ref=e402]: HUNGARY
+            - generic [ref=e404]: NETHERLANDS
+            - generic [ref=e406]: POLAND
+            - generic [ref=e408]: SLOVAKIA
+      - group "Map zoom controls" [ref=e318]:
+        - button "Zoom in" [ref=e319] [cursor=pointer]
+        - button "Zoom out" [ref=e321] [cursor=pointer]
+        - button "Show whole world" [ref=e323] [cursor=pointer]
+      - status: Split Test is now a country
+    - complementary [ref=e329]:
+      - tablist "Editor mode" [ref=e331]:
+        - tab "Inspect" [ref=e332] [cursor=pointer]
+        - tab "Transfer" [ref=e333] [cursor=pointer]
+        - tab "Divide" [selected] [ref=e334] [cursor=pointer]
+        - tab "Merge" [ref=e335] [cursor=pointer]
+      - generic [ref=e336]:
+        - tabpanel "Divide" [ref=e435]:
+          - generic [ref=e477]:
+            - generic [ref=e479]:
+              - generic [ref=e480]: Custom country
+              - heading "Split Test" [level=2] [ref=e481]
+              - generic [ref=e482]: 1 region
+            - button "Change country" [ref=e485] [cursor=pointer]
+          - generic [ref=e449]:
+            - generic [ref=e450]: New country
+            - button "Cut with keyboard" [ref=e452] [cursor=pointer]
+            - paragraph [ref=e489]: Draw a cut across the country, or click a separate island.
+        - group [ref=e347]:
+          - generic "About map data" [ref=e348] [cursor=pointer]
