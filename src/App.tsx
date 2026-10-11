@@ -4,6 +4,7 @@ import {
   Copy,
   Eye,
   Globe2,
+  Hand,
   Maximize2,
   Minimize2,
   Minus,
@@ -66,7 +67,7 @@ import {
   getCountryLabelScale,
   getLabelBox,
 } from "./mapLabelDisplay";
-import { interpolateZoom, zoomToBounds, type ProjectedBounds } from "./mapZoom";
+import { interpolateZoom, zoomFromTouchPair, zoomToBounds, type ProjectedBounds } from "./mapZoom";
 import { applyPoliticalMapPalette, getAdministrativeBorderZoomClass, getCountryBorderStrokeWidth } from "./mapVisualStyle";
 import { boundsIntersect, projectedViewportBounds, shouldCullPaths } from "./mapCulling";
 import { findRegionAtProjectedPoint } from "./geometryHitTest";
@@ -179,6 +180,8 @@ type ProjectedBoundaryEdgeWithBounds = ProjectedBoundaryEdge & {
   bounds: ProjectedBounds;
 };
 
+const compactLayoutQuery = "(max-width: 900px) and (min-height: 501px), (max-width: 599px)";
+
 type GeometrySplitModule = typeof import("./geometrySplit");
 
 export default function App() {
@@ -206,6 +209,10 @@ export default function App() {
   const [divideIsCalculating, setDivideIsCalculating] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
   const [isPresenting, setIsPresenting] = useState(false);
+  const [mobilePanelExpanded, setMobilePanelExpanded] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [compactLayout, setCompactLayout] = useState(() => window.matchMedia(compactLayoutQuery).matches);
+  const [mapNavigationEnabled, setMapNavigationEnabled] = useState(false);
   const [share, setShare] = useState<ShareState | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -247,6 +254,18 @@ export default function App() {
     entityId: string | null;
     selectOnRelease: boolean;
   } | null>(null);
+  const touchPointersRef = useRef(new Map<number, SvgPoint>());
+  const touchGestureRef = useRef<{
+    start: [SvgPoint, SvgPoint];
+    zoom: ZoomState;
+  } | null>(null);
+  const touchSequenceNavigatedRef = useRef(false);
+  const touchDivideDraftRef = useRef<{
+    line: SvgPoint[];
+    island: Position | null;
+    piece: 0 | 1 | null;
+    error: string;
+  } | null>(null);
   const divideDrawRef = useRef<{ pointerId: number; moved: boolean } | null>(null);
   const countryLabelLayoutCacheRef = useRef(new Map<string, FittedCountryLabel>());
   const countryUnderlayCacheRef = useRef(new Map<string, CountryUnderlay>());
@@ -263,6 +282,31 @@ export default function App() {
     baseRegionBoundsCacheRef.current.clear();
     baseProjectedRegionDetailStrokeCacheRef.current.clear();
     countryUnderlayCacheRef.current.clear();
+  }, []);
+
+  useEffect(() => {
+    const query = window.matchMedia(compactLayoutQuery);
+    const update = () => setCompactLayout(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const update = () => {
+      // Use the visible area when a phone's keyboard covers the layout viewport.
+      if (viewport.scale <= 1.01) {
+        document.documentElement.style.setProperty("--app-height", `${viewport.height}px`);
+        setKeyboardVisible(window.innerHeight - viewport.height > 120);
+      }
+    };
+    update();
+    viewport.addEventListener("resize", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      document.documentElement.style.removeProperty("--app-height");
+    };
   }, []);
 
   useEffect(() => {
@@ -1532,6 +1576,9 @@ export default function App() {
   }
 
   function selectMode(nextMode: EditMode) {
+    setMobilePanelExpanded(true);
+    setMapNavigationEnabled(false);
+    if (nextMode === mode) return;
     finishMetadataEdit();
     setMapChange(null);
     setMode(nextMode);
@@ -1728,6 +1775,7 @@ export default function App() {
 
   function handleRegionClick(regionId: string) {
     if (!snapshot) return;
+    if (mode === "inspect" || readOnly) setMobilePanelExpanded(true);
     const ownerId = snapshot.regionOwners[regionId];
     if (!ownerId) return;
 
@@ -1776,6 +1824,7 @@ export default function App() {
   }
 
   function handleEntityClick(entityId: string) {
+    if (mode === "inspect" || readOnly) setMobilePanelExpanded(true);
     if (!snapshot) return;
     if (!snapshot.entities[entityId]) return;
 
@@ -2264,7 +2313,33 @@ export default function App() {
       syncZoomStateNow();
       settleMapMoving();
     }
-    if (event.button === 1 || (isPresenting && event.button === 0)) {
+    if (event.pointerType === "touch") {
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      touchPointersRef.current.set(event.pointerId, getSvgPoint(event.currentTarget, event.clientX, event.clientY));
+      if (touchPointersRef.current.size === 1) {
+        touchSequenceNavigatedRef.current = false;
+        touchDivideDraftRef.current = { line: divideLine, island: divideIslandPoint, piece: divideNewPieceIndex, error: divideError };
+      } else {
+        touchSequenceNavigatedRef.current = true;
+        panRef.current = null;
+        divideDrawRef.current = null;
+        setIsDrawingDivideLine(false);
+        setIsBrushDown(false);
+        const draft = touchDivideDraftRef.current;
+        if (draft) {
+          setDivideLine(draft.line);
+          setDivideIslandPoint(draft.island);
+          setDivideNewPieceIndex(draft.piece);
+          setDivideError(draft.error);
+        }
+        const [first, second] = [...touchPointersRef.current.values()];
+        touchGestureRef.current = { start: [first, second], zoom: { ...zoomRef.current } };
+        markMapMoving();
+        return;
+      }
+    }
+    if (event.button === 1 || ((isPresenting || mapNavigationEnabled) && event.button === 0)) {
       event.preventDefault();
       panRef.current = {
         x: event.clientX,
@@ -2284,7 +2359,7 @@ export default function App() {
     const regionId = getEventRegionId(event.target) ?? findRegionAtMapPoint(clickedMapPoint);
     const entityId = getEventEntityId(event.target);
 
-    if (mode === "inspect") {
+    if (mode === "inspect" || (event.pointerType === "touch" && (readOnly || mode === "merge" || (mode === "transfer" && !brushEnabled) || (mode === "divide" && !selectedEntityId)))) {
       event.preventDefault();
       panRef.current = {
         x: event.clientX,
@@ -2320,6 +2395,7 @@ export default function App() {
     }
 
     if (brushEnabled && activeModeUsesRegions && !readOnly) {
+      if (event.pointerType === "touch") return;
       setIsBrushDown(true);
       if (regionId) {
         handleRegionClick(regionId);
@@ -2339,6 +2415,24 @@ export default function App() {
   }
 
   function handlePointerMove(event: React.PointerEvent<SVGSVGElement>) {
+    if (event.pointerType === "touch") {
+      if (!touchPointersRef.current.has(event.pointerId)) return;
+      touchPointersRef.current.set(event.pointerId, getSvgPoint(event.currentTarget, event.clientX, event.clientY));
+      if (touchGestureRef.current && touchPointersRef.current.size >= 2) {
+        const [first, second] = [...touchPointersRef.current.values()];
+        queueZoomUpdate(zoomFromTouchPair(touchGestureRef.current.zoom, touchGestureRef.current.start, [first, second]));
+        return;
+      }
+      // After a pinch, ignore the remaining finger until the full gesture ends.
+      if (touchSequenceNavigatedRef.current) return;
+      if (brushEnabled && activeModeUsesRegions && !readOnly && !mapNavigationEnabled && !isPresenting) {
+        const point = getMapPoint(event.currentTarget, event.clientX, event.clientY, zoomRef.current);
+        const regionId = findRegionAtMapPoint(point);
+        setIsBrushDown(true);
+        if (regionId) addRegionByBrush(regionId);
+        return;
+      }
+    }
     if (divideDrawRef.current) {
       const point = getMapPoint(event.currentTarget, event.clientX, event.clientY, zoomRef.current);
       setDivideLine((current) => {
@@ -2370,6 +2464,36 @@ export default function App() {
   }
 
   function handlePointerUp(event: React.PointerEvent<SVGSVGElement>) {
+    if (event.pointerType === "touch") {
+      touchPointersRef.current.delete(event.pointerId);
+      releasePointerCaptureIfHeld(event.currentTarget, event.pointerId);
+      if (touchSequenceNavigatedRef.current) {
+        if (touchPointersRef.current.size >= 2) {
+          const [first, second] = [...touchPointersRef.current.values()];
+          touchGestureRef.current = { start: [first, second], zoom: { ...zoomRef.current } };
+        } else {
+          touchGestureRef.current = null;
+        }
+        if (touchPointersRef.current.size === 0) {
+          touchSequenceNavigatedRef.current = false;
+          touchDivideDraftRef.current = null;
+          syncZoomStateNow();
+          settleMapMoving();
+        }
+        return;
+      }
+      touchDivideDraftRef.current = null;
+      if (brushEnabled && activeModeUsesRegions && !readOnly && !mapNavigationEnabled && !isPresenting && !isBrushDown && event.type !== "pointercancel") {
+        const regionId = findRegionAtMapPoint(getMapPoint(event.currentTarget, event.clientX, event.clientY, zoomRef.current));
+        if (regionId) handleRegionClick(regionId);
+      }
+    }
+    if (divideDrawRef.current && event.type === "pointercancel") {
+      divideDrawRef.current = null;
+      setIsDrawingDivideLine(false);
+      clearDivideDraft();
+      return;
+    }
     if (divideDrawRef.current) {
       const { moved, pointerId } = divideDrawRef.current;
       divideDrawRef.current = null;
@@ -2677,7 +2801,7 @@ export default function App() {
   }
 
   return (
-    <main className={`app-shell${isPresenting ? " is-presenting" : ""}`}>
+    <main className={`app-shell${isPresenting ? " is-presenting" : ""}${mobilePanelExpanded ? " editor-expanded" : " editor-collapsed"}${keyboardVisible ? " keyboard-open" : ""}`}>
       <header className="topbar">
         <div className="topbar-main">
           <div className="brand">
@@ -2997,7 +3121,13 @@ export default function App() {
             <button onClick={resetMapView} title="Show whole world" aria-label="Show whole world">
               <Globe2 size={17} />
             </button>
+            {!isPresenting ? (
+              <button className="map-pan-toggle" onClick={() => setMapNavigationEnabled((value) => !value)} aria-label="Move map" aria-pressed={mapNavigationEnabled} title="Move map">
+                <Hand size={17} />
+              </button>
+            ) : null}
           </div>
+          <p className="map-touch-hint">Pinch to zoom. Use two fingers to move.</p>
           {isPresenting ? (
             <div className="presentation-caption" aria-hidden="true">
               <strong className="presentation-caption-brand">AltBorder</strong>
@@ -3015,6 +3145,9 @@ export default function App() {
         {!isPresenting ? (
           <EditorSidePanel
           mode={mode}
+          compactLayout={compactLayout}
+          mobileExpanded={mobilePanelExpanded}
+          onToggleMobilePanel={() => setMobilePanelExpanded((value) => !value)}
           onChangeMode={selectMode}
           readOnly={readOnly}
           attribution={data.attribution}

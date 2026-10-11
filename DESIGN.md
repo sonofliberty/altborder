@@ -173,7 +173,9 @@ The existing editor uses separate danger, warning, and success colors. Keep thes
 
 The map fills its available canvas. The existing desktop editor has a header (68px) and a side panel (340px). Panel spacing is usually (16px). Present map uses the available workspace without the editing panel.
 
-At widths up to (900px), the editor panel moves below the map. At widths up to (640px), panel padding becomes (12px) and ocean labels are hidden. Short screen rules reduce the panel height further. Keep the existing touch and landscape rules in the stylesheet.
+On phones and portrait tablets up to (900px), the editor opens below the map. It starts closed with country context and all four mode controls visible. Show editor opens the scrollable tools; Show more map closes them. Selecting a mode opens its tools, and selecting a country in Inspect opens its details. The open panel uses half of the workspace, or more space when the keyboard is open. Short landscape screens from (600px) to (900px) keep a (300px) side panel.
+
+Mobile controls have a minimum touch size of (44px). Search selection dismisses the touch keyboard. The layout uses the visual viewport and safe-area insets. At widths up to (640px), ocean labels are hidden. Pinch zoom and two-finger panning work in every mode. Move map enables single-finger or mouse panning without editing; choosing a mode returns to editing.
 
 Country names fit within their country geometry. The label layout checks several positions and small rotations. It does not reserve space for a flag. Map geometry and editor control placement remain as implemented.
 

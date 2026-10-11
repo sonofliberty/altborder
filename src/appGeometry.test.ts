@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { interpolateZoom, zoomToBounds } from "./mapZoom";
+import { interpolateZoom, zoomFromTouchPair, zoomToBounds } from "./mapZoom";
 
 describe("map zoom helpers", () => {
   it("keeps a zoom anchor fixed throughout an animated zoom", () => {
@@ -41,5 +41,34 @@ describe("map zoom helpers", () => {
   it("clamps zoom for very large and very small bounds", () => {
     expect(zoomToBounds({ minX: 0, minY: 0, maxX: 10000, maxY: 10000 }, 50).k).toBe(0.8);
     expect(zoomToBounds({ minX: 0, minY: 0, maxX: 0.1, maxY: 0.1 }, 50).k).toBe(30);
+  });
+});
+
+describe("touch map navigation", () => {
+  const start: [{ x: number; y: number }, { x: number; y: number }] = [{ x: 200, y: 240 }, { x: 400, y: 240 }];
+
+  it("keeps the map point under the moving pinch midpoint", () => {
+    const current = { x: -100, y: 40, k: 2 };
+    const next = zoomFromTouchPair(current, start, [{ x: 150, y: 300 }, { x: 550, y: 300 }]);
+    expect(next.k).toBe(4);
+    expect(next.x + 200 * next.k).toBe(350);
+    expect(next.y + 100 * next.k).toBe(300);
+  });
+
+  it("pans with two fingers at constant separation", () => {
+    expect(zoomFromTouchPair({ x: 0, y: 0, k: 1 }, start, [{ x: 260, y: 280 }, { x: 460, y: 280 }]))
+      .toEqual({ x: 60, y: 40, k: 1 });
+  });
+
+  it("clamps pinch zoom without moving its geographic anchor", () => {
+    const next = zoomFromTouchPair({ x: 0, y: 0, k: 20 }, start, [{ x: 0, y: 240 }, { x: 600, y: 240 }]);
+    expect(next.k).toBe(30);
+    expect(next.x + 15 * next.k).toBe(300);
+    expect(zoomFromTouchPair({ x: 0, y: 0, k: 1 }, start, [{ x: 295, y: 240 }, { x: 305, y: 240 }]).k).toBe(0.8);
+  });
+
+  it("handles coincident starting touches without non-finite transforms", () => {
+    const next = zoomFromTouchPair({ x: 0, y: 0, k: 1 }, [start[0], start[0]], start);
+    expect(next).toEqual({ x: 100, y: 0, k: 1 });
   });
 });

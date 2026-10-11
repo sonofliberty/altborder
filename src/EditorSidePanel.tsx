@@ -4,6 +4,7 @@ import {
   Brush,
   Check,
   ChevronDown,
+  ChevronUp,
   Eye,
   GitMerge,
   Image,
@@ -34,6 +35,9 @@ type RegionPanelRow = {
 
 type EditorSidePanelProps = {
   mode: EditMode;
+  compactLayout: boolean;
+  mobileExpanded: boolean;
+  onToggleMobilePanel: () => void;
   onChangeMode: (mode: EditMode) => void;
   readOnly: boolean;
   attribution: string;
@@ -104,10 +108,23 @@ export function EditorSidePanel(props: EditorSidePanelProps) {
   }, [props.mode]);
 
   return (
-    <aside className="side-panel">
+    <aside className="side-panel" aria-label="Country editor">
+      <button
+        className="mobile-panel-toggle"
+        aria-label={props.mobileExpanded ? "Show more map" : "Show editor"}
+        aria-expanded={props.mobileExpanded}
+        aria-controls="editor-panel-content"
+        onClick={props.onToggleMobilePanel}
+      >
+        <span title={props.selectedEntity?.name}>{props.mobileExpanded ? "Country editor" : props.selectedEntity?.name || "Find a country"}</span>
+        <span className="mobile-panel-toggle-action">
+          {props.mobileExpanded ? "Map" : "Tools"}
+          {props.mobileExpanded ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+        </span>
+      </button>
       <PanelNav mode={props.mode} readOnly={props.readOnly} onChangeMode={props.onChangeMode} />
 
-      <div ref={panelScrollRef} className="panel-scroll">
+      <div ref={panelScrollRef} id="editor-panel-content" className="panel-scroll" hidden={props.compactLayout && !props.mobileExpanded}>
         <div key={props.mode} className="panel-mode-content" role="tabpanel" id="editor-mode-panel" aria-labelledby={`editor-mode-${props.mode}`}>
           {props.mode === "inspect" ? <InspectPanel {...props} /> : null}
           {props.mode === "transfer" ? <TransferPanel {...props} /> : null}
@@ -378,7 +395,7 @@ function DividePanel(props: EditorSidePanelProps) {
             ) : null}
           </>
         ) : (
-          <p className="hint">Draw a cut across the country, or click a separate island.</p>
+          <p className="hint">Draw a cut across the country, or select a separate island. Use two fingers to move or zoom the map.</p>
         )}
         </div>
       ) : null}
@@ -812,6 +829,7 @@ function CountrySearchSelect({
               setQuery(resetAfterChange ? "" : option.name);
               setActiveIndex(0);
               setOpen(false);
+              if (window.matchMedia("(pointer: coarse)").matches) inputRef.current?.blur();
             }
           }}
         />
@@ -854,6 +872,7 @@ function CountrySearchSelect({
                   setQuery(resetAfterChange ? "" : option.name);
                   setActiveIndex(0);
                   setOpen(false);
+                  if (window.matchMedia("(pointer: coarse)").matches) inputRef.current?.blur();
                 }}
               >
                 <span>{option.name}</span>

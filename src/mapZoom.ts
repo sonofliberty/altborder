@@ -50,3 +50,18 @@ export function zoomToBounds(bounds: ProjectedBounds, padding: number): ZoomStat
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+// Anchor the country under the initial midpoint while the fingers move and spread.
+export function zoomFromTouchPair(
+  current: ZoomState,
+  start: [{ x: number; y: number }, { x: number; y: number }],
+  next: [{ x: number; y: number }, { x: number; y: number }],
+): ZoomState {
+  const distance = (pair: typeof start) => Math.hypot(pair[1].x - pair[0].x, pair[1].y - pair[0].y);
+  const startDistance = distance(start);
+  const k = clamp(current.k * (startDistance > 0 ? distance(next) / startDistance : 1), minZoom, maxZoom);
+  const ratio = k / current.k;
+  const startCenter = { x: (start[0].x + start[1].x) / 2, y: (start[0].y + start[1].y) / 2 };
+  const nextCenter = { x: (next[0].x + next[1].x) / 2, y: (next[0].y + next[1].y) / 2 };
+  return { k, x: nextCenter.x - (startCenter.x - current.x) * ratio, y: nextCenter.y - (startCenter.y - current.y) * ratio };
+}
