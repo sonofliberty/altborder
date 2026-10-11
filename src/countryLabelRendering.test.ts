@@ -57,7 +57,6 @@ describe("country underlay rendering", () => {
     expect(appSource).toContain("hasTransferredOwnershipChanges(");
     expect(appSource).toContain("baseCountryByEntityId.get(baseEntityId)?.geometry");
     expect(appSource).toContain("renderRegionTopologyGeometryById.get(regionId)");
-    expect(appSource).toContain("simplifyPolygonalGeometry(geometry, mapRenderSimplifyTolerance)");
     expect(appSource).not.toContain("renderGapSensitiveEntityIds");
     expect(appSource).not.toContain("baseFillGeometry");
   });

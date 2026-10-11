@@ -1,5 +1,6 @@
 import type { Geometry, Position } from "geojson";
 import type { MapData } from "./types";
+import { mapInBatches, yieldToMainThread } from "./mapWork";
 
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 const coordinateDigits = new Int8Array(128).fill(-1);
@@ -81,11 +82,15 @@ function decodeGeometry(geometry: PackedGeometry): Geometry {
   }
 }
 
-export function decodePackedMapData(value: unknown): MapData {
+function readPackedMapData(value: unknown): PackedMapData {
   if (!value || typeof value !== "object" || (value as { format?: string }).format !== "polyline-2") {
     throw new Error("Map data has an unsupported format.");
   }
-  const packed = value as PackedMapData;
+  return value as PackedMapData;
+}
+
+export function decodePackedMapData(value: unknown): MapData {
+  const packed = readPackedMapData(value);
   return {
     version: packed.version,
     attribution: packed.attribution,
@@ -96,5 +101,36 @@ export function decodePackedMapData(value: unknown): MapData {
       ...row,
       geometry: decodeGeometry(row.geometry) as MapData["boundaryEdges"][number]["geometry"],
     })),
+  };
+}
+
+/** Decode the shipping bundle while allowing loading feedback and input to run. */
+export async function decodePackedMapDataInBatches(
+  value: unknown,
+  isCancelled: () => boolean,
+): Promise<MapData | null> {
+  const packed = readPackedMapData(value);
+  await yieldToMainThread();
+  const baseCountries = await mapInBatches(packed.baseCountries,
+    (row) => ({ ...row, geometry: decodeGeometry(row.geometry) }), isCancelled);
+  if (!baseCountries) return null;
+  await yieldToMainThread();
+  const regions = await mapInBatches(packed.regions,
+    (row) => ({ ...row, geometry: decodeGeometry(row.geometry) }), isCancelled);
+  if (!regions) return null;
+  await yieldToMainThread();
+  const boundaryEdges = await mapInBatches(packed.boundaryEdges,
+    (row) => ({
+      ...row,
+      geometry: decodeGeometry(row.geometry) as MapData["boundaryEdges"][number]["geometry"],
+    }), isCancelled);
+  if (!boundaryEdges) return null;
+  return {
+    version: packed.version,
+    attribution: packed.attribution,
+    countries: packed.countries,
+    baseCountries,
+    regions,
+    boundaryEdges,
   };
 }

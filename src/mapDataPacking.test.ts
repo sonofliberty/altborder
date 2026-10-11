@@ -1,11 +1,30 @@
 import { describe, expect, it } from "vitest";
 import source from "../public/data/map-data.json";
 import packed from "../public/data/map-data.packed.json";
-import { decodePackedMapData } from "./mapDataPacking";
+import { decodePackedMapData, decodePackedMapDataInBatches } from "./mapDataPacking";
 
 describe("packed map data", () => {
   it("preserves every country, region, and boundary coordinate", () => {
     expect(decodePackedMapData(packed)).toEqual(source);
+  });
+
+  it("preserves the same data when decoding in browser batches", async () => {
+    await expect(decodePackedMapDataInBatches(packed, () => false)).resolves.toEqual(source);
+  });
+
+  it("discards data when loading is cancelled", async () => {
+    let cancelled = false;
+    const decoding = decodePackedMapDataInBatches(packed, () => cancelled);
+    cancelled = true;
+    await expect(decoding).resolves.toBeNull();
+  });
+
+  it("rejects malformed data when decoding in browser batches", async () => {
+    await expect(decodePackedMapDataInBatches({ format: "other" }, () => false)).rejects.toThrow("unsupported format");
+    await expect(decodePackedMapDataInBatches({
+      ...packed,
+      regions: [{ ...packed.regions[0], geometry: { type: "Polygon", coordinates: ["!"] } }],
+    }, () => false)).rejects.toThrow("invalid coordinate");
   });
 
   it("rejects an unknown format", () => {

@@ -523,7 +523,6 @@ function CountryContext({
       ) : (
         <>
           <div className="country-intro">
-            <span className="country-intro-kicker">The atlas is yours</span>
             <h2>Your version of the world</h2>
             <p>
               {showEditingFields
@@ -594,11 +593,11 @@ function CountrySummary({ entity, onClear }: { entity: CountryEntity; onClear?: 
         <img className="country-summary-flag" src={getCountryFlagUrl(getCountryFlag(entity))} alt="" />
       </div>
       <div className="country-summary-text">
-        <span className="country-summary-kicker">{entity.isCustom ? "Custom country" : "Selected country"}</span>
         <h2 className="country-summary-name">{entity.name}</h2>
         <div className="country-summary-meta">
           <span className="country-swatch" style={{ backgroundColor: entity.color }} aria-hidden="true" />
           <span>{regionCount.toLocaleString()} {regionCount === 1 ? "region" : "regions"}</span>
+          {entity.isCustom ? <span>Custom country</span> : null}
         </div>
       </div>
       {onClear ? (

@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { geoGraticule, geoNaturalEarth1, geoPath } from "d3-geo";
-import type { FeatureCollection, Geometry, Position } from "geojson";
+import type { Geometry, Position } from "geojson";
 import type { GeoProjection } from "d3-geo";
 import type {
   BoundaryEdgeRecord,
@@ -25,7 +25,6 @@ import type {
   EditMode,
   EditorSnapshot,
   HistoryState,
-  MapData,
   RegionRecord,
 } from "./types";
 import {
@@ -83,7 +82,8 @@ import { batchBoundaryPaths, type ProjectedBoundaryEdge } from "./boundaryEdges"
 import { buildSelectedRegionAdjacency } from "./regionAdjacency";
 import { EditorSidePanel } from "./EditorSidePanel";
 import { mapInBatches, yieldToMainThread } from "./mapWork";
-import { decodePackedMapData } from "./mapDataPacking";
+import { decodePackedMapDataInBatches } from "./mapDataPacking";
+import { prepareMapRendering, type PreparedMapRendering } from "./mapPreparation";
 import {
   geometryToSvgPath,
   projectGeometryToPathData,
@@ -94,11 +94,11 @@ import { getCountryLabelCacheKey, getCountryLabelGeometry } from "./countryLabel
 import {
   removePolygonalGeometryHoles,
   removeSmallPolygonalGeometryComponents,
-  simplifyPolygonalGeometry,
 } from "./geometrySimplify";
 
 const viewportWidth = 1000;
 const viewportHeight = 560;
+const emptyProjection = geoNaturalEarth1();
 const minZoom = 0.8;
 const maxZoom = 30;
 const divideLinePointSpacing = 0.45;
@@ -182,7 +182,9 @@ type ProjectedBoundaryEdgeWithBounds = ProjectedBoundaryEdge & {
 type GeometrySplitModule = typeof import("./geometrySplit");
 
 export default function App() {
-  const [data, setData] = useState<MapData | null>(null);
+  const [preparedMap, setPreparedMap] = useState<PreparedMapRendering | null>(null);
+  const data = preparedMap?.data ?? null;
+  const projection = preparedMap?.projection ?? emptyProjection;
   const [history, setHistory] = useState<HistoryState | null>(null);
   const [mode, setMode] = useState<EditMode>("inspect");
   const [selectedEntityId, setSelectedEntityId] = useState<string>("");
@@ -364,7 +366,20 @@ export default function App() {
         if (!response.ok) {
           throw new Error(`${response.status} ${response.statusText}`);
         }
-        const mapData = applyPoliticalMapPalette(decodePackedMapData(await response.json()));
+        const decodedMapData = await decodePackedMapDataInBatches(await response.json(), () => cancelled);
+        if (!decodedMapData || cancelled) return;
+        await yieldToMainThread();
+        if (cancelled) return;
+        const mapData = applyPoliticalMapPalette(decodedMapData);
+        await yieldToMainThread();
+        if (cancelled) return;
+        const prepared = await prepareMapRendering(
+          mapData,
+          [[16, 18], [viewportWidth - 16, viewportHeight - 22]],
+          mapRenderSimplifyTolerance,
+          () => cancelled,
+        );
+        if (!prepared || cancelled) return;
         const encoded = readShareFromHash(window.location.hash);
         let initial = createInitialSnapshot(mapData);
         let shouldReadOnly = false;
@@ -381,7 +396,7 @@ export default function App() {
         }
 
         if (!cancelled) {
-          setData(mapData);
+          setPreparedMap(prepared);
           setHistory({ present: initial, past: [], future: [] });
           setReadOnly(shouldReadOnly);
         }
@@ -448,13 +463,12 @@ export default function App() {
   }, [effectiveRegions]);
 
   const renderRegionTopologyGeometryById = useMemo(() => {
-    return new Map(
-      effectiveRegions.map((region) => [
-        region.id,
-        removePolygonalGeometryHoles(region.geometry),
-      ]),
-    );
-  }, [effectiveRegions]);
+    const geometries = new Map(preparedMap?.topologyGeometryById);
+    for (const region of customRegionRecords) {
+      geometries.set(region.id, removePolygonalGeometryHoles(region.geometry));
+    }
+    return geometries;
+  }, [customRegionRecords, preparedMap]);
 
   const getRegionDisplayName = useCallback((regionId: string): string => {
     return regionNameOverrides[regionId] || regionById.get(regionId)?.name || regionId;
@@ -484,18 +498,12 @@ export default function App() {
   }, [data]);
 
   const renderRegionGeometryById = useMemo(() => {
-    const geometries = new Map<string, Geometry>();
-    if (!data) return geometries;
-
-    for (const region of data.regions) {
-      const geometry = renderRegionTopologyGeometryById.get(region.id) ?? region.geometry;
-      geometries.set(region.id, simplifyPolygonalGeometry(geometry, mapRenderSimplifyTolerance));
-    }
+    const geometries = new Map(preparedMap?.renderGeometryById);
     for (const region of customRegionRecords) {
       geometries.set(region.id, renderRegionTopologyGeometryById.get(region.id) ?? region.geometry);
     }
     return geometries;
-  }, [customRegionRecords, data, renderRegionTopologyGeometryById]);
+  }, [customRegionRecords, preparedMap, renderRegionTopologyGeometryById]);
 
   useEffect(() => {
     countryUnderlayCacheRef.current.clear();
@@ -511,24 +519,6 @@ export default function App() {
           geometry: country.geometry,
         },
       ]),
-    );
-  }, [data]);
-
-  const projection = useMemo(() => {
-    const collection: FeatureCollection = {
-      type: "FeatureCollection",
-      features: (data?.regions ?? []).map((region) => ({
-        type: "Feature",
-        properties: { id: region.id },
-        geometry: region.geometry,
-      })),
-    };
-    return geoNaturalEarth1().fitExtent(
-      [
-        [16, 18],
-        [viewportWidth - 16, viewportHeight - 22],
-      ],
-      collection,
     );
   }, [data]);
 
@@ -2699,7 +2689,9 @@ export default function App() {
           </div>
           <label className="title-field">
             {readOnly || isPresenting ? (
-              <strong className="scenario-title-text">{snapshot.title || "Untitled Border Experiment"}</strong>
+              <strong className="scenario-title-text" title={snapshot.title || "Untitled Border Experiment"}>
+                {snapshot.title || "Untitled Border Experiment"}
+              </strong>
             ) : (
               <input
                 aria-label="Scenario"

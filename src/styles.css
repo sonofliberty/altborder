@@ -937,14 +937,6 @@ textarea {
   padding: 22px 4px 16px;
 }
 
-.country-intro-kicker {
-  color: var(--color-primary);
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
 .country-intro h2 {
   color: var(--color-text-strong);
   font-family: var(--font-atlas);
@@ -1064,12 +1056,12 @@ textarea {
 .country-summary-clear {
   border-color: transparent;
   box-shadow: none;
-  min-height: 30px;
+  min-height: var(--control-height);
   grid-column: 2;
   grid-row: 1;
   align-self: start;
   padding: 0;
-  width: 30px;
+  width: var(--control-height);
 }
 
 .country-swatch {
@@ -1118,18 +1110,11 @@ textarea {
   overflow-wrap: anywhere;
 }
 
-.country-summary-kicker {
-  color: var(--color-primary);
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 .country-summary-meta {
   align-items: center;
   color: var(--color-muted);
   display: flex;
+  flex-wrap: wrap;
   gap: 7px;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
