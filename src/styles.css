@@ -438,6 +438,7 @@ textarea {
 
 .map-stage {
   background: var(--color-map-ocean);
+  container: map-canvas / size;
   min-height: 0;
   overflow: hidden;
   overscroll-behavior: contain;
@@ -863,6 +864,49 @@ textarea {
 .map-pan-toggle[aria-pressed="true"] {
   background: var(--color-primary-soft);
   color: var(--color-primary-hover);
+}
+
+.map-theme-control {
+  position: absolute;
+  z-index: 4;
+  left: 16px;
+  bottom: 70px;
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .map-theme-control {
+    left: max(12px, env(safe-area-inset-left));
+    bottom: 72px;
+  }
+}
+
+@container map-canvas (max-height: 240px) and (max-width: 600px) {
+  .map-theme-control {
+    bottom: 12px;
+    left: auto;
+    right: max(12px, env(safe-area-inset-right));
+  }
+
+  .map-theme-selector {
+    gap: 0;
+    padding: 3px;
+  }
+
+  .map-theme-label {
+    display: none;
+  }
+
+  .map-theme-option span {
+    min-width: 44px;
+    padding: 0 6px;
+  }
+
+  .divide-map-guide {
+    left: 12px;
+    max-width: calc(100% - 24px);
+    padding: 6px 8px;
+    top: 8px;
+  }
 }
 
 .panel-scroll[hidden] {
@@ -2501,7 +2545,8 @@ details[open] > summary > .disclosure-icon {
 }
 
 /* Keep navigation clear when the visible map is shortened by a keyboard. */
-.keyboard-open .map-touch-hint {
+.keyboard-open .map-touch-hint,
+.map-stage:has(.divide-map-guide) .map-touch-hint {
   display: none;
 }
 

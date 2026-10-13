@@ -1,6 +1,6 @@
 ---
 name: "AltBorder"
-description: "Political Command map with the existing dark editor."
+description: "Two political map themes with the existing dark and gold editor."
 colors:
   editor-text: "#dddcd3"
   editor-text-strong: "#f3eedf"
@@ -39,15 +39,64 @@ colors:
   map-country-sand: "#a69b78"
   map-country-sage: "#739087"
   map-country-violet: "#8e8499"
+  map-hoi4-ocean: "#253248"
+  map-hoi4-coast: "#34404c"
+  map-hoi4-country-border: "#202630"
+  map-hoi4-region-border: "#10151b"
+  map-hoi4-label: "#202731"
+  map-hoi4-label-outline: "#d8d9d3"
+  map-hoi4-ocean-label: "#c1c9d6"
+  map-hoi4-ocean-label-outline: "#29364a"
+  map-hoi4-graticule: "#9aafc8"
+  map-hoi4-region-label: "#e5e5de"
+  map-hoi4-region-label-outline: "#222d30"
+  map-hoi4-country-olive: "#777c6b"
+  map-hoi4-country-blue: "#53779b"
+  map-hoi4-country-rose: "#99738b"
+  map-hoi4-country-sand: "#a99b66"
+  map-hoi4-country-green: "#52755a"
+  map-hoi4-country-violet: "#766f84"
+  map-hoi4-country-clay: "#a07d6d"
+  map-hoi4-country-gray: "#929da5"
+  map-eu4-ocean: "#548798"
+  map-eu4-coast: "#626b60"
+  map-eu4-country-border: "#4c4b41"
+  map-eu4-region-border: "#4b4d40"
+  map-eu4-label: "#172324"
+  map-eu4-label-outline: "#f1e4b7"
+  map-eu4-ocean-label: "#183540"
+  map-eu4-ocean-label-outline: "#a6c5c4"
+  map-eu4-graticule: "#c9e0db"
+  map-eu4-region-label: "#273c34"
+  map-eu4-region-label-outline: "#f1e8cd"
+  map-eu4-coastal-shelf: "#bee2d5"
+  map-eu4-country-sand: "#c5bc8b"
+  map-eu4-country-blue: "#547bd1"
+  map-eu4-country-rose: "#dd8dad"
+  map-eu4-country-yellow: "#ebcc55"
+  map-eu4-country-green: "#52ac79"
+  map-eu4-country-violet: "#b795bf"
+  map-eu4-country-clay: "#bc7d61"
+  map-eu4-country-gray: "#9db6bb"
 typography:
   map-country:
-    fontFamily: "\"Trebuchet MS\", Arial, sans-serif"
-    fontWeight: 700
+    fontFamily: "\"Barlow Map\", sans-serif"
+    fontWeight: 600
+    letterSpacing: "0.035em"
+  map-eu4-country:
+    fontFamily: "\"Cinzel Map\", serif"
+    fontWeight: 500
+    letterSpacing: "0.075em"
   map-ocean:
-    fontFamily: "\"Palatino Linotype\", \"Book Antiqua\", Palatino, Georgia, serif"
+    fontFamily: "\"Barlow Map\", sans-serif"
     fontSize: "9px"
-    fontWeight: 400
-    letterSpacing: "0.12em"
+    fontWeight: 600
+    letterSpacing: "0.16em"
+  map-eu4-ocean:
+    fontFamily: "\"Cinzel Map\", serif"
+    fontSize: "9px"
+    fontWeight: 500
+    letterSpacing: "0.19em"
   editor-body:
     fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
   editor-title:
@@ -84,6 +133,7 @@ typography:
     fontWeight: 650
     letterSpacing: "0.16em"
 rounded:
+  theme-option: "3px"
   control: "4px"
   card: "8px"
   swatch: "5px"
@@ -125,63 +175,89 @@ components:
     rounded: "{rounded.swatch}"
     height: "34px"
     width: "34px"
-  political-map:
-    backgroundColor: "{colors.map-ocean}"
-    textColor: "{colors.map-label}"
+  map-hoi4:
+    backgroundColor: "{colors.map-hoi4-ocean}"
+    textColor: "{colors.map-hoi4-label}"
     typography: "{typography.map-country}"
+  map-eu4:
+    backgroundColor: "{colors.map-eu4-ocean}"
+    textColor: "{colors.map-eu4-label}"
+    typography: "{typography.map-eu4-country}"
+  map-theme-selector:
+    backgroundColor: "{colors.editor-surface}"
+    rounded: "{rounded.control}"
+    padding: "3px 3px 3px 12px"
+  map-theme-option:
+    textColor: "{colors.editor-text}"
+    typography: "{typography.editor-label}"
+    rounded: "{rounded.theme-option}"
+    padding: "0px 10px"
+  map-theme-option-selected:
+    backgroundColor: "{colors.editor-primary}"
+    textColor: "{colors.editor-primary-ink}"
+  map-theme-option-selected-hover:
+    backgroundColor: "{colors.editor-primary-hover}"
 ---
 
 # Design System: AltBorder
 
 ## Overview
 
-**Creative North Star: "Political Command — map only"**
+**Creative North Star: "Two political maps, one editor"**
 
-The map uses muted country colors, a dark slate-blue sea, strong country borders, and uppercase country names. The user selected Political Command from working map previews. The map is drawn with SVG and code. This change adds no shipping raster images.
+HOI4 uses dark blue water, muted country colors, strong terrain relief, thin borders, and outlined Barlow names. EU4 uses brighter political colors, pale coastal water, fine borders, subtle relief, and spaced Cinzel names. These are original AltBorder styles informed by the two games. HOI4 is the default theme.
 
-The editor keeps its existing dark surfaces, warm gold actions, serif titles, and compact controls. The map direction does not replace the editor identity. The map must remain easy to read while the user changes countries and regions.
+The editor keeps its dark surfaces, warm gold actions, serif titles, and compact controls. The map combines SVG geometry with projected raster layers. A theme changes the map appearance. Country ownership, geometry, names, and explicit colors stay intact.
 
 **Key Characteristics:**
 
-- Strong country borders with less visible region borders at low zoom.
-- Six default country colors with exact custom scenario colors.
-- Uppercase sans-serif country names without map flags.
-- Existing dark editor with warm gold controls.
+- Two distinct map palettes with thin country borders.
+- Strong HOI4 relief and subtle EU4 relief over live country fills.
+- Uppercase Barlow or Cinzel country names without map flags.
+- Existing dark editor with warm gold controls and a two-choice map theme control.
 
 ## Colors
 
-The map uses muted political colors. The unchanged editor uses dark green-gray surfaces and warm gold controls. Token names begin with `map-` or `editor-` to show their scope. The frontmatter contains the exact color values.
+The HOI4 palette is muted and dark. The EU4 palette is brighter, with clear political colors. The editor uses dark green-gray surfaces and warm gold controls. The frontmatter contains the exact color values.
 
 ### Primary
 
-- **Editor gold:** Primary actions, active control marks, and focus. The brighter hover color marks interaction.
-- **Map country palette:** Olive, blue, rose, sand, sage, and violet identify default countries. These colors have equal status; they do not represent action priority.
+- **Editor gold:** Primary actions, the selected theme, active control marks, and focus. The brighter hover color marks interaction.
+- **HOI4 country palette:** Olive, blue, rose, sand, green, violet, clay, and gray form the fallback palette.
+- **EU4 country palette:** Sand, blue, rose, yellow, green, violet, clay, and gray form the fallback palette.
+
+Country colors have equal status. Named countries use the approved assignments in `src/mapThemes.ts`. Other base countries use the theme's eight-color fallback palette, assigned in a stable order that avoids colors already used by adjacent countries.
 
 ### Neutral
 
-- **Dark slate-blue sea:** Map background and ocean fill.
-- **Dark map outlines:** Coastlines and country borders. Region borders use lower opacity.
-- **Country name ink and pale outline:** Dark letters with a pale edge remain visible over the country fills.
-- **Pale ocean names:** Full-opacity text on the sea. Do not reduce its opacity.
+- **Theme seas and coastlines:** HOI4 has dark blue water and a dark coast. EU4 has blue-green water, a fine coast, and pale coastal shelves.
+- **Theme outlines:** Country and region boundaries use separate theme colors and widths.
+- **Theme name ink and outline:** Country, ocean, and region text use separate ink and outline pairs for each theme.
 - **Editor surfaces and text:** Dark backgrounds, light text, muted supporting text, and visible control borders retain the existing editor appearance.
 
-### State colors
+### State colors and compatibility
 
-The existing editor uses separate danger, warning, and success colors. Keep these for their current feedback states.
+The editor uses separate danger, warning, and success colors. Keep these for their current feedback states.
 
-**The Map Scope Rule.** Apply Political Command to the map. Keep the existing editor identity.
+The six `map-country-*` colors remain the canonical base-state palette in `src/mapVisualStyle.ts`. They support change detection and old shared scenarios. The unqualified `map-ocean`, `map-coast`, border, label, and graticule colors record the base CSS fallbacks. They do not define the active map theme. Active appearance uses `map-hoi4-*` or `map-eu4-*` tokens. The loaded theme stylesheet is authoritative for rendered coast and border values.
 
-**The Scenario Color Rule.** Apply the default palette before scenario colors. Keep every explicit scenario color exact.
+**The Map Scope Rule.** Apply theme colors and map fonts to the map. Keep the existing editor identity.
+
+**The Scenario Color Rule.** Derive default display colors from the selected theme and the canonical base map. Preserve custom countries and explicit entity colors, including an explicit choice equal to the stored base color. Raster shading may change their visible tone without changing their stored fill color.
 
 ## Typography
 
-**Country font:** Trebuchet MS, then Arial and sans-serif. Country names use bold uppercase letters. Label size and spacing depend on the available country area. The fitting code uses map-space sizes from (0.5) to (24), then applies the current screen-size limit. Do not replace this with one fixed label size.
+**HOI4 map font:** Self-hosted Barlow Semibold, registered as Barlow Map, with a sans-serif fallback. Country names use uppercase letters, weight (600), and spacing (0.035em). Their pale outline is (0.075em).
 
-**Ocean font:** The existing atlas serif stack, in italic. Ocean labels stay centered and retain their spacing. They are hidden on narrow screens.
+**EU4 map font:** Self-hosted Cinzel Medium, registered as Cinzel Map, with a serif fallback. Country names use uppercase letters, weight (500), and spacing (0.075em). Their pale outline is (0.025em).
 
-**Editor font:** The existing system sans-serif stack for controls and text. The atlas serif stack remains in scenario titles, country headings, and supporting atlas text. The frontmatter records the existing type roles; it does not prescribe a new body size.
+Country label size and position depend on the available country area. The fitting code uses map-space sizes from (0.5) to (24), then applies the current screen-size limit. Keep this geometry fitting and its text-length adjustment. Do not replace it with one fixed label size. Theme CSS supplies the effective weight and letter spacing.
 
-**The Map Name Rule.** Use uppercase sans-serif country names on the map. Keep flags in the editor.
+**Ocean names:** Use the current theme font at (9px), in normal style. HOI4 uses spacing (0.16em) and an outline (0.13em). EU4 uses spacing (0.19em) and an outline (0.065em). Keep full fill opacity. Ocean names are hidden on narrow screens.
+
+**Editor font:** The existing system sans-serif stack for controls and text. The atlas serif stack remains in scenario titles, country headings, and supporting atlas text. The frontmatter records the existing type roles; it does not prescribe a new body size. Region labels retain the editor sans-serif and use theme ink and outline colors. The base Trebuchet country font is a legacy CSS fallback, not the font for either active theme.
+
+**The Map Name Rule.** Use the selected theme's uppercase country names on the map. Keep flags in the editor.
 
 ## Layout
 
@@ -191,17 +267,29 @@ On phones and portrait tablets up to (900px), the editor opens below the map. It
 
 Mobile controls have a minimum touch size of (44px). Search selection dismisses the touch keyboard. The layout uses the visual viewport and safe-area insets. At widths up to (640px), ocean labels are hidden. Pinch zoom and two-finger panning work in every mode. Move map enables single-finger or mouse panning without editing; choosing a mode returns to editing.
 
+The map theme control sits above the zoom controls. Its desktop position is (16px) from the left and (70px) from the bottom. Up to (900px), or with a coarse pointer, it uses the left safe-area inset with a minimum of (12px), and a bottom offset of (72px). It remains available in shared and presentation views.
+
+When the map canvas is at most (240px) high and (600px) wide, place the theme control beside the zoom controls at the lower right. Hide its decorative label, retain its accessible legend, and keep each option at least (44px) wide. Use (12px) bottom and safe-area right insets. Keep Divide instructions at the top with (8px) clearance. Hide the general touch hint while the Divide guide is visible.
+
 Country names fit within their country geometry. The label layout checks several positions and small rotations. It does not reserve space for a flag. Map geometry and editor control placement remain as implemented.
 
 ## Elevation & Depth
 
-The map uses flat country fills, dark boundaries, and pale text outlines. It has no added terrain image or raster texture. The graticule remains a low-opacity guide.
+Projected raster layers add geographic texture. The ocean raster sits below country fills, at opacity (0.6) for HOI4 and (0.17) for EU4. Theme land rasters sit above country fills and are clipped to the current land paths. HOI4 carries strong shaded relief; EU4 carries subtle relief. Raster alpha is part of the prepared assets. Political colors are not baked into the textures.
 
-The editor keeps its existing header, panel, and dialog shadows. The sidecar records their exact values. Selection outlines and transfer feedback retain their existing order above the map. Reduced-motion rules continue to control their animation.
+EU4 adds three pale coastal shelf strokes below the country fills. Their outer, middle, and inner widths are (18px), (10px), and (4px), with opacity (0.08), (0.12), and (0.18). The graticule keeps width (0.6px), with opacity (0.035) for HOI4 and (0.07) for EU4. Country outlines and editing feedback stay above the land texture.
+
+The editor keeps its existing header, panel, and dialog shadows. The sidecar records their exact values. Reduced-motion rules continue to control editing feedback. Theme changes add no decorative animation.
+
+**The Live Land Rule.** Align raster layers to the active map projection and clip land textures to the current country paths. Theme layers must not take pointer input. Preserve asset provenance in `public/map-themes/SOURCES.md` and the supplied font licenses.
+
+Clip the ocean texture to the projected world outline, so raster pixels outside the poles and map edges cannot show.
+
+Use 2400px overview textures until the settled zoom, canvas size, and device pixel ratio require more pixels. Keep the overview visible while full detail loads and decodes. A failed detail request must retain the overview. Both levels use the same projection, colors, and clipping paths.
 
 ## Shapes
 
-Country shapes come from the map geometry. Borders use rounded joins and non-scaling strokes. Country border width increases from (1.55px) to a maximum of (1.8px) as zoom increases.
+Country shapes come from the map geometry. Borders use rounded joins and non-scaling strokes. Country border width is (0.95px) for HOI4 and (0.8px) for EU4. Both themes use a coastline width of (0.6px). Theme CSS overrides the legacy country-width presentation attribute; do not restore its heavier zoom-based border as the active theme rule.
 
 The editor keeps small control corners, larger tool-card corners, and near-square flag frames. The frontmatter records these radii. Do not apply card corners to map geometry.
 
@@ -209,11 +297,24 @@ The editor keeps small control corners, larger tool-card corners, and near-squar
 
 ### Political map
 
-Use the six-color default palette and the country assignment helper. Build country adjacency from shared region boundaries. Assign colors in a stable order so every pair of neighboring default countries has different colors. Named country colors are preferences and change when a neighbor requires it. Custom countries remain unchanged by that helper; scenario colors are restored after the default palette.
+Use the selected theme's named country assignments and adjacency-aware fallback palette. Compute display colors from the immutable map baseline. Theme switching must not write derived default colors back into entity state. Preserve custom countries, explicit color markers, and colors that differ from the canonical baseline. A saved theme is an optional `mapTheme` field in the existing version (1) scenario payload. An absent theme uses HOI4; EU4 is stored explicitly.
 
-Country outlines remain stronger than region outlines. Below zoom (2.4), region borders use opacity (0.08) and width (0.4px). From zoom (2.4), opacity becomes (0.28). From zoom (5.5), opacity becomes (0.58) and width (0.55px). Active region borders use opacity (0.7) and width (0.6px).
+Country outlines remain stronger than region outlines. Region detail increases at zoom (2.4) and (5.5):
 
-Country names have a pale stroke (0.1em) behind the dark fill. They contain no flags. Ocean labels use full opacity. The graticule uses opacity (0.09) and width (0.6px).
+| Theme | Below 2.4 | 2.4 to below 5.5 | From 5.5 |
+| --- | --- | --- | --- |
+| HOI4 | 0.35px, opacity 0.1 | 0.35px, opacity 0.19 | 0.45px, opacity 0.3 |
+| EU4 | 0.4px, opacity 0.16 | 0.4px, opacity 0.34 | 0.5px, opacity 0.53 |
+
+Active region borders use width (0.6px) and opacity (0.7) in both themes. Country labels contain no flags. Ocean labels retain full opacity where visible. Theme land and sea textures move with the existing zoom group; they do not change hit areas or country geometry.
+
+### Map theme control
+
+A fieldset named Map theme contains native radio inputs for HOI4 and EU4. Keep one radio group, its visible label, full theme-name tooltips, and keyboard focus. The selected option uses editor gold and dark text; hover uses the brighter gold. Other options use editor text and gain a muted surface with a gold border on hover.
+
+The fieldset has a thin editor border, corners (4px), and padding (3px 3px 3px 12px). Options have corners (3px), minimum width (50px), padding (0px 10px), and the standard control height (38px). At widths up to (900px), or with a coarse pointer, their minimum height is (44px). Focus uses an outline (3px) with offset (2px). Forced-colors mode marks the checked radio with a Highlight border and inset outline.
+
+Selecting a theme changes the map immediately. Editable scenarios record that choice in Undo history. A shared-map viewer can change the display without entering edit mode. Sharing includes the selected theme through the existing scenario format.
 
 ### Editor buttons
 
@@ -249,8 +350,10 @@ When a custom country with one region is annexed, keep its country name as the r
 
 ### Do:
 
-- Do use the six map country colors for the default map.
-- Do keep custom country colors exact when a scenario is restored.
+- Do use the selected theme for default country display colors.
+- Do keep the six-color canonical baseline for state and shared-link compatibility.
+- Do keep country borders thin: HOI4 (0.95px) and EU4 (0.8px).
+- Do preserve explicit country color values when themes change or scenarios load.
 - Do show more region detail as the user zooms in.
 - Do keep ocean labels at full opacity where they are visible.
 - Do keep selection feedback, keyboard focus, and reduced-motion behavior.
@@ -260,4 +363,5 @@ When a custom country with one region is annexed, keep its country name as the r
 - Don't apply the map palette or country font to editor controls.
 - Don't add flags to country names on the map.
 - Don't use the default palette to replace explicit scenario colors.
-- Don't add raster textures as part of this map direction.
+- Don't bake political colors into the terrain rasters.
+- Don't replace live map geometry or input targets with raster artwork.

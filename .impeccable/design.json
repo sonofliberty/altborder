@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-29T00:45:13.154779+00:00",
+  "generatedAt": "2026-10-13T01:42:23.841315+00:00",
   "title": "Design System: AltBorder",
   "extensions": {
     "colorMeta": {
@@ -328,7 +328,7 @@
       },
       "map-ocean": {
         "role": "neutral",
-        "displayName": "Map Ocean",
+        "displayName": "Legacy Map Ocean",
         "tonalRamp": [
           "oklch(15.00% 0.03779 241.71)",
           "oklch(26.43% 0.03779 241.71)",
@@ -342,7 +342,7 @@
       },
       "map-coast": {
         "role": "neutral",
-        "displayName": "Map Coast",
+        "displayName": "Legacy Map Coast",
         "tonalRamp": [
           "oklch(15.00% 0.03337 248.88)",
           "oklch(26.43% 0.03337 248.88)",
@@ -356,7 +356,7 @@
       },
       "map-country-border": {
         "role": "neutral",
-        "displayName": "Map Country Border",
+        "displayName": "Legacy Map Country Border",
         "tonalRamp": [
           "oklch(15.00% 0.01234 258.37)",
           "oklch(26.43% 0.01234 258.37)",
@@ -370,7 +370,7 @@
       },
       "map-region-border": {
         "role": "neutral",
-        "displayName": "Map Region Border",
+        "displayName": "Legacy Map Region Border",
         "tonalRamp": [
           "oklch(15.00% 0.01234 258.37)",
           "oklch(26.43% 0.01234 258.37)",
@@ -384,7 +384,7 @@
       },
       "map-label": {
         "role": "neutral",
-        "displayName": "Map Label",
+        "displayName": "Legacy Map Label",
         "tonalRamp": [
           "oklch(15.00% 0.01315 253.03)",
           "oklch(26.43% 0.01315 253.03)",
@@ -398,7 +398,7 @@
       },
       "map-label-outline": {
         "role": "neutral",
-        "displayName": "Map Label Outline",
+        "displayName": "Legacy Map Label Outline",
         "tonalRamp": [
           "oklch(15.00% 0.01371 97.46)",
           "oklch(26.43% 0.01371 97.46)",
@@ -412,7 +412,7 @@
       },
       "map-ocean-label": {
         "role": "neutral",
-        "displayName": "Map Ocean Label",
+        "displayName": "Legacy Map Ocean Label",
         "tonalRamp": [
           "oklch(15.00% 0.00415 157.18)",
           "oklch(26.43% 0.00415 157.18)",
@@ -426,7 +426,7 @@
       },
       "map-graticule": {
         "role": "neutral",
-        "displayName": "Map Graticule",
+        "displayName": "Legacy Map Graticule",
         "tonalRamp": [
           "oklch(15.00% 0.01295 228.95)",
           "oklch(26.43% 0.01295 228.95)",
@@ -440,7 +440,7 @@
       },
       "map-country-olive": {
         "role": "secondary",
-        "displayName": "Map Country Olive",
+        "displayName": "Legacy Map Country Olive",
         "tonalRamp": [
           "oklch(15.00% 0.01941 117.53)",
           "oklch(26.43% 0.01941 117.53)",
@@ -454,7 +454,7 @@
       },
       "map-country-blue": {
         "role": "secondary",
-        "displayName": "Map Country Blue",
+        "displayName": "Legacy Map Country Blue",
         "tonalRamp": [
           "oklch(15.00% 0.04808 256.82)",
           "oklch(26.43% 0.04808 256.82)",
@@ -468,7 +468,7 @@
       },
       "map-country-rose": {
         "role": "secondary",
-        "displayName": "Map Country Rose",
+        "displayName": "Legacy Map Country Rose",
         "tonalRamp": [
           "oklch(15.00% 0.05496 20.20)",
           "oklch(26.43% 0.05496 20.20)",
@@ -482,7 +482,7 @@
       },
       "map-country-sand": {
         "role": "secondary",
-        "displayName": "Map Country Sand",
+        "displayName": "Legacy Map Country Sand",
         "tonalRamp": [
           "oklch(15.00% 0.05031 92.69)",
           "oklch(26.43% 0.05031 92.69)",
@@ -496,7 +496,7 @@
       },
       "map-country-sage": {
         "role": "secondary",
-        "displayName": "Map Country Sage",
+        "displayName": "Legacy Map Country Sage",
         "tonalRamp": [
           "oklch(15.00% 0.03543 174.25)",
           "oklch(26.43% 0.03543 174.25)",
@@ -510,7 +510,7 @@
       },
       "map-country-violet": {
         "role": "secondary",
-        "displayName": "Map Country Violet",
+        "displayName": "Legacy Map Country Violet",
         "tonalRamp": [
           "oklch(15.00% 0.03308 306.87)",
           "oklch(26.43% 0.03308 306.87)",
@@ -521,16 +521,562 @@
           "oklch(83.57% 0.03308 306.87)",
           "oklch(95.00% 0.03308 306.87)"
         ]
+      },
+      "map-hoi4-ocean": {
+        "role": "neutral",
+        "displayName": "HOI4 Ocean",
+        "tonalRamp": [
+          "oklch(15.00% 0.04343 260.65)",
+          "oklch(26.43% 0.04343 260.65)",
+          "oklch(37.86% 0.04343 260.65)",
+          "oklch(49.29% 0.04343 260.65)",
+          "oklch(60.71% 0.04343 260.65)",
+          "oklch(72.14% 0.04343 260.65)",
+          "oklch(83.57% 0.04343 260.65)",
+          "oklch(95.00% 0.04343 260.65)"
+        ]
+      },
+      "map-hoi4-coast": {
+        "role": "neutral",
+        "displayName": "HOI4 Coast",
+        "tonalRamp": [
+          "oklch(15.00% 0.02610 248.54)",
+          "oklch(26.43% 0.02610 248.54)",
+          "oklch(37.86% 0.02610 248.54)",
+          "oklch(49.29% 0.02610 248.54)",
+          "oklch(60.71% 0.02610 248.54)",
+          "oklch(72.14% 0.02610 248.54)",
+          "oklch(83.57% 0.02610 248.54)",
+          "oklch(95.00% 0.02610 248.54)"
+        ]
+      },
+      "map-hoi4-country-border": {
+        "role": "neutral",
+        "displayName": "HOI4 Country Border",
+        "tonalRamp": [
+          "oklch(15.00% 0.02065 260.59)",
+          "oklch(26.43% 0.02065 260.59)",
+          "oklch(37.86% 0.02065 260.59)",
+          "oklch(49.29% 0.02065 260.59)",
+          "oklch(60.71% 0.02065 260.59)",
+          "oklch(72.14% 0.02065 260.59)",
+          "oklch(83.57% 0.02065 260.59)",
+          "oklch(95.00% 0.02065 260.59)"
+        ]
+      },
+      "map-hoi4-region-border": {
+        "role": "neutral",
+        "displayName": "HOI4 Region Border",
+        "tonalRamp": [
+          "oklch(15.00% 0.01445 253.18)",
+          "oklch(26.43% 0.01445 253.18)",
+          "oklch(37.86% 0.01445 253.18)",
+          "oklch(49.29% 0.01445 253.18)",
+          "oklch(60.71% 0.01445 253.18)",
+          "oklch(72.14% 0.01445 253.18)",
+          "oklch(83.57% 0.01445 253.18)",
+          "oklch(95.00% 0.01445 253.18)"
+        ]
+      },
+      "map-hoi4-label": {
+        "role": "neutral",
+        "displayName": "HOI4 Label",
+        "tonalRamp": [
+          "oklch(15.00% 0.02121 257.28)",
+          "oklch(26.43% 0.02121 257.28)",
+          "oklch(37.86% 0.02121 257.28)",
+          "oklch(49.29% 0.02121 257.28)",
+          "oklch(60.71% 0.02121 257.28)",
+          "oklch(72.14% 0.02121 257.28)",
+          "oklch(83.57% 0.02121 257.28)",
+          "oklch(95.00% 0.02121 257.28)"
+        ]
+      },
+      "map-hoi4-label-outline": {
+        "role": "neutral",
+        "displayName": "HOI4 Label Outline",
+        "tonalRamp": [
+          "oklch(15.00% 0.00818 114.24)",
+          "oklch(26.43% 0.00818 114.24)",
+          "oklch(37.86% 0.00818 114.24)",
+          "oklch(49.29% 0.00818 114.24)",
+          "oklch(60.71% 0.00818 114.24)",
+          "oklch(72.14% 0.00818 114.24)",
+          "oklch(83.57% 0.00818 114.24)",
+          "oklch(95.00% 0.00818 114.24)"
+        ]
+      },
+      "map-hoi4-ocean-label": {
+        "role": "neutral",
+        "displayName": "HOI4 Ocean Label",
+        "tonalRamp": [
+          "oklch(15.00% 0.02017 260.17)",
+          "oklch(26.43% 0.02017 260.17)",
+          "oklch(37.86% 0.02017 260.17)",
+          "oklch(49.29% 0.02017 260.17)",
+          "oklch(60.71% 0.02017 260.17)",
+          "oklch(72.14% 0.02017 260.17)",
+          "oklch(83.57% 0.02017 260.17)",
+          "oklch(95.00% 0.02017 260.17)"
+        ]
+      },
+      "map-hoi4-ocean-label-outline": {
+        "role": "neutral",
+        "displayName": "HOI4 Ocean Label Outline",
+        "tonalRamp": [
+          "oklch(15.00% 0.03972 258.83)",
+          "oklch(26.43% 0.03972 258.83)",
+          "oklch(37.86% 0.03972 258.83)",
+          "oklch(49.29% 0.03972 258.83)",
+          "oklch(60.71% 0.03972 258.83)",
+          "oklch(72.14% 0.03972 258.83)",
+          "oklch(83.57% 0.03972 258.83)",
+          "oklch(95.00% 0.03972 258.83)"
+        ]
+      },
+      "map-hoi4-graticule": {
+        "role": "neutral",
+        "displayName": "HOI4 Graticule",
+        "tonalRamp": [
+          "oklch(15.00% 0.04308 252.89)",
+          "oklch(26.43% 0.04308 252.89)",
+          "oklch(37.86% 0.04308 252.89)",
+          "oklch(49.29% 0.04308 252.89)",
+          "oklch(60.71% 0.04308 252.89)",
+          "oklch(72.14% 0.04308 252.89)",
+          "oklch(83.57% 0.04308 252.89)",
+          "oklch(95.00% 0.04308 252.89)"
+        ]
+      },
+      "map-hoi4-region-label": {
+        "role": "neutral",
+        "displayName": "HOI4 Region Label",
+        "tonalRamp": [
+          "oklch(15.00% 0.00937 106.58)",
+          "oklch(26.43% 0.00937 106.58)",
+          "oklch(37.86% 0.00937 106.58)",
+          "oklch(49.29% 0.00937 106.58)",
+          "oklch(60.71% 0.00937 106.58)",
+          "oklch(72.14% 0.00937 106.58)",
+          "oklch(83.57% 0.00937 106.58)",
+          "oklch(95.00% 0.00937 106.58)"
+        ]
+      },
+      "map-hoi4-region-label-outline": {
+        "role": "neutral",
+        "displayName": "HOI4 Region Label Outline",
+        "tonalRamp": [
+          "oklch(15.00% 0.01604 216.19)",
+          "oklch(26.43% 0.01604 216.19)",
+          "oklch(37.86% 0.01604 216.19)",
+          "oklch(49.29% 0.01604 216.19)",
+          "oklch(60.71% 0.01604 216.19)",
+          "oklch(72.14% 0.01604 216.19)",
+          "oklch(83.57% 0.01604 216.19)",
+          "oklch(95.00% 0.01604 216.19)"
+        ]
+      },
+      "map-hoi4-country-olive": {
+        "role": "primary",
+        "displayName": "HOI4 Country Olive",
+        "tonalRamp": [
+          "oklch(15.00% 0.02603 120.55)",
+          "oklch(26.43% 0.02603 120.55)",
+          "oklch(37.86% 0.02603 120.55)",
+          "oklch(49.29% 0.02603 120.55)",
+          "oklch(60.71% 0.02603 120.55)",
+          "oklch(72.14% 0.02603 120.55)",
+          "oklch(83.57% 0.02603 120.55)",
+          "oklch(95.00% 0.02603 120.55)"
+        ]
+      },
+      "map-hoi4-country-blue": {
+        "role": "primary",
+        "displayName": "HOI4 Country Blue",
+        "tonalRamp": [
+          "oklch(15.00% 0.06965 249.17)",
+          "oklch(26.43% 0.06965 249.17)",
+          "oklch(37.86% 0.06965 249.17)",
+          "oklch(49.29% 0.06965 249.17)",
+          "oklch(60.71% 0.06965 249.17)",
+          "oklch(72.14% 0.06965 249.17)",
+          "oklch(83.57% 0.06965 249.17)",
+          "oklch(95.00% 0.06965 249.17)"
+        ]
+      },
+      "map-hoi4-country-rose": {
+        "role": "primary",
+        "displayName": "HOI4 Country Rose",
+        "tonalRamp": [
+          "oklch(15.00% 0.05826 340.77)",
+          "oklch(26.43% 0.05826 340.77)",
+          "oklch(37.86% 0.05826 340.77)",
+          "oklch(49.29% 0.05826 340.77)",
+          "oklch(60.71% 0.05826 340.77)",
+          "oklch(72.14% 0.05826 340.77)",
+          "oklch(83.57% 0.05826 340.77)",
+          "oklch(95.00% 0.05826 340.77)"
+        ]
+      },
+      "map-hoi4-country-sand": {
+        "role": "primary",
+        "displayName": "HOI4 Country Sand",
+        "tonalRamp": [
+          "oklch(15.00% 0.07321 95.09)",
+          "oklch(26.43% 0.07321 95.09)",
+          "oklch(37.86% 0.07321 95.09)",
+          "oklch(49.29% 0.07321 95.09)",
+          "oklch(60.71% 0.07321 95.09)",
+          "oklch(72.14% 0.07321 95.09)",
+          "oklch(83.57% 0.07321 95.09)",
+          "oklch(95.00% 0.07321 95.09)"
+        ]
+      },
+      "map-hoi4-country-green": {
+        "role": "primary",
+        "displayName": "HOI4 Country Green",
+        "tonalRamp": [
+          "oklch(15.00% 0.05819 151.11)",
+          "oklch(26.43% 0.05819 151.11)",
+          "oklch(37.86% 0.05819 151.11)",
+          "oklch(49.29% 0.05819 151.11)",
+          "oklch(60.71% 0.05819 151.11)",
+          "oklch(72.14% 0.05819 151.11)",
+          "oklch(83.57% 0.05819 151.11)",
+          "oklch(95.00% 0.05819 151.11)"
+        ]
+      },
+      "map-hoi4-country-violet": {
+        "role": "primary",
+        "displayName": "HOI4 Country Violet",
+        "tonalRamp": [
+          "oklch(15.00% 0.03310 300.53)",
+          "oklch(26.43% 0.03310 300.53)",
+          "oklch(37.86% 0.03310 300.53)",
+          "oklch(49.29% 0.03310 300.53)",
+          "oklch(60.71% 0.03310 300.53)",
+          "oklch(72.14% 0.03310 300.53)",
+          "oklch(83.57% 0.03310 300.53)",
+          "oklch(95.00% 0.03310 300.53)"
+        ]
+      },
+      "map-hoi4-country-clay": {
+        "role": "primary",
+        "displayName": "HOI4 Country Clay",
+        "tonalRamp": [
+          "oklch(15.00% 0.04971 45.79)",
+          "oklch(26.43% 0.04971 45.79)",
+          "oklch(37.86% 0.04971 45.79)",
+          "oklch(49.29% 0.04971 45.79)",
+          "oklch(60.71% 0.04971 45.79)",
+          "oklch(72.14% 0.04971 45.79)",
+          "oklch(83.57% 0.04971 45.79)",
+          "oklch(95.00% 0.04971 45.79)"
+        ]
+      },
+      "map-hoi4-country-gray": {
+        "role": "primary",
+        "displayName": "HOI4 Country Gray",
+        "tonalRamp": [
+          "oklch(15.00% 0.01724 239.23)",
+          "oklch(26.43% 0.01724 239.23)",
+          "oklch(37.86% 0.01724 239.23)",
+          "oklch(49.29% 0.01724 239.23)",
+          "oklch(60.71% 0.01724 239.23)",
+          "oklch(72.14% 0.01724 239.23)",
+          "oklch(83.57% 0.01724 239.23)",
+          "oklch(95.00% 0.01724 239.23)"
+        ]
+      },
+      "map-eu4-ocean": {
+        "role": "neutral",
+        "displayName": "EU4 Ocean",
+        "tonalRamp": [
+          "oklch(15.00% 0.06042 221.17)",
+          "oklch(26.43% 0.06042 221.17)",
+          "oklch(37.86% 0.06042 221.17)",
+          "oklch(49.29% 0.06042 221.17)",
+          "oklch(60.71% 0.06042 221.17)",
+          "oklch(72.14% 0.06042 221.17)",
+          "oklch(83.57% 0.06042 221.17)",
+          "oklch(95.00% 0.06042 221.17)"
+        ]
+      },
+      "map-eu4-coast": {
+        "role": "neutral",
+        "displayName": "EU4 Coast",
+        "tonalRamp": [
+          "oklch(15.00% 0.02025 140.00)",
+          "oklch(26.43% 0.02025 140.00)",
+          "oklch(37.86% 0.02025 140.00)",
+          "oklch(49.29% 0.02025 140.00)",
+          "oklch(60.71% 0.02025 140.00)",
+          "oklch(72.14% 0.02025 140.00)",
+          "oklch(83.57% 0.02025 140.00)",
+          "oklch(95.00% 0.02025 140.00)"
+        ]
+      },
+      "map-eu4-country-border": {
+        "role": "neutral",
+        "displayName": "EU4 Country Border",
+        "tonalRamp": [
+          "oklch(15.00% 0.01624 102.40)",
+          "oklch(26.43% 0.01624 102.40)",
+          "oklch(37.86% 0.01624 102.40)",
+          "oklch(49.29% 0.01624 102.40)",
+          "oklch(60.71% 0.01624 102.40)",
+          "oklch(72.14% 0.01624 102.40)",
+          "oklch(83.57% 0.01624 102.40)",
+          "oklch(95.00% 0.01624 102.40)"
+        ]
+      },
+      "map-eu4-region-border": {
+        "role": "neutral",
+        "displayName": "EU4 Region Border",
+        "tonalRamp": [
+          "oklch(15.00% 0.02111 114.43)",
+          "oklch(26.43% 0.02111 114.43)",
+          "oklch(37.86% 0.02111 114.43)",
+          "oklch(49.29% 0.02111 114.43)",
+          "oklch(60.71% 0.02111 114.43)",
+          "oklch(72.14% 0.02111 114.43)",
+          "oklch(83.57% 0.02111 114.43)",
+          "oklch(95.00% 0.02111 114.43)"
+        ]
+      },
+      "map-eu4-label": {
+        "role": "neutral",
+        "displayName": "EU4 Label",
+        "tonalRamp": [
+          "oklch(15.00% 0.01683 202.56)",
+          "oklch(26.43% 0.01683 202.56)",
+          "oklch(37.86% 0.01683 202.56)",
+          "oklch(49.29% 0.01683 202.56)",
+          "oklch(60.71% 0.01683 202.56)",
+          "oklch(72.14% 0.01683 202.56)",
+          "oklch(83.57% 0.01683 202.56)",
+          "oklch(95.00% 0.01683 202.56)"
+        ]
+      },
+      "map-eu4-label-outline": {
+        "role": "neutral",
+        "displayName": "EU4 Label Outline",
+        "tonalRamp": [
+          "oklch(15.00% 0.06024 93.84)",
+          "oklch(26.43% 0.06024 93.84)",
+          "oklch(37.86% 0.06024 93.84)",
+          "oklch(49.29% 0.06024 93.84)",
+          "oklch(60.71% 0.06024 93.84)",
+          "oklch(72.14% 0.06024 93.84)",
+          "oklch(83.57% 0.06024 93.84)",
+          "oklch(95.00% 0.06024 93.84)"
+        ]
+      },
+      "map-eu4-ocean-label": {
+        "role": "neutral",
+        "displayName": "EU4 Ocean Label",
+        "tonalRamp": [
+          "oklch(15.00% 0.03997 225.10)",
+          "oklch(26.43% 0.03997 225.10)",
+          "oklch(37.86% 0.03997 225.10)",
+          "oklch(49.29% 0.03997 225.10)",
+          "oklch(60.71% 0.03997 225.10)",
+          "oklch(72.14% 0.03997 225.10)",
+          "oklch(83.57% 0.03997 225.10)",
+          "oklch(95.00% 0.03997 225.10)"
+        ]
+      },
+      "map-eu4-ocean-label-outline": {
+        "role": "neutral",
+        "displayName": "EU4 Ocean Label Outline",
+        "tonalRamp": [
+          "oklch(15.00% 0.03337 194.10)",
+          "oklch(26.43% 0.03337 194.10)",
+          "oklch(37.86% 0.03337 194.10)",
+          "oklch(49.29% 0.03337 194.10)",
+          "oklch(60.71% 0.03337 194.10)",
+          "oklch(72.14% 0.03337 194.10)",
+          "oklch(83.57% 0.03337 194.10)",
+          "oklch(95.00% 0.03337 194.10)"
+        ]
+      },
+      "map-eu4-graticule": {
+        "role": "neutral",
+        "displayName": "EU4 Graticule",
+        "tonalRamp": [
+          "oklch(15.00% 0.02538 181.21)",
+          "oklch(26.43% 0.02538 181.21)",
+          "oklch(37.86% 0.02538 181.21)",
+          "oklch(49.29% 0.02538 181.21)",
+          "oklch(60.71% 0.02538 181.21)",
+          "oklch(72.14% 0.02538 181.21)",
+          "oklch(83.57% 0.02538 181.21)",
+          "oklch(95.00% 0.02538 181.21)"
+        ]
+      },
+      "map-eu4-region-label": {
+        "role": "neutral",
+        "displayName": "EU4 Region Label",
+        "tonalRamp": [
+          "oklch(15.00% 0.03030 168.78)",
+          "oklch(26.43% 0.03030 168.78)",
+          "oklch(37.86% 0.03030 168.78)",
+          "oklch(49.29% 0.03030 168.78)",
+          "oklch(60.71% 0.03030 168.78)",
+          "oklch(72.14% 0.03030 168.78)",
+          "oklch(83.57% 0.03030 168.78)",
+          "oklch(95.00% 0.03030 168.78)"
+        ]
+      },
+      "map-eu4-region-label-outline": {
+        "role": "neutral",
+        "displayName": "EU4 Region Label Outline",
+        "tonalRamp": [
+          "oklch(15.00% 0.03691 91.70)",
+          "oklch(26.43% 0.03691 91.70)",
+          "oklch(37.86% 0.03691 91.70)",
+          "oklch(49.29% 0.03691 91.70)",
+          "oklch(60.71% 0.03691 91.70)",
+          "oklch(72.14% 0.03691 91.70)",
+          "oklch(83.57% 0.03691 91.70)",
+          "oklch(95.00% 0.03691 91.70)"
+        ]
+      },
+      "map-eu4-coastal-shelf": {
+        "role": "neutral",
+        "displayName": "EU4 Coastal Shelf",
+        "tonalRamp": [
+          "oklch(15.00% 0.04175 171.46)",
+          "oklch(26.43% 0.04175 171.46)",
+          "oklch(37.86% 0.04175 171.46)",
+          "oklch(49.29% 0.04175 171.46)",
+          "oklch(60.71% 0.04175 171.46)",
+          "oklch(72.14% 0.04175 171.46)",
+          "oklch(83.57% 0.04175 171.46)",
+          "oklch(95.00% 0.04175 171.46)"
+        ]
+      },
+      "map-eu4-country-sand": {
+        "role": "primary",
+        "displayName": "EU4 Country Sand",
+        "tonalRamp": [
+          "oklch(15.00% 0.06611 98.93)",
+          "oklch(26.43% 0.06611 98.93)",
+          "oklch(37.86% 0.06611 98.93)",
+          "oklch(49.29% 0.06611 98.93)",
+          "oklch(60.71% 0.06611 98.93)",
+          "oklch(72.14% 0.06611 98.93)",
+          "oklch(83.57% 0.06611 98.93)",
+          "oklch(95.00% 0.06611 98.93)"
+        ]
+      },
+      "map-eu4-country-blue": {
+        "role": "primary",
+        "displayName": "EU4 Country Blue",
+        "tonalRamp": [
+          "oklch(15.00% 0.13880 264.23)",
+          "oklch(26.43% 0.13880 264.23)",
+          "oklch(37.86% 0.13880 264.23)",
+          "oklch(49.29% 0.13880 264.23)",
+          "oklch(60.71% 0.13880 264.23)",
+          "oklch(72.14% 0.13880 264.23)",
+          "oklch(83.57% 0.13880 264.23)",
+          "oklch(95.00% 0.13880 264.23)"
+        ]
+      },
+      "map-eu4-country-rose": {
+        "role": "primary",
+        "displayName": "EU4 Country Rose",
+        "tonalRamp": [
+          "oklch(15.00% 0.10451 354.40)",
+          "oklch(26.43% 0.10451 354.40)",
+          "oklch(37.86% 0.10451 354.40)",
+          "oklch(49.29% 0.10451 354.40)",
+          "oklch(60.71% 0.10451 354.40)",
+          "oklch(72.14% 0.10451 354.40)",
+          "oklch(83.57% 0.10451 354.40)",
+          "oklch(95.00% 0.10451 354.40)"
+        ]
+      },
+      "map-eu4-country-yellow": {
+        "role": "primary",
+        "displayName": "EU4 Country Yellow",
+        "tonalRamp": [
+          "oklch(15.00% 0.14040 94.57)",
+          "oklch(26.43% 0.14040 94.57)",
+          "oklch(37.86% 0.14040 94.57)",
+          "oklch(49.29% 0.14040 94.57)",
+          "oklch(60.71% 0.14040 94.57)",
+          "oklch(72.14% 0.14040 94.57)",
+          "oklch(83.57% 0.14040 94.57)",
+          "oklch(95.00% 0.14040 94.57)"
+        ]
+      },
+      "map-eu4-country-green": {
+        "role": "primary",
+        "displayName": "EU4 Country Green",
+        "tonalRamp": [
+          "oklch(15.00% 0.11590 156.50)",
+          "oklch(26.43% 0.11590 156.50)",
+          "oklch(37.86% 0.11590 156.50)",
+          "oklch(49.29% 0.11590 156.50)",
+          "oklch(60.71% 0.11590 156.50)",
+          "oklch(72.14% 0.11590 156.50)",
+          "oklch(83.57% 0.11590 156.50)",
+          "oklch(95.00% 0.11590 156.50)"
+        ]
+      },
+      "map-eu4-country-violet": {
+        "role": "primary",
+        "displayName": "EU4 Country Violet",
+        "tonalRamp": [
+          "oklch(15.00% 0.07087 319.81)",
+          "oklch(26.43% 0.07087 319.81)",
+          "oklch(37.86% 0.07087 319.81)",
+          "oklch(49.29% 0.07087 319.81)",
+          "oklch(60.71% 0.07087 319.81)",
+          "oklch(72.14% 0.07087 319.81)",
+          "oklch(83.57% 0.07087 319.81)",
+          "oklch(95.00% 0.07087 319.81)"
+        ]
+      },
+      "map-eu4-country-clay": {
+        "role": "primary",
+        "displayName": "EU4 Country Clay",
+        "tonalRamp": [
+          "oklch(15.00% 0.08854 44.70)",
+          "oklch(26.43% 0.08854 44.70)",
+          "oklch(37.86% 0.08854 44.70)",
+          "oklch(49.29% 0.08854 44.70)",
+          "oklch(60.71% 0.08854 44.70)",
+          "oklch(72.14% 0.08854 44.70)",
+          "oklch(83.57% 0.08854 44.70)",
+          "oklch(95.00% 0.08854 44.70)"
+        ]
+      },
+      "map-eu4-country-gray": {
+        "role": "primary",
+        "displayName": "EU4 Country Gray",
+        "tonalRamp": [
+          "oklch(15.00% 0.02836 211.08)",
+          "oklch(26.43% 0.02836 211.08)",
+          "oklch(37.86% 0.02836 211.08)",
+          "oklch(49.29% 0.02836 211.08)",
+          "oklch(60.71% 0.02836 211.08)",
+          "oklch(72.14% 0.02836 211.08)",
+          "oklch(83.57% 0.02836 211.08)",
+          "oklch(95.00% 0.02836 211.08)"
+        ]
       }
     },
     "typographyMeta": {
       "map-country": {
-        "displayName": "Map Country",
-        "purpose": "Map text."
+        "displayName": "HOI4 Country",
+        "purpose": "Self-hosted Barlow Semibold country names; geometry sets the size."
       },
       "map-ocean": {
-        "displayName": "Map Ocean",
-        "purpose": "Map text."
+        "displayName": "HOI4 Ocean",
+        "purpose": "Barlow ocean names; hidden at widths up to 640px."
       },
       "editor-body": {
         "displayName": "Editor Body",
@@ -551,6 +1097,14 @@
       "editor-wordmark": {
         "displayName": "Editor Wordmark",
         "purpose": "Existing editor text."
+      },
+      "map-eu4-country": {
+        "displayName": "EU4 Country",
+        "purpose": "Self-hosted Cinzel Medium country names; geometry sets the size."
+      },
+      "map-eu4-ocean": {
+        "displayName": "EU4 Ocean",
+        "purpose": "Cinzel ocean names; hidden at widths up to 640px."
       }
     },
     "shadows": [
@@ -648,43 +1202,66 @@
       "css": ".ds-swatch{display:block;width:34px;height:34px;background:#7a8eaa;border:1px solid rgba(16,22,20,.22);border-radius:5px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}"
     },
     {
-      "name": "Political Command map sample",
+      "name": "HOI4 map marks",
       "kind": "custom",
-      "refersTo": "political-map",
-      "description": "Style sample for country fill, sea, border, and country name. Geometry here is illustrative.",
-      "html": "<svg class=\"ds-map\" viewBox=\"0 0 320 160\" role=\"img\" aria-label=\"Political map style sample\"><rect width=\"320\" height=\"160\"/><path d=\"M55 28 L190 18 L258 60 L236 131 L117 144 L45 100 Z\"/><text x=\"155\" y=\"84\" text-anchor=\"middle\">COUNTRY</text></svg>",
-      "css": ".ds-map{display:block;width:100%;max-width:480px;background:var(--color-map-ocean)}.ds-map rect{fill:var(--color-map-ocean)}.ds-map path{fill:#85887b;stroke:var(--color-map-country-border);stroke-width:1.55;stroke-linejoin:round;vector-effect:non-scaling-stroke}.ds-map text{font-family:var(--font-map-country);font-size:18px;font-weight:700;letter-spacing:1px;fill:var(--color-map-label);stroke:var(--color-map-label-outline);stroke-width:.1em;stroke-linejoin:round;paint-order:stroke fill}"
+      "refersTo": "map-hoi4",
+      "description": "Country fill, thin border, and name sample. Geometry is illustrative; the full map adds projected raster layers.",
+      "html": "<svg class=\"ds-map-hoi4\" viewBox=\"0 0 320 160\" role=\"img\" aria-label=\"HOI4 map marks\"><rect width=\"320\" height=\"160\"/><path d=\"M55 28 L190 18 L258 60 L236 131 L117 144 L45 100 Z\"/><text x=\"155\" y=\"84\" text-anchor=\"middle\">COUNTRY</text></svg>",
+      "css": "@font-face{font-family:\"Barlow Map\";src:url(\"/fonts/barlow-semibold.ttf\") format(\"truetype\");font-style:normal;font-weight:600;font-display:swap}.ds-map-hoi4{display:block;width:100%;max-width:480px;background:#253248}.ds-map-hoi4 rect{fill:#253248}.ds-map-hoi4 path{fill:#53779b;stroke:#202630;stroke-width:.95;stroke-linejoin:round;vector-effect:non-scaling-stroke}.ds-map-hoi4 text{font-family:\"Barlow Map\",sans-serif;font-size:18px;font-weight:600;letter-spacing:.035em;fill:#202731;stroke:#d8d9d3;stroke-width:.075em;stroke-linejoin:round;paint-order:stroke fill}"
+    },
+    {
+      "name": "EU4 map marks",
+      "kind": "custom",
+      "refersTo": "map-eu4",
+      "description": "Country fill, thin border, and name sample. Geometry is illustrative; the full map adds projected raster layers.",
+      "html": "<svg class=\"ds-map-eu4\" viewBox=\"0 0 320 160\" role=\"img\" aria-label=\"EU4 map marks\"><rect width=\"320\" height=\"160\"/><path d=\"M55 28 L190 18 L258 60 L236 131 L117 144 L45 100 Z\"/><text x=\"155\" y=\"84\" text-anchor=\"middle\">COUNTRY</text></svg>",
+      "css": "@font-face{font-family:\"Cinzel Map\";src:url(\"/fonts/cinzel-medium.ttf\") format(\"truetype\");font-style:normal;font-weight:500;font-display:swap}.ds-map-eu4{display:block;width:100%;max-width:480px;background:#548798}.ds-map-eu4 rect{fill:#548798}.ds-map-eu4 path{fill:#547bd1;stroke:#4c4b41;stroke-width:.8;stroke-linejoin:round;vector-effect:non-scaling-stroke}.ds-map-eu4 text{font-family:\"Cinzel Map\",serif;font-size:18px;font-weight:500;letter-spacing:.075em;fill:#172324;stroke:#f1e4b7;stroke-width:.025em;stroke-linejoin:round;paint-order:stroke fill}"
+    },
+    {
+      "name": "Map theme control",
+      "kind": "custom",
+      "refersTo": "map-theme-selector",
+      "description": "Native radio group above the map controls, available in editor, shared, and presentation views. On a map canvas at most 240px high and 600px wide, use the lower-right compact layout beside zoom controls: hide the decorative label, retain the legend, and keep 44px option targets. Use 12px bottom and safe-area right insets. Keep the Divide guide at the top and hide the general touch hint while it is visible.",
+      "html": "<fieldset class=\"ds-theme-selector\"><legend class=\"ds-theme-legend\">Map theme</legend><span class=\"ds-theme-label\" aria-hidden=\"true\">Map theme</span><div class=\"ds-theme-options\"><label class=\"ds-theme-option\" title=\"Hearts of Iron IV\"><input type=\"radio\" name=\"ds-map-theme\" value=\"hoi4\" checked/><span>HOI4</span></label><label class=\"ds-theme-option\" title=\"Europa Universalis IV\"><input type=\"radio\" name=\"ds-map-theme\" value=\"eu4\"/><span>EU4</span></label></div></fieldset>",
+      "css": ".ds-theme-selector{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.ds-theme-selector {\n  align-items: center;\n  background: var(--color-surface);\n  border: 1px solid var(--color-border);\n  border-radius: 4px;\n  display: inline-flex;\n  gap: 10px;\n  margin: 0;\n  min-inline-size: 0;\n  padding: 3px 3px 3px 12px;\n}\n\n.ds-theme-legend {\n  clip-path: inset(50%);\n  height: 1px;\n  overflow: hidden;\n  padding: 0;\n  position: absolute;\n  white-space: nowrap;\n  width: 1px;\n}\n\n.ds-theme-label {\n  color: var(--color-muted);\n  font-size: 12px;\n  white-space: nowrap;\n}\n\n.ds-theme-options {\n  display: flex;\n  gap: 2px;\n}\n\n.ds-theme-option {\n  cursor: pointer;\n  position: relative;\n}\n\n.ds-theme-option input {\n  cursor: pointer;\n  height: 100%;\n  inset: 0;\n  margin: 0;\n  opacity: 0;\n  position: absolute;\n  width: 100%;\n}\n\n.ds-theme-option span {\n  align-items: center;\n  border: 1px solid transparent;\n  border-radius: 3px;\n  color: var(--color-text);\n  display: flex;\n  font-size: 12px;\n  font-weight: 650;\n  justify-content: center;\n  min-height: var(--control-height);\n  min-width: 50px;\n  padding: 0 10px;\n}\n\n.ds-theme-option:hover span {\n  background: var(--color-surface-muted);\n  border-color: var(--color-primary);\n}\n\n.ds-theme-option input:checked + span {\n  background: var(--color-primary);\n  border-color: var(--color-primary);\n  color: var(--color-primary-ink);\n}\n\n.ds-theme-option:hover input:checked + span {\n  background: var(--color-primary-hover);\n  border-color: var(--color-primary-hover);\n}\n\n.ds-theme-option input:focus-visible + span {\n  outline: 3px solid var(--color-focus);\n  outline-offset: 2px;\n}\n\n@media (max-width: 900px), (pointer: coarse) {\n  .ds-theme-option span {\n    min-height: 44px;\n  }\n}\n\n@media (forced-colors: active) {\n  .ds-theme-option input:checked + span {\n    border-color: Highlight;\n    outline: 2px solid Highlight;\n    outline-offset: -3px;\n  }\n}\n"
     }
   ],
   "narrative": {
-    "northStar": "Political Command — map only",
-    "overview": "The map uses muted country colors, a dark slate-blue sea, strong country borders, and uppercase country names. The user selected Political Command from working map previews. The map is drawn with SVG and code. This change adds no shipping raster images.\n\nThe editor keeps its existing dark surfaces, warm gold actions, serif titles, and compact controls. The map direction does not replace the editor identity. The map must remain easy to read while the user changes countries and regions.",
+    "northStar": "Two political maps, one editor",
+    "overview": "HOI4 uses dark blue water, muted country colors, strong terrain relief, thin borders, and outlined Barlow names. EU4 uses brighter political colors, pale coastal water, fine borders, subtle relief, and spaced Cinzel names. These are original AltBorder styles informed by the two games. HOI4 is the default theme.\n\nThe editor keeps its dark surfaces, warm gold actions, serif titles, and compact controls. The map combines SVG geometry with projected raster layers. A theme changes the map appearance. Country ownership, geometry, names, and explicit colors stay intact.",
     "keyCharacteristics": [
-      "Strong country borders with less visible region borders at low zoom.",
-      "Six default country colors with exact custom scenario colors.",
-      "Uppercase sans-serif country names without map flags.",
-      "Existing dark editor with warm gold controls."
+      "Two distinct map palettes with thin country borders.",
+      "Strong HOI4 relief and subtle EU4 relief over live country fills.",
+      "Uppercase Barlow or Cinzel country names without map flags.",
+      "Existing dark editor with warm gold controls and a two-choice map theme control."
     ],
     "rules": [
       {
         "name": "The Map Scope Rule",
-        "body": "Apply Political Command to the map. Keep the existing editor identity.",
+        "body": "Apply theme colors and map fonts to the map. Keep the existing editor identity.",
         "section": "colors"
       },
       {
         "name": "The Scenario Color Rule",
-        "body": "Apply the default palette before scenario colors. Keep every explicit scenario color exact.",
+        "body": "Derive default display colors from the selected theme and the canonical base map. Preserve custom countries and explicit entity colors, including an explicit choice equal to the stored base color. Raster shading may change their visible tone without changing their stored fill color.",
         "section": "colors"
       },
       {
         "name": "The Map Name Rule",
-        "body": "Use uppercase sans-serif country names on the map. Keep flags in the editor.",
+        "body": "Use the selected theme's uppercase country names on the map. Keep flags in the editor.",
         "section": "typography"
+      },
+      {
+        "name": "The Live Land Rule",
+        "body": "Align raster layers to the active map projection and clip land textures to the current country paths. Theme layers must not take pointer input. Preserve asset provenance in `public/map-themes/SOURCES.md` and the supplied font licenses. Use 2400px overview textures until the settled zoom, canvas size, and device pixel ratio require more pixels. Keep the overview visible while full detail loads and decodes, including when that request fails. Both levels use the same projection, colors, and clipping paths. Clip the ocean texture to the projected world outline to exclude pixels outside the poles and map edges.",
+        "section": "elevation"
       }
     ],
     "dos": [
-      "Do use the six map country colors for the default map.",
-      "Do keep custom country colors exact when a scenario is restored.",
+      "Do use the selected theme for default country display colors.",
+      "Do keep the six-color canonical baseline for state and shared-link compatibility.",
+      "Do keep country borders thin: HOI4 (0.95px) and EU4 (0.8px).",
+      "Do preserve explicit country color values when themes change or scenarios load.",
       "Do show more region detail as the user zooms in.",
       "Do keep ocean labels at full opacity where they are visible.",
       "Do keep selection feedback, keyboard focus, and reduced-motion behavior."
@@ -693,7 +1270,8 @@
       "Don't apply the map palette or country font to editor controls.",
       "Don't add flags to country names on the map.",
       "Don't use the default palette to replace explicit scenario colors.",
-      "Don't add raster textures as part of this map direction."
+      "Don't bake political colors into the terrain rasters.",
+      "Don't replace live map geometry or input targets with raster artwork."
     ]
   }
 }

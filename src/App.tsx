@@ -30,6 +30,7 @@ import type {
   EditMode,
   EditorSnapshot,
   HistoryState,
+  MapThemeId,
   RegionRecord,
 } from "./types";
 import {
@@ -73,6 +74,10 @@ import {
 } from "./mapLabelDisplay";
 import { interpolateZoom, zoomFromTouchPair, zoomToBounds, type ProjectedBounds } from "./mapZoom";
 import { applyPoliticalMapPalette, getAdministrativeBorderZoomClass, getCountryBorderStrokeWidth } from "./mapVisualStyle";
+import { getMapTheme, getThemedEntities, setEntityColor, setMapTheme } from "./mapThemes";
+import { MapThemeSelector } from "./MapThemeSelector";
+import { MapThemeCoasts, MapThemeLand, MapThemeOcean } from "./MapThemeLayers";
+import mapThemeRaster from "./mapThemeRaster.json";
 import { boundsIntersect, projectedViewportBounds, shouldCullPaths } from "./mapCulling";
 import { findRegionAtProjectedPoint } from "./geometryHitTest";
 import { customCountryAccentColor, getFallbackCountryColor } from "./colorRuntime";
@@ -226,6 +231,7 @@ export default function App() {
   const [mapChange, setMapChange] = useState<MapChangeAnimation | null>(null);
   const [zoom, setZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
   const [mapViewScale, setMapViewScale] = useState(1);
+  const [mapViewMeasured, setMapViewMeasured] = useState(false);
   const [settledZoom, setSettledZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
   const [isMapMoving, setIsMapMoving] = useState(false);
   const [projectedBoundaryEdges, setProjectedBoundaryEdges] = useState<ProjectedBoundaryEdgeWithBounds[]>([]);
@@ -330,7 +336,10 @@ export default function App() {
     if (!svg) return;
     const observer = new ResizeObserver(([entry]) => {
       const scale = Math.min(entry.contentRect.width / viewportWidth, entry.contentRect.height / viewportHeight);
-      if (scale > 0) setMapViewScale(scale);
+      if (scale > 0) {
+        setMapViewScale(scale);
+        setMapViewMeasured(true);
+      }
     });
     observer.observe(svg);
     return () => observer.disconnect();
@@ -471,7 +480,12 @@ export default function App() {
 
   const snapshot = history?.present ?? null;
   const regionOwners = snapshot?.regionOwners;
-  const entities = snapshot?.entities;
+  const mapTheme = getMapTheme(snapshot?.mapTheme);
+  const detailedMapRaster = mapViewMeasured && mapViewScale * settledZoom.k * window.devicePixelRatio * viewportWidth > mapThemeRaster.overviewWidth;
+  const entities = useMemo(
+    () => data && snapshot ? getThemedEntities(data, snapshot) : undefined,
+    [data, snapshot],
+  );
   const regionNameOverrides = useMemo(() => snapshot?.regionNameOverrides ?? {}, [snapshot?.regionNameOverrides]);
 
   const customRegionRecords = useMemo(() => {
@@ -752,8 +766,8 @@ export default function App() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [activeEntityIds, entities]);
 
-  const selectedEntity = snapshot && selectedEntityId ? snapshot.entities[selectedEntityId] : undefined;
-  const targetEntity = snapshot && targetEntityId ? snapshot.entities[targetEntityId] : undefined;
+  const selectedEntity = selectedEntityId ? entities?.[selectedEntityId] : undefined;
+  const targetEntity = targetEntityId ? entities?.[targetEntityId] : undefined;
   const hasValidTransferTarget = Boolean(
     entities &&
     isValidTransferTarget({
@@ -1534,6 +1548,24 @@ export default function App() {
     metadataEditKeyRef.current = null;
   }
 
+  function changeMapTheme(theme: MapThemeId) {
+    if (theme === mapTheme.id) return;
+    finishMetadataEdit();
+    setMapChange(null);
+    setShare(null);
+    setHistory((current) => {
+      if (!current) return current;
+      const present = setMapTheme(current.present, theme);
+      if (present === current.present) return current;
+      // A shared-map viewer can change the display without entering edit mode.
+      return {
+        present,
+        past: readOnly ? current.past : [...current.past, current.present].slice(-80),
+        future: [],
+      };
+    });
+  }
+
   function showMapChange(
     pieces: MapChangeAnimation["pieces"],
     reveal: MapChangeAnimation["reveal"],
@@ -2242,17 +2274,7 @@ export default function App() {
   function updateSelectedColor(color: string) {
     const entityId = selectedEntityId;
     if (!entityId || readOnly) return;
-    commitMetadata(`entity-color:${entityId}`, (current) => {
-      const entity = current.entities[entityId];
-      if (!entity || entity.color === color) return current;
-      return {
-        ...current,
-        entities: {
-          ...current.entities,
-          [entityId]: { ...entity, color },
-        },
-      };
-    });
+    commitMetadata(`entity-color:${entityId}`, (current) => setEntityColor(current, entityId, color));
   }
 
   function updateSelectedFlag(flag: CountryFlag) {
@@ -2985,7 +3007,7 @@ export default function App() {
       </header>
 
       <section className="workspace">
-        <section className="map-stage" aria-label={isPresenting ? "World map presentation" : "World map editor"}>
+        <section className="map-stage" data-map-theme={mapTheme.id} aria-label={isPresenting ? "World map presentation" : "World map editor"}>
           {loadError && !isPresenting ? (
             <div className="inline-error" role="alert">
               <span>{loadError}</span>
@@ -2994,6 +3016,7 @@ export default function App() {
           ) : null}
           <svg
             ref={mapSvgRef}
+            data-map-theme={mapTheme.id}
             viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}
             style={{
               "--map-region-label-size": `${regionLabelScreenFontSize / mapViewScale}px`,
@@ -3020,6 +3043,7 @@ export default function App() {
           >
             <rect width={viewportWidth} height={viewportHeight} className="ocean" />
             <g ref={mapContentRef} transform={formatZoomTransform(zoom)}>
+              <MapThemeOcean theme={mapTheme.id} projection={projection} detail={detailedMapRaster} />
               <path
                 className="atlas-graticule"
                 d={graticulePath}
@@ -3043,9 +3067,11 @@ export default function App() {
                   </g>
                 ))}
               </g>
+              <MapThemeCoasts theme={mapTheme.id} coastlinePath={boundaryPaths?.coastlinePath ?? ""} />
               <g aria-hidden="true">
                 {countryUnderlayElements}
               </g>
+              <MapThemeLand theme={mapTheme.id} projection={projection} detail={detailedMapRaster} countryPaths={visibleCountryUnderlays} />
               {!isPresenting && selectedCountryOverlayElement}
               {boundaryElements}
               <g pointerEvents={isPresenting ? "none" : undefined}>
@@ -3223,6 +3249,9 @@ export default function App() {
               ) : null}
             </div>
           ) : null}
+          <div className="map-theme-control">
+            <MapThemeSelector theme={mapTheme.id} onChange={changeMapTheme} />
+          </div>
           <div className="map-controls" role="group" aria-label="Map zoom controls">
             <button onClick={() => zoomBy(1.25)} disabled={zoom.k >= maxZoom} title="Zoom in" aria-label="Zoom in">
               <Plus size={17} />

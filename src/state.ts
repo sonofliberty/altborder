@@ -1,4 +1,5 @@
 import type { CountryEntity, EditorSnapshot, MapData, RegionDivision, RegionRecord, ScenarioPayload } from "./types";
+import { DEFAULT_MAP_THEME, isMapThemeId } from "./mapThemes";
 import {
   countryFlagEquals,
   getCountryFlag,
@@ -16,6 +17,7 @@ export function createInitialSnapshot(data: MapData): EditorSnapshot {
 
   return {
     title: "Untitled Border Experiment",
+    mapTheme: DEFAULT_MAP_THEME,
     entities: Object.fromEntries(data.countries.map((country) => [country.id, { ...country }])),
     regionOwners,
     regionNameOverrides: {},
@@ -27,6 +29,7 @@ export function createInitialSnapshot(data: MapData): EditorSnapshot {
 export function cloneSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
   return {
     title: snapshot.title,
+    mapTheme: snapshot.mapTheme ?? DEFAULT_MAP_THEME,
     customCounter: snapshot.customCounter,
     entities: Object.fromEntries(
       Object.entries(snapshot.entities).map(([id, entity]) => [
@@ -316,6 +319,7 @@ export function createScenarioPayload(data: MapData, snapshot: EditorSnapshot): 
       !baseEntity ||
       baseEntity.name !== entity.name ||
       baseEntity.color !== entity.color ||
+      Boolean(baseEntity.colorIsCustom) !== Boolean(entity.colorIsCustom) ||
       !countryFlagEquals(baseEntity.flag, entity.flag) ||
       entity.isCustom
     ) {
@@ -330,6 +334,7 @@ export function createScenarioPayload(data: MapData, snapshot: EditorSnapshot): 
   return {
     version: 1,
     title: normalizedSnapshot.title,
+    ...(normalizedSnapshot.mapTheme !== DEFAULT_MAP_THEME ? { mapTheme: normalizedSnapshot.mapTheme } : {}),
     customCounter: normalizedSnapshot.customCounter,
     entityChanges,
     regionOwnerChanges,
@@ -349,6 +354,7 @@ export function applyScenarioPayload(data: MapData, payload: ScenarioPayload): E
   const next: EditorSnapshot = {
     ...base,
     title: payload.title ?? base.title,
+    mapTheme: isMapThemeId(payload.mapTheme) ? payload.mapTheme : DEFAULT_MAP_THEME,
     customCounter: payload.customCounter ?? base.customCounter,
     entities: {
       ...base.entities,

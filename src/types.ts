@@ -4,6 +4,8 @@ export type EditMode = "inspect" | "transfer" | "divide" | "merge";
 
 export type DivideMethod = "line" | "draw" | "island";
 
+export type MapThemeId = "hoi4" | "eu4";
+
 export type CountryFlag =
   | { kind: "builtin"; id: string }
   | { kind: "custom"; dataUrl: string };
@@ -12,6 +14,7 @@ export type CountryEntity = {
   id: string;
   name: string;
   color: string;
+  colorIsCustom?: boolean;
   regionIds: string[];
   isCustom?: boolean;
   flag?: CountryFlag;
@@ -52,6 +55,7 @@ export type MapData = {
 
 export type EditorSnapshot = {
   title: string;
+  mapTheme?: MapThemeId;
   entities: Record<string, CountryEntity>;
   regionOwners: Record<string, string>;
   regionNameOverrides: Record<string, string>;
@@ -69,6 +73,7 @@ export type HistoryState = {
 export type ScenarioPayload = {
   version: 1;
   title: string;
+  mapTheme?: MapThemeId;
   customCounter: number;
   entityChanges: Record<string, CountryEntity>;
   regionOwnerChanges: Array<[regionId: string, ownerId: string]>;

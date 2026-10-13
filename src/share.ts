@@ -1,6 +1,7 @@
 import type { ScenarioPayload } from "./types";
 import { isHexColor } from "./colorRuntime";
 import { isCountryFlag } from "./countryFlags";
+import { isMapThemeId } from "./mapThemes";
 
 export type DecodedShare =
   | { ok: true; payload: ScenarioPayload }
@@ -91,6 +92,7 @@ export function describeUrlSize(url: string): { bytes: number; level: "ok" | "wa
 function isScenarioPayloadShape(payload: Record<string, unknown>): payload is ScenarioPayload {
   return (
     optionalString(payload.title) &&
+    (payload.mapTheme === undefined || isMapThemeId(payload.mapTheme)) &&
     optionalPositiveInteger(payload.customCounter) &&
     optionalEntityChanges(payload.entityChanges) &&
     optionalRegionOwnerChanges(payload.regionOwnerChanges) &&
@@ -218,6 +220,7 @@ function isCountryEntity(value: unknown): value is { id: string } {
     Array.isArray(value.regionIds) &&
     value.regionIds.every(isSafeId) &&
     optionalBoolean(value.isCustom) &&
+    optionalBoolean(value.colorIsCustom) &&
     (value.flag === undefined || isCountryFlag(value.flag))
   );
 }

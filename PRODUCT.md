@@ -38,6 +38,7 @@ A scenario is carried in a compressed URL. Normal editing and sharing must conti
 ### Current capabilities
 
 - Pan and zoom around the world map. Find countries by name or select them on the map.
+- Choose HOI4 or EU4 map appearance in the editor, a shared map, or Present map. HOI4 is the default. Theme changes preserve territory, names, and explicit country colors.
 - Inspect countries and their regions. Change country names, colors, and flags, and rename regions.
 - Choose a bundled flag or upload a supported image.
 - Transfer selected regions to another country, or separate a region as a new country.
@@ -60,6 +61,7 @@ A scenario is carried in a compressed URL. Normal editing and sharing must conti
 - Divide can create custom region geometry. Do not assume that every editable region must remain one of the original administrative regions.
 - Shared scenarios store changes to the base map, including custom entities and regions. They do not store a separate full world map.
 - The current share format uses the URL fragment `#s=<compressed-scenario>`. The `edit=1` fragment parameter opens an editable scenario.
+- Version (1) scenarios can carry an optional `mapTheme` value. Links without a theme use HOI4. An explicit country-color marker preserves a user choice even when it equals the canonical base color. Theme display colors are derived from the base map and are not stored as bulk entity edits.
 - Share length depends on the changes stored in the scenario. The app reports the URL size; do not promise a fixed link length.
 - Loading the app and bundled assets requires access to their host. Offline installation and automatic persistence are not established product capabilities.
 
@@ -71,6 +73,7 @@ A scenario is carried in a compressed URL. Normal editing and sharing must conti
 - `public/data/map-data.json` contains the base map. `public/data/map-data.packed.json` is the bundle loaded by the app.
 - The app displays source attribution for geoBoundaries Open and the fallback world-atlas / Natural Earth data. Preserve the attribution when map data or its presentation changes.
 - `public/flags/SOURCES.md` and `public/flags/LICENSE-flag-icons.txt` record the flag sources and supplied license information.
+- `src/mapThemes.ts` defines theme display colors. `src/MapThemeLayers.tsx` and its stylesheet define map textures and text. `public/map-themes/SOURCES.md` records the raster and font sources; supplied font licenses are in `public/fonts`.
 - The existing app is the evidence for current behavior. Init does not establish usage figures, performance claims, or accessibility certification.
 
 ## Product Principles
