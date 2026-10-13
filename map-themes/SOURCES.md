@@ -35,10 +35,23 @@ map projection and performs no raster reprojection in the browser.
 
 Each texture also has a 2400 × 1344 `-overview.webp` variant, derived from its
 full-size WebP with cwebp (`-resize 2400 0 -q 80 -alpha_q 60 -m 6 -mt`). The
-world view uses these smaller files. Full detail loads when the settled zoom,
+world view uses these smaller files. Detail loads when the settled zoom,
 canvas size, and device pixel ratio require more than 2400 horizontal pixels.
-The overview stays visible until the detail image has decoded, including if
-the detail request fails. Zooming back out restores the overview texture.
+The browser requests only the 1024-pixel detail cells within the camera bounds.
+Two cells decode at a time. The overview stays visible in each cell until its
+detail has decoded, including if a request fails. Zooming back out restores the
+overview texture. Transparent detail replaces its overview cell, so relief is
+never applied twice.
+
+`tiles/` contains lossless crops of the approved full-size WebP pixels. Each
+cell has two extra source pixels at its edges for interpolation. The app clips
+these extra pixels to the cell viewport to prevent seams and double shading.
+To rebuild these files without the Natural Earth source images, run:
+
+    node scripts/prepare-map-theme-tiles.mjs
+
+Tile dimensions are stored in `src/mapThemeTiles.json`. The full preparation
+script also rebuilds the tiles. The browser never decodes a full detail atlas.
 
 ## Fonts
 
@@ -51,6 +64,10 @@ Barlow Semibold (600) and Cinzel Medium (500), from Google Fonts:
 
 Both are distributed under the SIL Open Font License 1.1. Original license
 texts are included beside the self-hosted font files in `public/fonts`.
+The browser uses WOFF2 copies, converted from the supplied TTF files with
+FontTools and Brotli. The conversion retains every glyph and font metric.
+To regenerate, load each TTF with `fontTools.ttLib.TTFont`, set `flavor` to
+`"woff2"`, and save beside the source with the `.woff2` extension.
 
 ## Visual references
 
