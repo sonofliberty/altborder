@@ -1064,7 +1064,6 @@ export default function App() {
     let cancelled = false;
     const controller = new AbortController();
     const geometryClient = getCountryGeometryClient();
-    let timeoutId: number | null = null;
     const activeCacheKeys = new Set<string>();
     const labels: FittedCountryLabel[] = [];
     const entityMap = entities;
@@ -1074,7 +1073,6 @@ export default function App() {
       return (entityMap[b]?.name ?? b).localeCompare(entityMap[a]?.name ?? a);
     });
     let index = 0;
-    let layoutCountryLabelFn: (typeof import("./labelLayout"))["layoutCountryLabel"] | null = null;
 
     function sortedLabels() {
       return [...labels].sort((a, b) => {
@@ -1092,12 +1090,20 @@ export default function App() {
 
     function work() {
       void (async () => {
-        layoutCountryLabelFn ??= (await import("./labelLayout")).layoutCountryLabel;
+        const { layoutCountryLabel: layoutCountryLabelFn } = await import("./labelLayout");
+        await yieldToMainThread();
         if (cancelled) return;
 
-        const chunkDeadline = performance.now() + 7;
+        let chunkDeadline = performance.now() + 7;
 
-        while (!cancelled && index < entityIds.length && performance.now() < chunkDeadline) {
+        while (index < entityIds.length) {
+          // Nested timers are throttled in background tabs. Message tasks keep
+          // this pass responsive without adding a delay to each label batch.
+          if (performance.now() >= chunkDeadline) {
+            await yieldToMainThread();
+            chunkDeadline = performance.now() + 7;
+          }
+          if (cancelled) return;
           const entityId = entityIds[index];
           index += 1;
           const entity = entityMap[entityId];
@@ -1148,24 +1154,17 @@ export default function App() {
         }
 
         if (cancelled) return;
-        if (index < entityIds.length) {
-          timeoutId = window.setTimeout(work, 0);
-        } else {
-          flushLabels();
-        }
+        flushLabels();
       })().catch(() => {
         if (!cancelled) setLoadError("Could not update the map labels. Reload the page and try again.");
       });
     }
 
-    timeoutId = window.setTimeout(work, 0);
+    work();
 
     return () => {
       cancelled = true;
       controller.abort();
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
     };
   }, [
     activeEntityIds,
