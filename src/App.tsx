@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { startTransition, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   Check,
   Copy,
@@ -19,7 +19,8 @@ import {
 } from "lucide-react";
 import { geoGraticule, geoNaturalEarth1, geoPath } from "d3-geo";
 import { getCompleteBaseCountryGroups } from "./countryRenderGroups";
-import { buildStableBaseRenderGeometry, shouldUseStableBaseRenderGeometry, unionOwnedRegionRenderGeometry } from "./countryRenderGeometry";
+import { shouldUseStableBaseRenderGeometry } from "./countryRenderGeometry";
+import { CountryGeometryWorkerClient } from "./countryGeometryWorkerClient";
 import { withRegionLandAddition } from "./regionLandGeometry";
 import type { Geometry, Position } from "geojson";
 import type { GeoProjection } from "d3-geo";
@@ -72,14 +73,16 @@ import {
   getCountryLabelScale,
   getLabelBox,
 } from "./mapLabelDisplay";
-import { interpolateZoom, zoomFromTouchPair, zoomToBounds, type ProjectedBounds } from "./mapZoom";
+import { cameraViewportTransform, interpolateZoom, svgViewportBounds, svgViewportPoint, zoomFromTouchPair, zoomToBounds, type ProjectedBounds } from "./mapZoom";
 import { applyPoliticalMapPalette, getAdministrativeBorderZoomClass, getCountryBorderStrokeWidth } from "./mapVisualStyle";
 import { getMapTheme, getThemedEntities, setEntityColor, setMapTheme } from "./mapThemes";
 import { MapThemeSelector } from "./MapThemeSelector";
 import { MapThemeCoasts, MapThemeLand, MapThemeOcean } from "./MapThemeLayers";
+import { clipMapThemeCountryPaths, clipMapThemePolygonPath } from "./mapThemeClip";
+import { clipProjectedLinePath } from "./projectedLineClipping";
 import mapThemeRaster from "./mapThemeRaster.json";
 import { preloadMapThemeAssets } from "./mapThemeAssets";
-import { boundsIntersect, projectedViewportBounds, shouldCullPaths } from "./mapCulling";
+import { boundsIntersect, projectedViewportBounds, shouldCullPaths, shouldRefreshCullingZoom } from "./mapCulling";
 import { findRegionAtProjectedPoint } from "./geometryHitTest";
 import { customCountryAccentColor, getFallbackCountryColor } from "./colorRuntime";
 import {
@@ -98,10 +101,11 @@ import { prepareMapRendering, type PreparedMapRendering } from "./mapPreparation
 import {
   geometryToSvgPath,
   projectGeometryToPathData,
+  projectGeometryStrokeToPathData,
   projectedGeometryBounds,
   type ProjectedPathData,
 } from "./projectedPath";
-import { getCountryLabelCacheKey, getCountryLabelGeometry } from "./countryLabelGeometry";
+import { getCountryLabelCacheKey } from "./countryLabelGeometry";
 import {
   removePolygonalGeometryHoles,
   removeSmallPolygonalGeometryComponents,
@@ -193,8 +197,6 @@ type ProjectedBoundaryEdgeWithBounds = ProjectedBoundaryEdge & {
 
 const compactLayoutQuery = "(max-width: 900px) and (min-height: 501px), (max-width: 599px)";
 
-type GeometrySplitModule = typeof import("./geometrySplit");
-
 export default function App() {
   const [preparedMap, setPreparedMap] = useState<PreparedMapRendering | null>(null);
   const data = preparedMap?.data ?? null;
@@ -234,7 +236,9 @@ export default function App() {
   const [zoom, setZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
   const [mapViewScale, setMapViewScale] = useState(1);
   const [mapViewMeasured, setMapViewMeasured] = useState(false);
+  const [mapViewportSize, setMapViewportSize] = useState({ width: viewportWidth, height: viewportHeight });
   const [settledZoom, setSettledZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
+  const [cullingZoom, setCullingZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
   const [isMapMoving, setIsMapMoving] = useState(false);
   const [projectedBoundaryEdges, setProjectedBoundaryEdges] = useState<ProjectedBoundaryEdgeWithBounds[]>([]);
   const [countryUnderlays, setCountryUnderlays] = useState<CountryUnderlay[]>([]);
@@ -245,7 +249,9 @@ export default function App() {
   const [neighborTargetEntityIds, setNeighborTargetEntityIds] = useState<Set<string>>(new Set());
   const [divideWorkerResult, setDivideWorkerResult] = useState<DivideWorkerResult>(emptyDivideWorkerResult);
   const mapSvgRef = useRef<SVGSVGElement | null>(null);
-  const mapContentRef = useRef<SVGGElement | null>(null);
+  const mapSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const mapCameraRef = useRef<HTMLDivElement | null>(null);
+  const mapViewportClipId = `map-viewport-${useId()}`;
   const countryLabelsRef = useRef<SVGGElement | null>(null);
   const oceanLabelRefs = useRef<(SVGTextElement | null)[]>([]);
   const presentationToggleRef = useRef<HTMLButtonElement | null>(null);
@@ -254,6 +260,9 @@ export default function App() {
   const shareDialogRef = useRef<HTMLDialogElement | null>(null);
   const shareUrlRef = useRef<HTMLInputElement | null>(null);
   const zoomRef = useRef<ZoomState>({ x: 0, y: 0, k: 1 });
+  const cullingZoomRef = useRef<ZoomState>({ x: 0, y: 0, k: 1 });
+  const renderedZoomRef = useRef<ZoomState>({ x: 0, y: 0, k: 1 });
+  const mapViewportSizeRef = useRef({ width: viewportWidth, height: viewportHeight });
   const pendingZoomFrameRef = useRef<number | null>(null);
   const zoomAnimationFrameRef = useRef<number | null>(null);
   const zoomAnimationTargetRef = useRef<ZoomState | null>(null);
@@ -295,7 +304,18 @@ export default function App() {
   const baseProjectedRegionDetailStrokeCacheRef = useRef(new Map<string, string>());
   const metadataEditKeyRef = useRef<string | null>(null);
   const geometryWorkerRequestIdRef = useRef(0);
+  const countryGeometryClientRef = useRef<CountryGeometryWorkerClient | null>(null);
   const mapChangeIdRef = useRef(0);
+
+  const getCountryGeometryClient = useCallback(() => {
+    countryGeometryClientRef.current ??= new CountryGeometryWorkerClient();
+    return countryGeometryClientRef.current;
+  }, []);
+
+  useEffect(() => () => {
+    countryGeometryClientRef.current?.dispose();
+    countryGeometryClientRef.current = null;
+  }, []);
 
   useEffect(() => {
     baseProjectedRegionCacheRef.current.clear();
@@ -336,34 +356,52 @@ export default function App() {
   useEffect(() => {
     const svg = mapSvgRef.current;
     if (!svg) return;
+    const stage = svg.closest(".map-stage");
+    if (!stage) return;
     const observer = new ResizeObserver(([entry]) => {
+      mapViewportSizeRef.current = { width: entry.contentRect.width, height: entry.contentRect.height };
+      setMapViewportSize(mapViewportSizeRef.current);
       const scale = Math.min(entry.contentRect.width / viewportWidth, entry.contentRect.height / viewportHeight);
       if (scale > 0) {
         setMapViewScale(scale);
         setMapViewMeasured(true);
       }
     });
-    observer.observe(svg);
+    observer.observe(stage);
     return () => observer.disconnect();
   }, [data]);
 
   useEffect(() => {
-    const svg = mapSvgRef.current;
-    if (!svg) return;
-    // React's wheel listener is passive, so cancel page scrolling on the SVG itself.
+    const surface = mapSurfaceRef.current;
+    if (!surface) return;
+    // React's wheel listener is passive. Keep input on a fixed surface while the map moves.
     const preventPageScroll = (event: WheelEvent) => event.preventDefault();
-    svg.addEventListener("wheel", preventPageScroll, { passive: false });
-    return () => svg.removeEventListener("wheel", preventPageScroll);
+    surface.addEventListener("wheel", preventPageScroll, { passive: false });
+    return () => surface.removeEventListener("wheel", preventPageScroll);
   }, [data]);
 
   const applyZoomToDom = useCallback((nextZoom: ZoomState) => {
-    mapContentRef.current?.setAttribute("transform", formatZoomTransform(nextZoom));
-    // Only country labels use this value. Keep it out of the geometry subtree.
-    countryLabelsRef.current?.style.setProperty("--map-camera-scale", String(nextZoom.k));
-    for (const label of oceanLabelRefs.current) {
-      label?.setAttribute("transform", `scale(${1 / nextZoom.k})`);
+    const camera = mapCameraRef.current;
+    if (camera) {
+      const { width, height } = mapViewportSizeRef.current;
+      const delta = cameraViewportTransform(nextZoom, renderedZoomRef.current, width, height);
+      camera.style.transform = `translate3d(${delta.x}px, ${delta.y}px, 0) scale(${delta.k})`;
+    }
+    const { width, height } = mapViewportSizeRef.current;
+    if (shouldRefreshCullingZoom(cullingZoomRef.current, nextZoom, viewportWidth, viewportHeight, pathCullingOverscanRatio, svgViewportBounds(width, height))) {
+      cullingZoomRef.current = nextZoom;
+      startTransition(() => setCullingZoom(nextZoom));
     }
   }, []);
+
+  useLayoutEffect(() => {
+    renderedZoomRef.current = cullingZoom;
+    countryLabelsRef.current?.style.setProperty("--map-camera-scale", String(cullingZoom.k));
+    for (const label of oceanLabelRefs.current) {
+      label?.setAttribute("transform", `scale(${1 / cullingZoom.k})`);
+    }
+    applyZoomToDom(zoomRef.current);
+  }, [applyZoomToDom, cullingZoom, mapViewScale, mapViewportSize]);
 
   useEffect(() => {
     applyZoomToDom(zoom);
@@ -664,7 +702,7 @@ export default function App() {
 
     const geometry = renderRegionTopologyGeometryById.get(regionId);
     if (!geometry) return "";
-    const projected = projectGeometryToPathData(geometry, projection, getProjectedPathOptions());
+    const projected = projectGeometryStrokeToPathData(geometry, projection, getProjectedPathOptions());
     const strokePath = projected?.strokePathData ?? projected?.pathData ?? "";
     baseProjectedRegionDetailStrokeCacheRef.current.set(cacheKey, strokePath);
     return strokePath;
@@ -716,41 +754,46 @@ export default function App() {
     return () => { cancelled = true; };
   }, [customBoundaryEdges, data?.boundaryEdges, projection]);
 
-  const settledViewportBounds = useMemo(() => {
+  const logicalViewportBounds = useMemo(() => svgViewportBounds(mapViewportSize.width, mapViewportSize.height), [mapViewportSize]);
+
+  const renderViewportBounds = useMemo(() => {
     return projectedViewportBounds({
       height: viewportHeight,
       overscanRatio: pathCullingOverscanRatio,
       width: viewportWidth,
-      zoom: settledZoom,
+      zoom: cullingZoom,
+      viewport: logicalViewportBounds,
     });
-  }, [settledZoom]);
+  }, [cullingZoom, logicalViewportBounds]);
 
   const shouldCullMapPaths = shouldCullPaths({
     isMapMoving,
     minZoom: pathCullingMinZoom,
-    zoomScale: settledZoom.k,
+    zoomScale: cullingZoom.k,
   });
 
   const visibleRegions = useMemo(() => {
     if (!shouldCullMapPaths) return effectiveRegions;
     return effectiveRegions.filter((region) => {
       const bounds = getRegionBounds(region.id);
-      return Boolean(bounds && boundsIntersect(bounds, settledViewportBounds));
+      return Boolean(bounds && boundsIntersect(bounds, renderViewportBounds));
     });
-  }, [effectiveRegions, getRegionBounds, settledViewportBounds, shouldCullMapPaths]);
+  }, [effectiveRegions, getRegionBounds, renderViewportBounds, shouldCullMapPaths]);
+
+  const hitTestRegions = useMemo(() => effectiveRegions.map((region) => ({
+    id: region.id,
+    geometry: region.geometry,
+    bounds: getRegionBounds(region.id),
+  })), [effectiveRegions, getRegionBounds]);
 
   const findRegionAtMapPoint = useCallback((point: SvgPoint) => {
     return findRegionAtProjectedPoint(
       [point.x, point.y],
-      visibleRegions.map((region) => ({
-        id: region.id,
-        geometry: region.geometry,
-        bounds: getRegionBounds(region.id),
-      })),
+      hitTestRegions,
       (position) => projection([position[0], position[1]]),
       regionOwners ?? {},
     );
-  }, [getRegionBounds, projection, regionOwners, visibleRegions]);
+  }, [hitTestRegions, projection, regionOwners]);
 
   const regionIdsByEntityId = useMemo(() => {
     const grouped = new Map<string, string[]>();
@@ -860,6 +903,8 @@ export default function App() {
     }
 
     let cancelled = false;
+    const controller = new AbortController();
+    const geometryClient = getCountryGeometryClient();
     const updateDelay = countryUnderlaysInitializedRef.current ? countryUnderlayUpdateDelayMs : 0;
     const timeout = window.setTimeout(() => {
       void (async () => {
@@ -867,19 +912,25 @@ export default function App() {
 
         const activeCacheKeys = new Set<string>();
         const nextUnderlays: CountryUnderlay[] = [];
-        let subtractGeoJsonGeometries: GeometrySplitModule["subtractGeoJsonGeometries"] | null = null;
-        let unionGeoJsonGeometries: GeometrySplitModule["unionGeoJsonGeometries"] | null = null;
-        let unionGeoJsonGeometriesClosingGaps: GeometrySplitModule["unionGeoJsonGeometriesClosingGaps"] | null =
-          null;
+        const jobs = activeEntityIds.map((entityId) => {
+          const regionIds = regionIdsByEntityId.get(entityId) ?? [];
+          const hasOwnershipChanges = hasTransferredOwnershipChanges(entityId, regionIds, baseEntityById, baseOwnerByRegionId);
+          return { entityId, regionIds, hasOwnershipChanges, needsWorker: !baseEntityById.has(entityId) || hasOwnershipChanges };
+        }).sort((a, b) => Number(a.needsWorker) - Number(b.needsWorker));
+        let publishedInitialUnderlays = false;
 
         let chunkDeadline = performance.now() + 8;
-        for (const entityId of activeEntityIds) {
+        for (const { entityId, regionIds, hasOwnershipChanges, needsWorker } of jobs) {
+          // A large changed country must not delay the rest of a shared map.
+          if (needsWorker && !publishedInitialUnderlays && !countryUnderlaysInitializedRef.current && nextUnderlays.length > 0) {
+            setCountryUnderlays([...nextUnderlays]);
+            publishedInitialUnderlays = true;
+          }
           if (performance.now() >= chunkDeadline) {
             await yieldToMainThread();
             chunkDeadline = performance.now() + 8;
           }
           if (cancelled) return;
-          const regionIds = regionIdsByEntityId.get(entityId) ?? [];
           const cacheKey = `${projectedPathCacheVersion}|${entityId}|${regionIds.join(",")}`;
           activeCacheKeys.add(cacheKey);
           const cached = countryUnderlayCacheRef.current.get(cacheKey);
@@ -890,7 +941,7 @@ export default function App() {
 
           const renderGeometries = renderGeometriesByEntityId.get(entityId) ?? [];
           if (!baseEntityById.has(entityId)) {
-            const union = await unionOwnedRegionRenderGeometry(renderGeometries);
+            const union = await geometryClient.unionOwned(renderGeometries, controller.signal);
             if (cancelled) return;
             const projected = union ? projectGeometryToPathData(union, projection, getProjectedPathOptions(false, true)) : null;
             if (union && projected) {
@@ -907,18 +958,12 @@ export default function App() {
             continue;
           }
 
-          const hasOwnershipChanges = hasTransferredOwnershipChanges(
-            entityId, regionIds, baseEntityById, baseOwnerByRegionId,
-          );
           const geometry = await (async () => {
             if (
               shouldUseStableBaseRenderGeometry(entityId, regionIds, baseEntityById, baseCountryByEntityId, baseGeometryUnionSensitiveEntityIds, regionOwners ?? {})
             ) {
               if (!hasOwnershipChanges) return baseCountryByEntityId.get(entityId)?.geometry;
-              subtractGeoJsonGeometries ??= (await import("./geometrySplit")).subtractGeoJsonGeometries;
-              unionGeoJsonGeometries ??= (await import("./geometrySplit")).unionGeoJsonGeometries;
-              unionGeoJsonGeometriesClosingGaps ??= (await import("./geometrySplit")).unionGeoJsonGeometriesClosingGaps;
-              return buildStableBaseRenderGeometry({
+              return geometryClient.stableBase({
                 baseCountryByEntityId,
                 baseEntityById,
                 baseOwnerByRegionId,
@@ -926,25 +971,21 @@ export default function App() {
                 regionGeometryById: renderRegionTopologyGeometryById,
                 regionIds,
                 regionOwners: regionOwners ?? {},
-                subtractGeoJsonGeometries,
-                unionGeoJsonGeometries,
-                unionGeoJsonGeometriesClosingGaps,
                 unionGapTolerance: acquiredRegionRenderGapTolerance,
-              });
+              }, controller.signal);
             }
 
             if (renderGeometries.length <= 1) return renderGeometries[0];
 
             if (shouldSkipRenderGapClosing(entityId, regionIds, baseOwnerByRegionId)) {
-              unionGeoJsonGeometries ??= (await import("./geometrySplit")).unionGeoJsonGeometries;
-              return unionGeoJsonGeometries(renderGeometries);
+              return geometryClient.union(renderGeometries, undefined, controller.signal);
             }
-            unionGeoJsonGeometriesClosingGaps ??= (await import("./geometrySplit")).unionGeoJsonGeometriesClosingGaps;
-            return unionGeoJsonGeometriesClosingGaps(
+            return geometryClient.union(
               renderGeometries,
               ownsTransferredRegions(entityId, regionIds, baseOwnerByRegionId)
                 ? acquiredRegionRenderGapTolerance
                 : countryRenderGapTolerance,
+              controller.signal,
             );
           })();
 
@@ -990,11 +1031,14 @@ export default function App() {
           countryUnderlaysInitializedRef.current = true;
           setCountryUnderlays(nextUnderlays);
         }
-      })();
+      })().catch(() => {
+        if (!cancelled) setLoadError("Could not update the map. Reload the page and try again.");
+      });
     }, updateDelay);
 
     return () => {
       cancelled = true;
+      controller.abort();
       window.clearTimeout(timeout);
     };
   }, [
@@ -1003,6 +1047,7 @@ export default function App() {
     baseEntityById,
     baseOwnerByRegionId,
     data,
+    getCountryGeometryClient,
     projection,
     renderRegionTopologyGeometryById,
     regionIdsByEntityId,
@@ -1017,6 +1062,8 @@ export default function App() {
     }
 
     let cancelled = false;
+    const controller = new AbortController();
+    const geometryClient = getCountryGeometryClient();
     let timeoutId: number | null = null;
     const activeCacheKeys = new Set<string>();
     const labels: FittedCountryLabel[] = [];
@@ -1028,8 +1075,6 @@ export default function App() {
     });
     let index = 0;
     let layoutCountryLabelFn: (typeof import("./labelLayout"))["layoutCountryLabel"] | null = null;
-    let subtractGeoJsonGeometries: GeometrySplitModule["subtractGeoJsonGeometries"] | null = null;
-    let unionGeoJsonGeometriesClosingGaps: GeometrySplitModule["unionGeoJsonGeometriesClosingGaps"] | null = null;
 
     function sortedLabels() {
       return [...labels].sort((a, b) => {
@@ -1075,23 +1120,19 @@ export default function App() {
           } else if (!baseCountry || !baseEntityById.has(entity.id)) {
             geometries = renderGeometriesByEntityId.get(entity.id) ?? [];
           } else {
-            subtractGeoJsonGeometries ??= (await import("./geometrySplit")).subtractGeoJsonGeometries;
-            unionGeoJsonGeometriesClosingGaps ??= (await import("./geometrySplit")).unionGeoJsonGeometriesClosingGaps;
             if (cancelled) return;
-            geometries = getCountryLabelGeometry({
+            geometries = await geometryClient.labelGeometry({
               baseCountryByEntityId,
               baseEntityById,
               baseOwnerByRegionId,
               entityId: entity.id,
-              entityName: entity.name,
               fallbackGeometries: renderGeometriesByEntityId.get(entity.id) ?? [],
               regionById,
               regionIds,
-              subtractGeoJsonGeometries,
-              unionGeoJsonGeometriesClosingGaps,
               unionGapTolerance: acquiredRegionRenderGapTolerance,
-            }).geometries;
+            }, controller.signal);
           }
+          if (cancelled) return;
           if (geometries.length === 0) continue;
 
           const label = layoutCountryLabelFn({
@@ -1112,13 +1153,16 @@ export default function App() {
         } else {
           flushLabels();
         }
-      })();
+      })().catch(() => {
+        if (!cancelled) setLoadError("Could not update the map labels. Reload the page and try again.");
+      });
     }
 
     timeoutId = window.setTimeout(work, 0);
 
     return () => {
       cancelled = true;
+      controller.abort();
       if (timeoutId !== null) {
         window.clearTimeout(timeoutId);
       }
@@ -1130,6 +1174,7 @@ export default function App() {
     baseOwnerByRegionId,
     data,
     entities,
+    getCountryGeometryClient,
     projection,
     regionById,
     regionIdsByEntityId,
@@ -1144,12 +1189,11 @@ export default function App() {
     return filterLabels(rawLabels, settledZoom, {
       maxLabels: displayScale < 1.8 ? 44 : displayScale < 4 ? 120 : 240,
       minGap: displayScale < 2.2 ? 5 : displayScale < 4 ? 1.5 : 0,
-      viewportWidth,
-      viewportHeight,
+      viewportBounds: logicalViewportBounds,
       getSortText: (label) => label.displayName,
       getBoxSize: (label) => getCountryLabelBoxSize(label, displayScale, mapViewScale),
     });
-  }, [countryLabelLayouts, mapViewScale, settledZoom]);
+  }, [countryLabelLayouts, logicalViewportBounds, mapViewScale, settledZoom]);
 
   const regionLabels = useMemo<SimpleMapLabel[]>(() => {
     if (!regionOwners) return [];
@@ -1188,8 +1232,7 @@ export default function App() {
     return filterLabels(rawLabels, zoom, {
       maxLabels: zoom.k < 2.7 ? 18 : 55,
       minGap: 4 / mapViewScale,
-      viewportWidth,
-      viewportHeight,
+      viewportBounds: logicalViewportBounds,
       reservedBoxes: countryLabels.map((label) => getLabelBox(label, zoom, getCountryLabelBoxSize(label, zoom.k, mapViewScale))),
       getSortText: (label) => label.name,
       getBoxSize: (label) => ({
@@ -1201,6 +1244,7 @@ export default function App() {
     activeModeUsesRegions,
     countryLabels,
     getRegionBounds,
+    logicalViewportBounds,
     mapViewScale,
     regionNameOverrides,
     regionOwners,
@@ -1422,12 +1466,20 @@ export default function App() {
     divideSplit.ok && activeDivideNewPieceIndex !== null
       ? divideWorkerResult.territories?.[activeDivideNewPieceIndex] ?? null
       : null;
-  const divideExistingPath = divideTerritories
+  const divideExistingPath = useMemo(() => divideTerritories
     ? geometryToSvgPath(divideTerritories.existingGeometry, projection, getProjectedPathOptions())
-    : "";
-  const divideNewPath = divideTerritories
+    : "", [divideTerritories, projection]);
+  const divideNewPath = useMemo(() => divideTerritories
     ? geometryToSvgPath(divideTerritories.newGeometry, projection, getProjectedPathOptions())
-    : "";
+    : "", [divideTerritories, projection]);
+  const visibleDividePaths = useMemo(() => ({
+    existing: clipMapThemePolygonPath(divideExistingPath, shouldCullMapPaths ? renderViewportBounds : undefined),
+    new: clipMapThemePolygonPath(divideNewPath, shouldCullMapPaths ? renderViewportBounds : undefined),
+  }), [divideExistingPath, divideNewPath, renderViewportBounds, shouldCullMapPaths]);
+  const visibleMapChangePieces = useMemo(() => mapChange?.pieces.map((piece) => ({
+    ...piece,
+    path: clipMapThemePolygonPath(piece.path, shouldCullMapPaths ? renderViewportBounds : undefined),
+  })) ?? [], [mapChange, renderViewportBounds, shouldCullMapPaths]);
   const divideLinePath = svgLineToPath(
     keyboardCutActive && keyboardCutCursor && divideLine.length > 0
       ? [...divideLine, keyboardCutCursor]
@@ -1738,6 +1790,8 @@ export default function App() {
     applyZoomToDom(nextZoom);
     setZoom(nextZoom);
     setSettledZoom(nextZoom);
+    cullingZoomRef.current = nextZoom;
+    setCullingZoom(nextZoom);
   }
 
   function cancelZoomAnimation() {
@@ -2019,10 +2073,12 @@ export default function App() {
       const step = (event.shiftKey ? 32 : 10) / Math.max(viewScale * currentZoom.k, 0.01);
       const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
       const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
-      const minX = -currentZoom.x / currentZoom.k;
-      const maxX = (viewportWidth - currentZoom.x) / currentZoom.k;
-      const minY = -currentZoom.y / currentZoom.k;
-      const maxY = (viewportHeight - currentZoom.y) / currentZoom.k;
+      const { width, height } = mapViewportSizeRef.current;
+      const viewport = svgViewportBounds(width, height);
+      const minX = (viewport.minX - currentZoom.x) / currentZoom.k;
+      const maxX = (viewport.maxX - currentZoom.x) / currentZoom.k;
+      const minY = (viewport.minY - currentZoom.y) / currentZoom.k;
+      const maxY = (viewport.maxY - currentZoom.y) / currentZoom.k;
       setKeyboardCutCursor({
         x: clamp(keyboardCutCursor.x + dx, minX, maxX),
         y: clamp(keyboardCutCursor.y + dy, minY, maxY),
@@ -2372,10 +2428,13 @@ export default function App() {
   function syncZoomStateNow() {
     flushZoomFrame();
     setZoom(zoomRef.current);
+    cullingZoomRef.current = zoomRef.current;
+    setCullingZoom(zoomRef.current);
   }
 
   function markMapMoving() {
     mapSvgRef.current?.classList.add("is-moving");
+    mapCameraRef.current?.style.setProperty("will-change", "transform");
     if (!isMapMovingRef.current) {
       isMapMovingRef.current = true;
       setIsMapMoving(true);
@@ -2395,13 +2454,16 @@ export default function App() {
       applyZoomToDom(zoomRef.current);
       setZoom(zoomRef.current);
       mapSvgRef.current?.classList.remove("is-moving");
+      mapCameraRef.current?.style.removeProperty("will-change");
       isMapMovingRef.current = false;
       setSettledZoom(zoomRef.current);
+      cullingZoomRef.current = zoomRef.current;
+      setCullingZoom(zoomRef.current);
       setIsMapMoving(false);
     }, delay);
   }
 
-  function handlePointerDown(event: React.PointerEvent<SVGSVGElement>) {
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (zoomAnimationFrameRef.current !== null) {
       cancelZoomAnimation();
       syncZoomStateNow();
@@ -2484,7 +2546,7 @@ export default function App() {
 
     if (mode === "divide" && !readOnly) {
       if (keyboardCutActive) clearDivideDraft();
-      event.currentTarget.focus({ preventScroll: true });
+      mapSvgRef.current?.focus({ preventScroll: true });
       const ownerId = regionId && snapshot ? snapshot.regionOwners[regionId] : "";
       if (!selectedEntityId && ownerId) {
         setSelectedEntityId(ownerId);
@@ -2528,7 +2590,7 @@ export default function App() {
     }
   }
 
-  function handlePointerMove(event: React.PointerEvent<SVGSVGElement>) {
+  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
     if (event.pointerType === "touch") {
       if (!touchPointersRef.current.has(event.pointerId)) return;
       touchPointersRef.current.set(event.pointerId, getSvgPoint(event.currentTarget, event.clientX, event.clientY));
@@ -2585,7 +2647,7 @@ export default function App() {
     });
   }
 
-  function handlePointerUp(event: React.PointerEvent<SVGSVGElement>) {
+  function handlePointerUp(event: React.PointerEvent<HTMLDivElement>) {
     if (event.pointerType === "touch") {
       touchPointersRef.current.delete(event.pointerId);
       releasePointerCaptureIfHeld(event.currentTarget, event.pointerId);
@@ -2665,7 +2727,7 @@ export default function App() {
     }
   }
 
-  function handleWheel(event: React.WheelEvent<SVGSVGElement>) {
+  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
     markMapMoving();
     const deltaX = normalizeWheelDelta(event.deltaX, event.deltaMode, viewportWidth);
     const deltaY = normalizeWheelDelta(event.deltaY, event.deltaMode, viewportHeight);
@@ -2688,10 +2750,12 @@ export default function App() {
   }
 
   const visibleCountryUnderlays = useMemo(() => {
-    return shouldCullMapPaths
-      ? countryUnderlays.filter((underlay) => boundsIntersect(underlay.bounds, settledViewportBounds))
-      : countryUnderlays;
-  }, [countryUnderlays, settledViewportBounds, shouldCullMapPaths]);
+    if (!shouldCullMapPaths) return countryUnderlays;
+    return clipMapThemeCountryPaths(
+      countryUnderlays.filter((underlay) => boundsIntersect(underlay.bounds, renderViewportBounds)),
+      renderViewportBounds,
+    );
+  }, [countryUnderlays, renderViewportBounds, shouldCullMapPaths]);
 
   const countryUnderlayById = useMemo(() => {
     return new Map(countryUnderlays.map((underlay) => [underlay.id, underlay]));
@@ -2794,23 +2858,26 @@ export default function App() {
   const boundaryPaths = useMemo(() => {
     if (!regionOwners) return null;
     const visibleEdges = shouldCullMapPaths
-      ? projectedBoundaryEdges.filter((edge) => boundsIntersect(edge.bounds, settledViewportBounds))
+      ? projectedBoundaryEdges.filter((edge) => boundsIntersect(edge.bounds, renderViewportBounds))
       : projectedBoundaryEdges;
     const activeAdministrativeEntityId =
       !isPresenting && selectedEntityId && (mode === "transfer" || mode === "divide")
         ? selectedEntityId
         : undefined;
-    return batchBoundaryPaths(visibleEdges, regionOwners, {
+    const paths = batchBoundaryPaths(visibleEdges, regionOwners, {
       activeAdministrativeEntityId,
       selectedEntityId: isPresenting ? undefined : selectedEntityId || undefined,
     });
+    if (!shouldCullMapPaths) return paths;
+    return Object.fromEntries(Object.entries(paths).map(([kind, pathData]) =>
+      [kind, clipProjectedLinePath(pathData, renderViewportBounds)])) as typeof paths;
   }, [
     isPresenting,
     mode,
     projectedBoundaryEdges,
     regionOwners,
     selectedEntityId,
-    settledViewportBounds,
+    renderViewportBounds,
     shouldCullMapPaths,
   ]);
 
@@ -2871,24 +2938,30 @@ export default function App() {
         <g key={region.id} className="selected-region-overlay">
           <path
             className="selected-region-tint"
-            d={getRegionPath(region.id)}
+            d={clipMapThemePolygonPath(getRegionPath(region.id), shouldCullMapPaths ? renderViewportBounds : undefined)}
             fillRule={customProjectedRegionById.has(region.id) ? "nonzero" : "evenodd"}
             aria-hidden="true"
           />
           <path
             className="selected-region-outline"
-            d={getRegionStrokePath(region.id, useDetailedRegionBorderStrokes)}
+            d={shouldCullMapPaths
+              ? clipProjectedLinePath(getRegionStrokePath(region.id, useDetailedRegionBorderStrokes), renderViewportBounds)
+              : getRegionStrokePath(region.id, useDetailedRegionBorderStrokes)}
             fill="none"
             aria-hidden="true"
           />
         </g>
       ));
-  }, [customProjectedRegionById, getRegionPath, getRegionStrokePath, selectedRegions, useDetailedRegionBorderStrokes, visibleRegions]);
+  }, [customProjectedRegionById, getRegionPath, getRegionStrokePath, selectedRegions, renderViewportBounds, shouldCullMapPaths, useDetailedRegionBorderStrokes, visibleRegions]);
 
   const selectedCountryOverlayElement = useMemo(() => {
     if (!selectedEntityId) return null;
     const underlay = countryUnderlayById.get(selectedEntityId);
     if (!underlay) return null;
+    const pathData = shouldCullMapPaths
+      ? clipMapThemePolygonPath(underlay.pathData, renderViewportBounds)
+      : underlay.pathData;
+    if (!pathData) return null;
 
     return (
       <g
@@ -2900,13 +2973,13 @@ export default function App() {
       >
         <path
           className="selected-country-tint"
-          d={underlay.pathData}
+          d={pathData}
           fillRule="evenodd"
           aria-hidden="true"
         />
       </g>
     );
-  }, [countryUnderlayById, selectedEntity?.color, selectedEntityId]);
+  }, [countryUnderlayById, selectedEntity?.color, selectedEntityId, renderViewportBounds, shouldCullMapPaths]);
 
   if (loadError && !data) {
     return (
@@ -3027,6 +3100,21 @@ export default function App() {
               <button onClick={startFreshAfterLoadError}>Start fresh</button>
             </div>
           ) : null}
+          <div
+            ref={mapSurfaceRef}
+            className={[
+              "map-surface",
+              brushEnabled && activeModeUsesRegions && !isPresenting ? "brush-map" : "",
+              mode === "divide" && !readOnly && !isPresenting && !mapNavigationEnabled ? "divide-map" : "",
+            ].join(" ")}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            onAuxClick={(event) => event.preventDefault()}
+            onWheel={handleWheel}
+          >
+          <div ref={mapCameraRef} className="map-camera">
           <svg
             ref={mapSvgRef}
             data-map-theme={mapTheme.id}
@@ -3047,16 +3135,15 @@ export default function App() {
             aria-describedby={keyboardCutActive ? "keyboard-cut-help" : undefined}
             tabIndex={keyboardCutActive || (mode === "divide" && !readOnly && !isPresenting) ? 0 : undefined}
             onKeyDown={handleMapKeyDown}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            onAuxClick={(event) => event.preventDefault()}
-            onWheel={handleWheel}
           >
             <rect width={viewportWidth} height={viewportHeight} className="ocean" />
-            <g ref={mapContentRef} transform={formatZoomTransform(zoom)}>
-              <MapThemeOcean theme={mapTheme.id} projection={projection} detail={detailedMapRaster} />
+            <defs>
+              <clipPath id={mapViewportClipId} clipPathUnits="userSpaceOnUse">
+                <rect x={renderViewportBounds.minX} y={renderViewportBounds.minY} width={renderViewportBounds.maxX - renderViewportBounds.minX} height={renderViewportBounds.maxY - renderViewportBounds.minY} />
+              </clipPath>
+            </defs>
+            <g transform={formatZoomTransform(cullingZoom)} clipPath={`url(#${mapViewportClipId})`}>
+              <MapThemeOcean theme={mapTheme.id} projection={projection} detail={detailedMapRaster} viewportBounds={renderViewportBounds} />
               <path
                 className="atlas-graticule"
                 d={graticulePath}
@@ -3084,7 +3171,7 @@ export default function App() {
               <g aria-hidden="true">
                 {countryUnderlayElements}
               </g>
-              <MapThemeLand theme={mapTheme.id} projection={projection} detail={detailedMapRaster} countryPaths={visibleCountryUnderlays} />
+              <MapThemeLand theme={mapTheme.id} projection={projection} detail={detailedMapRaster} viewportBounds={renderViewportBounds} countryPaths={visibleCountryUnderlays} />
               {!isPresenting && selectedCountryOverlayElement}
               {boundaryElements}
               <g pointerEvents={isPresenting ? "none" : undefined}>
@@ -3097,8 +3184,8 @@ export default function App() {
               ) : null}
               {!isPresenting && divideTerritories ? (
                 <g className="divide-preview" aria-hidden="true">
-                  <path className="divide-existing-preview" d={divideExistingPath} />
-                  <path className="divide-new-preview" d={divideNewPath} fill={newCountryColor} />
+                  <path className="divide-existing-preview" d={visibleDividePaths.existing} />
+                  <path className="divide-new-preview" d={visibleDividePaths.new} fill={newCountryColor} />
                 </g>
               ) : null}
               {!isPresenting && divideLinePath ? (
@@ -3107,7 +3194,7 @@ export default function App() {
               {!isPresenting && divideLine.length > 0 ? (
                 <g className="divide-endpoints" aria-hidden="true">
                   {[divideLine[0], ...(divideLine.length > 1 ? [divideLine[divideLine.length - 1]] : [])].map((point, index) => (
-                    <circle key={index} cx={point.x} cy={point.y} r={4 / Math.max(zoom.k * mapViewScale, 0.01)} />
+                    <circle key={index} cx={point.x} cy={point.y} r={4 / Math.max(cullingZoom.k * mapViewScale, 0.01)} />
                   ))}
                 </g>
               ) : null}
@@ -3122,12 +3209,12 @@ export default function App() {
                     <mask
                       id={`map-change-mask-${mapChange.id}`}
                       maskUnits="userSpaceOnUse"
-                      x={0}
-                      y={0}
-                      width={viewportWidth}
-                      height={viewportHeight}
+                      x={renderViewportBounds.minX}
+                      y={renderViewportBounds.minY}
+                      width={renderViewportBounds.maxX - renderViewportBounds.minX}
+                      height={renderViewportBounds.maxY - renderViewportBounds.minY}
                     >
-                      <rect x={0} y={0} width={viewportWidth} height={viewportHeight} fill="white" />
+                      <rect x={renderViewportBounds.minX} y={renderViewportBounds.minY} width={renderViewportBounds.maxX - renderViewportBounds.minX} height={renderViewportBounds.maxY - renderViewportBounds.minY} fill="white" />
                       <path
                         className="map-change-reveal"
                         d={mapChange.reveal.kind === "edge"
@@ -3140,12 +3227,12 @@ export default function App() {
                     <mask
                       id={`map-change-front-mask-${mapChange.id}`}
                       maskUnits="userSpaceOnUse"
-                      x={0}
-                      y={0}
-                      width={viewportWidth}
-                      height={viewportHeight}
+                      x={renderViewportBounds.minX}
+                      y={renderViewportBounds.minY}
+                      width={renderViewportBounds.maxX - renderViewportBounds.minX}
+                      height={renderViewportBounds.maxY - renderViewportBounds.minY}
                     >
-                      <rect x={0} y={0} width={viewportWidth} height={viewportHeight} fill="black" />
+                      <rect x={renderViewportBounds.minX} y={renderViewportBounds.minY} width={renderViewportBounds.maxX - renderViewportBounds.minX} height={renderViewportBounds.maxY - renderViewportBounds.minY} fill="black" />
                       <path
                         className="map-change-front-outer"
                         d={mapChange.reveal.kind === "edge"
@@ -3164,7 +3251,7 @@ export default function App() {
                       />
                     </mask>
                   </defs>
-                  {mapChange.pieces.map((piece, index) => (
+                  {visibleMapChangePieces.map((piece, index) => (
                     <path
                       key={`${index}-destination`}
                       className="map-change-destination"
@@ -3173,7 +3260,7 @@ export default function App() {
                       fill={piece.toColor}
                     />
                   ))}
-                  {mapChange.pieces.map((piece, index) => (
+                  {visibleMapChangePieces.map((piece, index) => (
                     <path
                       key={`${index}-fill`}
                       className="map-change-cover"
@@ -3183,7 +3270,7 @@ export default function App() {
                       mask={`url(#map-change-mask-${mapChange.id})`}
                     />
                   ))}
-                  {mapChange.pieces.map((piece, index) => (
+                  {visibleMapChangePieces.map((piece, index) => (
                     <path
                       key={`${index}-front`}
                       className="map-change-front"
@@ -3193,7 +3280,7 @@ export default function App() {
                       mask={`url(#map-change-front-mask-${mapChange.id})`}
                     />
                   ))}
-                  {mapChange.pieces.map((piece, index) => (
+                  {visibleMapChangePieces.map((piece, index) => (
                     <path
                       key={`${index}-outline`}
                       className="map-change-outline"
@@ -3208,7 +3295,7 @@ export default function App() {
                   className="keyboard-cut-cursor"
                   cx={keyboardCutCursor.x}
                   cy={keyboardCutCursor.y}
-                  r={7 / zoom.k}
+                  r={7 / cullingZoom.k}
                   aria-hidden="true"
                 />
               ) : null}
@@ -3254,6 +3341,8 @@ export default function App() {
               </g>
             </g>
           </svg>
+          </div>
+          </div>
           {mode === "divide" && selectedEntity && !readOnly && !isPresenting ? (
             <div className="divide-map-guide">
               <span>{mapNavigationEnabled ? "Move the map. Turn off Move map to continue your cut." : divideMapHint}</span>
@@ -3544,18 +3633,13 @@ function getCountryLabelBoxSize(label: FittedCountryLabel, scale: number, viewSc
   };
 }
 
-function getSvgPoint(svg: SVGSVGElement, clientX: number, clientY: number): SvgPoint {
-  const point = svg.createSVGPoint();
-  point.x = clientX;
-  point.y = clientY;
-  const matrix = svg.getScreenCTM();
-  if (!matrix) return { x: 0, y: 0 };
-  const transformed = point.matrixTransform(matrix.inverse());
-  return { x: transformed.x, y: transformed.y };
+function getSvgPoint(surface: Element, clientX: number, clientY: number): SvgPoint {
+  const stage = surface.closest(".map-stage");
+  return stage ? svgViewportPoint(clientX, clientY, stage.getBoundingClientRect()) : { x: 0, y: 0 };
 }
 
-function getMapPoint(svg: SVGSVGElement, clientX: number, clientY: number, zoom: ZoomState): SvgPoint {
-  const point = getSvgPoint(svg, clientX, clientY);
+function getMapPoint(surface: Element, clientX: number, clientY: number, zoom: ZoomState): SvgPoint {
+  const point = getSvgPoint(surface, clientX, clientY);
   return {
     x: (point.x - zoom.x) / zoom.k,
     y: (point.y - zoom.y) / zoom.k,

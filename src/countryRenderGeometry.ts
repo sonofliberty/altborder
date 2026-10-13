@@ -1,6 +1,20 @@
 import type { Geometry } from "geojson";
 type GeometrySplitModule = typeof import("./geometrySplit");
 
+export type StableBaseRenderGeometryInput = {
+  baseCountryByEntityId: Map<string, { geometry: Geometry }>;
+  baseEntityById: Map<string, { regionIds: string[] }>;
+  baseOwnerByRegionId: Map<string, string>;
+  entityId: string;
+  regionGeometryById: Map<string, Geometry>;
+  regionIds: string[];
+  regionOwners: Readonly<Record<string, string>>;
+  subtractGeoJsonGeometries: GeometrySplitModule["subtractGeoJsonGeometries"];
+  unionGeoJsonGeometries: GeometrySplitModule["unionGeoJsonGeometries"];
+  unionGeoJsonGeometriesClosingGaps?: GeometrySplitModule["unionGeoJsonGeometriesClosingGaps"];
+  unionGapTolerance?: number;
+};
+
 /** A single union prevents overlapping subdivisions from cancelling in SVG. */
 export async function unionOwnedRegionRenderGeometry(geometries: Geometry[]): Promise<Geometry | null> {
   const coordinates = geometries.flatMap((geometry) => geometry.type === "Polygon"
@@ -46,19 +60,7 @@ export async function buildStableBaseRenderGeometry({
   unionGeoJsonGeometries,
   unionGeoJsonGeometriesClosingGaps,
   unionGapTolerance,
-}: {
-  baseCountryByEntityId: Map<string, { geometry: Geometry }>;
-  baseEntityById: Map<string, { regionIds: string[] }>;
-  baseOwnerByRegionId: Map<string, string>;
-  entityId: string;
-  regionGeometryById: Map<string, Geometry>;
-  regionIds: string[];
-  regionOwners: Readonly<Record<string, string>>;
-  subtractGeoJsonGeometries: GeometrySplitModule["subtractGeoJsonGeometries"];
-  unionGeoJsonGeometries: GeometrySplitModule["unionGeoJsonGeometries"];
-  unionGeoJsonGeometriesClosingGaps?: GeometrySplitModule["unionGeoJsonGeometriesClosingGaps"];
-  unionGapTolerance?: number;
-}): Promise<Geometry | null> {
+}: StableBaseRenderGeometryInput): Promise<Geometry | null> {
   const baseEntity = baseEntityById.get(entityId);
   const baseCountry = baseCountryByEntityId.get(entityId);
   if (!baseEntity || !baseCountry) return null;

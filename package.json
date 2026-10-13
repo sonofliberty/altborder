@@ -14,7 +14,9 @@
     "deadcode": "knip --reporter compact",
     "prepare:data": "node scripts/build-map-data.mjs && node scripts/sync-flag-assets.mjs && node scripts/pack-map-data.mjs",
     "prepare:pack": "node scripts/pack-map-data.mjs",
-    "prepare:flags": "node scripts/sync-flag-assets.mjs && node scripts/pack-map-data.mjs"
+    "prepare:flags": "node scripts/sync-flag-assets.mjs && node scripts/pack-map-data.mjs",
+    "prepare:themes": "node scripts/prepare-map-theme-assets.mjs",
+    "prepare:theme-tiles": "node scripts/prepare-map-theme-tiles.mjs"
   },
   "dependencies": {
     "clipper-lib": "^6.4.2",

@@ -16,6 +16,47 @@ export type ZoomState = {
   k: number;
 };
 
+/** The visible SVG coordinates include the space around a centered viewBox. */
+export function svgViewportBounds(width: number, height: number): ProjectedBounds {
+  const scale = Math.min(width / viewportWidth, height / viewportHeight);
+  if (scale <= 0) return { minX: 0, minY: 0, maxX: viewportWidth, maxY: viewportHeight };
+  const paddingX = (width / scale - viewportWidth) / 2;
+  const paddingY = (height / scale - viewportHeight) / 2;
+  return { minX: -paddingX, minY: -paddingY, maxX: viewportWidth + paddingX, maxY: viewportHeight + paddingY };
+}
+
+/** Move a cached SVG viewport without repainting its map paths on each input frame. */
+export function cameraViewportTransform(
+  camera: ZoomState,
+  rendered: ZoomState,
+  width: number,
+  height: number,
+): ZoomState {
+  const scale = Math.min(width / viewportWidth, height / viewportHeight);
+  const offsetX = (width - viewportWidth * scale) / 2;
+  const offsetY = (height - viewportHeight * scale) / 2;
+  const k = camera.k / rendered.k;
+  return {
+    x: scale * (camera.x - rendered.x * k) + offsetX * (1 - k),
+    y: scale * (camera.y - rendered.y * k) + offsetY * (1 - k),
+    k,
+  };
+}
+
+/** Convert pointer input against the fixed map stage, independent of its visual transform. */
+export function svgViewportPoint(
+  clientX: number,
+  clientY: number,
+  bounds: { x: number; y: number; width: number; height: number },
+): { x: number; y: number } {
+  const scale = Math.min(bounds.width / viewportWidth, bounds.height / viewportHeight);
+  if (scale <= 0) return { x: 0, y: 0 };
+  return {
+    x: (clientX - bounds.x - (bounds.width - viewportWidth * scale) / 2) / scale,
+    y: (clientY - bounds.y - (bounds.height - viewportHeight * scale) / 2) / scale,
+  };
+}
+
 export function interpolateZoom(start: ZoomState, end: ZoomState, progress: number): ZoomState {
   if (progress <= 0) return start;
   if (progress >= 1) return end;

@@ -1,7 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { interpolateZoom, zoomFromTouchPair, zoomToBounds } from "./mapZoom";
+import { cameraViewportTransform, interpolateZoom, svgViewportPoint, zoomFromTouchPair, zoomToBounds } from "./mapZoom";
 
 describe("map zoom helpers", () => {
+  it.each([[1280, 732], [390, 650], [844, 300]])("composes the cached camera correctly in a %s by %s viewport", (width, height) => {
+    const rendered = { x: -400, y: -220, k: 2 };
+    const camera = { x: -750, y: -400, k: 3 };
+    const delta = cameraViewportTransform(camera, rendered, width, height);
+    const scale = Math.min(width / 1000, height / 560);
+    const offset = { x: (width - 1000 * scale) / 2, y: (height - 560 * scale) / 2 };
+    const point = { x: 510, y: 125 };
+    const cached = { x: offset.x + scale * (rendered.x + point.x * rendered.k), y: offset.y + scale * (rendered.y + point.y * rendered.k) };
+    expect(delta.x + cached.x * delta.k).toBeCloseTo(offset.x + scale * (camera.x + point.x * camera.k));
+    expect(delta.y + cached.y * delta.k).toBeCloseTo(offset.y + scale * (camera.y + point.y * camera.k));
+    const client = { x: 20 + offset.x + 500 * scale, y: 68 + offset.y + 280 * scale };
+    const converted = svgViewportPoint(client.x, client.y, { x: 20, y: 68, width, height });
+    expect(converted.x).toBeCloseTo(500);
+    expect(converted.y).toBeCloseTo(280);
+  });
+
   it("keeps a zoom anchor fixed throughout an animated zoom", () => {
     const start = { x: 50, y: -20, k: 3 };
     const end = { x: -350, y: -740, k: 9 };

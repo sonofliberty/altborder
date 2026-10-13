@@ -71,6 +71,16 @@ export function projectGeometryToPathData(
       : null;
   }
 
+  if (options.preferManualFill) {
+    return projectedStroke.pathData
+      ? {
+          pathData: projectedStroke.pathData,
+          strokePathData: projectedStroke.pathData,
+          bounds: projectedStroke.bounds,
+        }
+      : null;
+  }
+
   let pathGenerator = geoPath(projection) as GeoPathWithDigits;
   if (pathGenerator.digits && options.coordinatePrecision !== undefined) {
     pathGenerator = pathGenerator.digits(options.coordinatePrecision) as GeoPathWithDigits;
@@ -78,10 +88,9 @@ export function projectGeometryToPathData(
 
   const d3PathData = pathGenerator(geometry);
   if (!d3PathData) return null;
-  const d3Bounds = pathGenerator.bounds(geometry);
   const pathData =
-    options.preferManualFill ||
-    (!options.preferD3Fill && shouldUseManualFillPath(d3PathData, d3Bounds, projectedStroke.bounds))
+    !options.preferD3Fill &&
+    shouldUseManualFillPath(d3PathData, pathGenerator.bounds(geometry), projectedStroke.bounds)
       ? projectedStroke.pathData
       : d3PathData;
   if (!pathData) return null;
@@ -90,6 +99,21 @@ export function projectGeometryToPathData(
     pathData,
     strokePathData: projectedStroke.pathData || pathData,
     bounds: projectedStroke.bounds,
+  };
+}
+
+/** Project border linework without generating a fill that will be discarded. */
+export function projectGeometryStrokeToPathData(
+  geometry: Geometry,
+  projection: GeoProjection,
+  options: ProjectedPathOptions = {},
+): ProjectedPathData | null {
+  const projected = projectGeometryToStrokePathData(geometry, projection, options);
+  if (!projected.pathData || !projected.bounds) return null;
+  return {
+    pathData: projected.pathData,
+    strokePathData: projected.pathData,
+    bounds: projected.bounds,
   };
 }
 
@@ -302,12 +326,19 @@ function projectPosition(
 ): [number, number] | null {
   const point = projection([position[0], position[1]]);
   if (!point || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) return null;
-  accumulator.bounds = mergeBounds(accumulator.bounds, {
-    minX: point[0],
-    minY: point[1],
-    maxX: point[0],
-    maxY: point[1],
-  });
+  if (accumulator.bounds) {
+    accumulator.bounds.minX = Math.min(accumulator.bounds.minX, point[0]);
+    accumulator.bounds.minY = Math.min(accumulator.bounds.minY, point[1]);
+    accumulator.bounds.maxX = Math.max(accumulator.bounds.maxX, point[0]);
+    accumulator.bounds.maxY = Math.max(accumulator.bounds.maxY, point[1]);
+  } else {
+    accumulator.bounds = {
+      minX: point[0],
+      minY: point[1],
+      maxX: point[0],
+      maxY: point[1],
+    };
+  }
   return point;
 }
 
@@ -431,15 +462,4 @@ function isLikelyProjectedFillArtifact(a: [number, number], b: [number, number])
 
 function boundsArea(bounds: ProjectedBounds): number {
   return Math.max(0, bounds.maxX - bounds.minX) * Math.max(0, bounds.maxY - bounds.minY);
-}
-
-
-function mergeBounds(a: ProjectedBounds | null, b: ProjectedBounds): ProjectedBounds {
-  if (!a) return b;
-  return {
-    minX: Math.min(a.minX, b.minX),
-    minY: Math.min(a.minY, b.minY),
-    maxX: Math.max(a.maxX, b.maxX),
-    maxY: Math.max(a.maxY, b.maxY),
-  };
 }

@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { geoNaturalEarth1 } from "d3-geo";
+import { pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceDirectory = resolve(process.argv[2] ?? join(root, "output/theme-study/assets"));
@@ -110,6 +111,7 @@ try {
   buildRaster("hoi4", 6, relief, terrain);
   buildRaster("eu4", 6, relief, terrain);
   writeFileSync(join(root, "src/mapThemeRaster.json"), `${JSON.stringify({ ...viewBox, overviewWidth, scale: projection.scale(), translate: projection.translate() }, null, 2)}\n`);
+  await import(pathToFileURL(join(root, "scripts/prepare-map-theme-tiles.mjs")).href);
 } finally {
   rmSync(temporaryDirectory, { recursive: true, force: true });
 }

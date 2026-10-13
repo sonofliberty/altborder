@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { geoIdentity, geoNaturalEarth1 } from "d3-geo";
 import type { GeoProjection } from "d3-geo";
 import type { FeatureCollection, Geometry } from "geojson";
 import mapDataFixture from "../public/data/map-data.json";
 import { subtractGeoJsonGeometries, unionGeoJsonGeometriesClosingGaps } from "./geometrySplit";
-import { projectGeometryToPathData, projectedGeometryBounds } from "./projectedPath";
+import { projectGeometryStrokeToPathData, projectGeometryToPathData, projectedGeometryBounds } from "./projectedPath";
 import type { ProjectedPathData } from "./projectedPath";
 import type { MapData } from "./types";
 
@@ -15,6 +15,41 @@ const renderPathOptions = {
 };
 
 describe("projected path layout", () => {
+  it("projects detailed border linework without changing its paths or bounds", () => {
+    const data = mapDataFixture as MapData;
+    const projection = makeMapProjection(data);
+    const geometries = ["BRA", "RUS", "USA", "CAN", "JPN", "IDN"].map((id) =>
+      data.baseCountries.find((candidate) => candidate.entityId === id)?.geometry
+        ?? getRegionGeometry(data, `${id}-ALL`),
+    );
+    geometries.push(data.boundaryEdges[0].geometry);
+    for (const geometry of geometries) {
+      const full = projectGeometryToPathData(geometry, projection, renderPathOptions);
+      const border = projectGeometryStrokeToPathData(geometry, projection, renderPathOptions);
+      expect(border?.pathData).toBe(full?.strokePathData);
+      expect(border?.bounds).toEqual(full?.bounds);
+    }
+  });
+
+  it("skips D3 fill streaming when only a manual fill or border is requested", () => {
+    const projection = geoNaturalEarth1();
+    const stream = vi.spyOn(projection, "stream");
+    const geometry: Geometry = {
+      type: "Polygon",
+      coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+    };
+    const manual = projectGeometryToPathData(geometry, projection, { preferManualFill: true });
+    const border = projectGeometryStrokeToPathData(geometry, projection);
+    expect(manual).not.toBeNull();
+    expect(manual).toEqual(border);
+    expect(stream).not.toHaveBeenCalled();
+  });
+
+  it("returns no border for geometry with no drawable linework", () => {
+    expect(projectGeometryStrokeToPathData({ type: "Polygon", coordinates: [] }, identityProjection)).toBeNull();
+    expect(projectGeometryStrokeToPathData({ type: "Point", coordinates: [10, 5] }, identityProjection)).toBeNull();
+  });
+
   it("finds the same country bounds without generating SVG paths", () => {
     const data = mapDataFixture as MapData;
     const projection = makeMapProjection(data);

@@ -285,7 +285,9 @@ The editor keeps its existing header, panel, and dialog shadows. The sidecar rec
 
 Clip the ocean texture to the projected world outline, so raster pixels outside the poles and map edges cannot show.
 
-Use 2400px overview textures until the settled zoom, canvas size, and device pixel ratio require more pixels. Keep the overview visible while full detail loads and decodes. A failed detail request must retain the overview. Both levels use the same projection, colors, and clipping paths.
+Use 2400px overview textures until the settled zoom, canvas size, and device pixel ratio require more pixels. Load only the visible 1024px detail tiles, with a small margin for map movement. Keep each overview area visible until its detail tile loads and decodes. A failed detail request must retain the overview. Both levels use the same projection, colors, and clipping paths.
+
+During zoom and pan, move the cached map with a CSS transform. Refresh projected paths when the camera leaves the prepared area or changes scale substantially. Clip fills, borders, and texture masks to the visible stage plus its movement margin, including the space around the centered SVG viewBox. Keep polygon operations in cancellable workers so edits do not block camera input.
 
 ## Shapes
 

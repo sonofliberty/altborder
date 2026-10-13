@@ -296,6 +296,30 @@ describe("splitCountryGeometry", () => {
 });
 
 describe("country geometry unions", () => {
+  it("preserves holes and land when neighboring polygons use mixed winding", () => {
+    const donut: Geometry = { type: "Polygon", coordinates: [
+      squareCoordinates(0, 0, 10, 10),
+      squareCoordinates(3, 3, 7, 7),
+    ] };
+    const reversedNeighbor: Geometry = { type: "Polygon", coordinates: [squareCoordinates(10.01, 0, 12, 10).reverse()] };
+    const input = structuredClone([donut, reversedNeighbor]);
+    const fill = unionGeoJsonGeometriesClosingGaps(input, 0.02)!;
+    expect(geometryContainsPoint(fill, [1, 1])).toBe(true);
+    expect(geometryContainsPoint(fill, [11, 5])).toBe(true);
+    expect(geometryContainsPoint(fill, [10.005, 5])).toBe(true);
+    expect(geometryContainsPoint(fill, [5, 5])).toBe(false);
+    expect(input).toEqual([donut, reversedNeighbor]);
+  });
+
+  it("keeps islands that touch another polygon at a single vertex", () => {
+    const land = [square(0, 0, 10, 10), square(10, 10, 20, 20), square(30, 0, 31, 1)];
+    const fill = unionGeoJsonGeometriesClosingGaps(land, 0.02)!;
+    for (const point of [[5, 5], [15, 15], [30.5, 0.5]] as [number, number][]) {
+      expect(geometryContainsPoint(fill, point)).toBe(true);
+    }
+    expect(geometryContainsPoint(fill, [15, 5])).toBe(false);
+  });
+
   it.each([0, 0.02, 0.08])("retains narrow corners while closing gaps at tolerance %s", (tolerance) => {
     const corner: Geometry = { type: "Polygon", coordinates: [[
       [0, 0], [0, 1], [0.002, 1.01], [0.004, 1], [1, 1], [1, 0], [0, 0],

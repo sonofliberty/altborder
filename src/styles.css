@@ -474,6 +474,7 @@ textarea {
 }
 
 .map {
+  overflow: visible;
   background: var(--color-map-ocean);
   cursor: grab;
   display: block;
@@ -483,7 +484,23 @@ textarea {
   width: 100%;
 }
 
-.map:active {
+.map-surface,
+.map-camera {
+  position: absolute;
+  inset: 0;
+}
+
+.map-surface {
+  cursor: grab;
+  touch-action: none;
+}
+
+.map-camera {
+  transform-origin: 0 0;
+}
+
+.map:active,
+.map-surface:active {
   cursor: grabbing;
 }
 

@@ -14,6 +14,21 @@ describe("country label display thresholds", () => {
 });
 
 describe("filterLabels", () => {
+  it("keeps labels visible in the space around a portrait SVG viewBox", () => {
+    const labels = [
+      { id: "above-viewBox", x: 500, y: -100, priority: 1 },
+      { id: "below-viewBox", x: 500, y: 650, priority: 1 },
+      { id: "outside-stage", x: 500, y: 1000, priority: 10 },
+    ];
+    const filtered = filterLabels(labels, { x: 0, y: 0, k: 1 }, {
+      maxLabels: 3,
+      minGap: 0,
+      viewportBounds: { minX: 0, minY: -200, maxX: 1000, maxY: 760 },
+      getBoxSize: () => ({ width: 80, height: 20 }),
+    });
+    expect(filtered.map((label) => label.id)).toEqual(["above-viewBox", "below-viewBox"]);
+  });
+
   it("keeps region labels clear of country names and flags after zoom and pan", () => {
     const zoom = { x: -40, y: -20, k: 3 };
     const countryBox = getLabelBox({ x: 30, y: 20 }, zoom, { width: 60, height: 20 });

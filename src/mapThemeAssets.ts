@@ -1,5 +1,43 @@
 import type { MapThemeId } from "./types";
 
+const decodedRasters = new Set<string>();
+const pendingRasters = new Map<string, Promise<void>>();
+const decodeQueue: Array<() => void> = [];
+const maxConcurrentDecodes = 2;
+let activeDecodes = 0;
+
+function startNextDecode(): void {
+  while (activeDecodes < maxConcurrentDecodes && decodeQueue.length > 0) {
+    decodeQueue.shift()!();
+  }
+}
+
+/** Share requests between changing viewports and limit transient bitmap memory. */
+export function decodeMapThemeRaster(source: string): Promise<void> {
+  if (decodedRasters.has(source)) return Promise.resolve();
+  const pending = pendingRasters.get(source);
+  if (pending) return pending;
+
+  const request = new Promise<void>((resolve, reject) => {
+    decodeQueue.push(() => {
+      activeDecodes += 1;
+      const image = new Image();
+      image.src = source;
+      void image.decode().then(() => {
+        decodedRasters.add(source);
+        resolve();
+      }, reject).finally(() => {
+        pendingRasters.delete(source);
+        activeDecodes -= 1;
+        startNextDecode();
+      });
+    });
+  });
+  pendingRasters.set(source, request);
+  startNextDecode();
+  return request;
+}
+
 /** Start the selected overview and font while the map geometry is prepared. */
 export function preloadMapThemeAssets(theme: MapThemeId): () => void {
   const base = import.meta.env.BASE_URL;

@@ -11,14 +11,15 @@ describe("country label rendering", () => {
     expect(appSource).not.toContain("country-label-outline");
     expect(appSource).not.toContain("country-label-fill");
     expect(appSource).not.toContain("country-label-clip");
-    expect(appSource).not.toContain("<clipPath");
+    const labelLayer = appSource.slice(appSource.indexOf("ref={countryLabelsRef}"), appSource.indexOf('<g className="region-labels"'));
+    expect(labelLayer).not.toContain("clipPath");
     expect(appSource).toContain("letterSpacing={label.letterSpacing}");
   });
 
   it("keeps country label visibility independent from selected country state", () => {
     expect(appSource).not.toContain("label.id === selectedEntityId");
     expect(appSource).not.toContain("priority: label.priority +");
-    expect(appSource).toContain("}, [countryLabelLayouts, mapViewScale, settledZoom]);");
+    expect(appSource).toContain("}, [countryLabelLayouts, logicalViewportBounds, mapViewScale, settledZoom]);");
   });
 
   it("swaps rebuilt country labels only after the full layout pass completes", () => {

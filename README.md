@@ -81,6 +81,12 @@ pnpm deadcode
 
 Run Knip for unused code and dependency checks.
 
+```sh
+pnpm prepare:themes
+```
+
+Prepare map textures, overview images, and detail tiles. Use `pnpm prepare:theme-tiles` to rebuild only the tiles from the existing textures.
+
 ## Map Data
 
 The committed map bundle lives at `public/data/map-data.json`. It currently contains:

@@ -1,4 +1,5 @@
 import { countryLabelMaxScreenFontSize } from "./labelConstants";
+import type { ProjectedBounds } from "./mapZoom";
 
 export function getCountryLabelScale(fontSize: number, zoomScale: number, viewScale: number): number {
   return Math.min(1, countryLabelMaxScreenFontSize / (fontSize * zoomScale * viewScale));
@@ -61,6 +62,7 @@ export function filterLabels<T extends ScreenLabelCandidate>(
     minGap: number;
     viewportWidth?: number;
     viewportHeight?: number;
+    viewportBounds?: ProjectedBounds;
     reservedBoxes?: LabelBox[];
     getBoxSize: (label: T) => LabelBoxSize;
     getSortText?: (label: T) => string;
@@ -71,16 +73,15 @@ export function filterLabels<T extends ScreenLabelCandidate>(
     if (b.priority !== a.priority) return b.priority - a.priority;
     return (options.getSortText?.(a).length ?? 0) - (options.getSortText?.(b).length ?? 0);
   });
+  const viewport = options.viewportBounds ?? (options.viewportWidth !== undefined && options.viewportHeight !== undefined
+    ? { minX: 0, minY: 0, maxX: options.viewportWidth, maxY: options.viewportHeight }
+    : undefined);
 
   for (const label of sorted) {
     if (accepted.length >= options.maxLabels) break;
     const box = getLabelBox(label, zoom, options.getBoxSize(label), options.minGap);
 
-    if (
-      options.viewportWidth !== undefined &&
-      options.viewportHeight !== undefined &&
-      (box.right < 0 || box.left > options.viewportWidth || box.bottom < 0 || box.top > options.viewportHeight)
-    ) {
+    if (viewport && (box.right < viewport.minX || box.left > viewport.maxX || box.bottom < viewport.minY || box.top > viewport.maxY)) {
       continue;
     }
 

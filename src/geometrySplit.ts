@@ -328,7 +328,9 @@ export function unionGeoJsonGeometriesClosingGaps(
 
   if (gapTolerance <= 0) return unionPolygonGeometryOnGrid(readable);
 
-  const unioned = unionJstsGeometries(readable.map(readGeometry));
+  // Merge on the output grid before buffering. Shared subdivision vertices
+  // otherwise force JSTS to node the same country border repeatedly.
+  const unioned = readGeometry(unionPolygonGeometryOnGrid(readable));
   const expanded = BufferOp.bufferOp(unioned, gapTolerance) as JstsGeometry;
   const closed = BufferOp.bufferOp(expanded, -gapTolerance) as JstsGeometry;
   // Buffer erosion and independent simplification can remove narrow corners

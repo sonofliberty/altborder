@@ -1,39 +1,130 @@
 import { memo, useEffect, useId, useMemo, useState } from "react";
 import { geoPath, type GeoProjection } from "d3-geo";
 import type { MapThemeId } from "./types";
-import { getMapThemeRasterTransform } from "./mapThemeProjection";
+import type { ProjectedBounds } from "./mapZoom";
+import {
+  getMapThemeOverviewClipPath,
+  getMapThemeRasterBounds,
+  getMapThemeRasterTiles,
+  getMapThemeRasterTransform,
+  type MapThemeRasterName,
+} from "./mapThemeProjection";
+import { decodeMapThemeRaster } from "./mapThemeAssets";
+import { clipMapThemeCountryPaths, clipMapThemePolygonPath, type MapThemeCountryPath } from "./mapThemeClip";
 import raster from "./mapThemeRaster.json";
 
-type ThemeLayerProps = { theme: MapThemeId; projection: GeoProjection; detail: boolean };
-type CountryPath = { id: string; pathData: string };
+type ThemeLayerProps = {
+  theme: MapThemeId;
+  projection: GeoProjection;
+  detail: boolean;
+  viewportBounds?: ProjectedBounds;
+};
 
-/** Keep the overview visible while a zoomed texture loads and decodes. */
-function useMapRaster(name: MapThemeId | "ocean", detail: boolean): string {
-  const base = `${import.meta.env.BASE_URL}map-themes/${name}`;
-  const full = `${base}.webp`;
-  const [decoded, setDecoded] = useState<string | null>(null);
-
+function useDecodedRasterTiles(sources: readonly string[]): ReadonlySet<string> {
+  const [decoded, setDecoded] = useState<ReadonlySet<string>>(() => new Set());
   useEffect(() => {
-    if (!detail || decoded === full) return;
     let cancelled = false;
-    const image = new Image();
-    image.src = full;
-    void image.decode().then(() => {
-      if (!cancelled) setDecoded(full);
-    }).catch(() => {
-      // A failed detail request keeps the complete overview map available.
-    });
+    let next = 0;
+    async function decodeNextTiles() {
+      while (!cancelled && next < sources.length) {
+        const source = sources[next++];
+        try {
+          await decodeMapThemeRaster(source);
+          if (!cancelled) setDecoded((previous) => previous.has(source) ? previous : new Set([...previous, source]));
+        } catch {
+          // Keep the overview cell when a detail tile cannot load.
+        }
+      }
+    }
+    // Request only two cells at a time; obsolete viewports do not queue a world.
+    void decodeNextTiles();
+    void decodeNextTiles();
     return () => { cancelled = true; };
-  }, [decoded, detail, full]);
-
-  return detail && decoded === full ? full : `${base}-overview.webp`;
+  }, [sources]);
+  return decoded;
 }
 
+/** Keep a complete overview while decoding small, visible detail cells. */
+const MapThemeRaster = memo(function MapThemeRaster({
+  name,
+  projection,
+  detail,
+  viewportBounds,
+  className,
+}: Omit<ThemeLayerProps, "theme"> & { name: MapThemeRasterName; className?: string }) {
+  const clipId = `map-theme-overview-${useId()}`;
+  const base = `${import.meta.env.BASE_URL}map-themes`;
+  const tiles = useMemo(() => detail ? getMapThemeRasterTiles(name, projection, viewportBounds) : [],
+    [detail, name, projection, viewportBounds]);
+  const sourceForTile = (id: string) => `${base}/tiles/${name}/${id}.webp`;
+  const sources = useMemo(() => tiles.map((tile) => `${base}/tiles/${name}/${tile.id}.webp`), [base, name, tiles]);
+  const decoded = useDecodedRasterTiles(sources);
+  const readyTiles = tiles.filter((tile) => decoded.has(sourceForTile(tile.id)));
+  const rasterBounds = getMapThemeRasterBounds(projection, viewportBounds);
+  const hasOverviewClip = Boolean(viewportBounds) || readyTiles.length > 0;
+  return (
+    <g transform={getMapThemeRasterTransform(projection)}>
+      {hasOverviewClip ? (
+        <defs>
+          <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
+            <path d={getMapThemeOverviewClipPath(readyTiles, rasterBounds)} clipRule="evenodd" fillRule="evenodd" />
+          </clipPath>
+        </defs>
+      ) : null}
+      <image
+        className={className}
+        href={`${base}/${name}-overview.webp`}
+        width={raster.width}
+        height={raster.height}
+        preserveAspectRatio="none"
+        clipPath={hasOverviewClip ? `url(#${clipId})` : undefined}
+      />
+      {readyTiles.map((tile) => (
+        <svg
+          key={tile.id}
+          x={tile.x}
+          y={tile.y}
+          width={tile.width}
+          height={tile.height}
+          viewBox={`0 0 ${tile.width} ${tile.height}`}
+          overflow="hidden"
+        >
+          <image
+            className={className}
+            href={sourceForTile(tile.id)}
+            x={tile.imageX - tile.x}
+            y={tile.imageY - tile.y}
+            width={tile.imageWidth}
+            height={tile.imageHeight}
+            preserveAspectRatio="none"
+          />
+        </svg>
+      ))}
+    </g>
+  );
+});
+
+const MapThemeLandClip = memo(function MapThemeLandClip({
+  clipId,
+  countryPaths,
+  viewportBounds,
+}: { clipId: string; countryPaths: readonly MapThemeCountryPath[]; viewportBounds?: ProjectedBounds }) {
+  const clippedPaths = useMemo(() => clipMapThemeCountryPaths(countryPaths, viewportBounds), [countryPaths, viewportBounds]);
+  return (
+    <defs>
+      <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
+        {clippedPaths.map((country) => (
+          <path key={country.id} d={country.pathData} clipRule="evenodd" fillRule="evenodd" />
+        ))}
+      </clipPath>
+    </defs>
+  );
+});
+
 /** Render within the existing map zoom group, before country fills. */
-export const MapThemeOcean = memo(function MapThemeOcean({ projection, detail }: ThemeLayerProps) {
-  const source = useMapRaster("ocean", detail);
+export const MapThemeOcean = memo(function MapThemeOcean({ projection, detail, viewportBounds }: ThemeLayerProps) {
   const clipId = `map-theme-world-${useId()}`;
-  const worldPath = useMemo(() => geoPath(projection)({ type: "Sphere" }) ?? "", [projection]);
+  const worldPath = useMemo(() => clipMapThemePolygonPath(geoPath(projection)({ type: "Sphere" }) ?? "", viewportBounds), [projection, viewportBounds]);
   return (
     <g pointerEvents="none" aria-hidden="true">
       <defs>
@@ -42,14 +133,7 @@ export const MapThemeOcean = memo(function MapThemeOcean({ projection, detail }:
         </clipPath>
       </defs>
       <g clipPath={`url(#${clipId})`}>
-        <image
-          className="map-theme-ocean"
-          href={source}
-          width={raster.width}
-          height={raster.height}
-          preserveAspectRatio="none"
-          transform={getMapThemeRasterTransform(projection)}
-        />
+        <MapThemeRaster name="ocean" projection={projection} detail={detail} viewportBounds={viewportBounds} className="map-theme-ocean" />
       </g>
     </g>
   );
@@ -60,27 +144,15 @@ export const MapThemeLand = memo(function MapThemeLand({
   theme,
   projection,
   detail,
+  viewportBounds,
   countryPaths,
-}: ThemeLayerProps & { countryPaths: readonly CountryPath[] }) {
+}: ThemeLayerProps & { countryPaths: readonly MapThemeCountryPath[] }) {
   const clipId = `map-theme-land-${useId()}`;
-  const source = useMapRaster(theme, detail);
   return (
     <g className="map-theme-land" pointerEvents="none" aria-hidden="true">
-      <defs>
-        <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
-          {countryPaths.map((country) => (
-            <path key={country.id} d={country.pathData} clipRule="evenodd" fillRule="evenodd" />
-          ))}
-        </clipPath>
-      </defs>
+      <MapThemeLandClip clipId={clipId} countryPaths={countryPaths} viewportBounds={viewportBounds} />
       <g clipPath={`url(#${clipId})`}>
-        <image
-          href={source}
-          width={raster.width}
-          height={raster.height}
-          preserveAspectRatio="none"
-          transform={getMapThemeRasterTransform(projection)}
-        />
+        <MapThemeRaster name={theme} projection={projection} detail={detail} viewportBounds={viewportBounds} />
       </g>
     </g>
   );
