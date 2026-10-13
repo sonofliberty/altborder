@@ -58,16 +58,29 @@ const minimumCustomBoundaryLength = 1e-6;
 export function buildCustomBoundaryEdges(
   activeRegions: RegionRecord[],
   customRegionIds: ReadonlySet<string>,
+  options: {
+    regionOwners?: Readonly<Record<string, string>>;
+    countryGeometries?: Readonly<Record<string, Geometry>>;
+  } = {},
 ): BoundaryEdgeRecord[] {
   if (customRegionIds.size === 0) return [];
 
   const indexedRegions = activeRegions.flatMap((region) => {
     if (!isPolygonalGeometry(region.geometry)) return [];
+    const isCustom = customRegionIds.has(region.id);
+    const ownerId = options.regionOwners?.[region.id] ?? region.ownerId ?? "";
+    const countryGeometry = options.countryGeometries?.[ownerId];
+    // Subdivision data can cross the country fill. Such land must not create
+    // a country border inside a neighbor after a cut and transfer.
+    const geometry = isCustom && countryGeometry
+      ? overlayPolygonalGeometry("intersection", region.geometry, countryGeometry)
+      : region.geometry;
+    if (geometry.type === "MultiPolygon" && geometry.coordinates.length === 0) return [];
     return [{
       id: region.id,
-      geometry: region.geometry,
-      bounds: boundsForPolygonalGeometry(region.geometry),
-      isCustom: customRegionIds.has(region.id),
+      geometry,
+      bounds: boundsForPolygonalGeometry(geometry),
+      isCustom,
     }];
   });
   const customRegions = indexedRegions.filter((region) => region.isCustom);
@@ -302,7 +315,7 @@ export function unionGeoJsonGeometries(geometries: Geometry[]): Geometry | null 
   const readable = geometries.filter(isPolygonalGeometry);
   if (readable.length === 0) return null;
   if (readable.length === 1) return readable[0];
-  return writeGeometry(unionJstsGeometries(readable.map(readGeometry)));
+  return rawWriteGeometry(unionJstsGeometries(readable.map(readGeometry)));
 }
 
 export function unionGeoJsonGeometriesClosingGaps(
@@ -313,25 +326,44 @@ export function unionGeoJsonGeometriesClosingGaps(
   if (readable.length === 0) return null;
   if (readable.length === 1) return readable[0];
 
-  const unioned = unionJstsGeometries(readable.map(readGeometry));
-  if (gapTolerance <= 0) return writeGeometry(unioned);
+  if (gapTolerance <= 0) return unionPolygonGeometryOnGrid(readable);
 
+  const unioned = unionJstsGeometries(readable.map(readGeometry));
   const expanded = BufferOp.bufferOp(unioned, gapTolerance) as JstsGeometry;
   const closed = BufferOp.bufferOp(expanded, -gapTolerance) as JstsGeometry;
-  return writeGeometry(closed);
+  // Buffer erosion and independent simplification can remove narrow corners
+  // or move shared borders. Gap closing may add land, but must keep the input.
+  return unionPolygonGeometryOnGrid([...readable, rawWriteGeometry(closed)]);
+}
+
+function unionPolygonGeometryOnGrid(geometries: Geometry[]): Geometry {
+  const coordinates = geometries.flatMap((geometry) => geometry.type === "Polygon"
+    ? [geometry.coordinates] : geometry.type === "MultiPolygon" ? geometry.coordinates : [])
+    .map((polygon) => polygon.map((ring, index) => {
+      const signedArea = ring.slice(1).reduce((sum, point, vertex) =>
+        sum + ring[vertex][0] * point[1] - point[0] * ring[vertex][1], 0);
+      return (signedArea < 0) === (index === 0) ? ring : [...ring].reverse();
+    }));
+  const union = overlayPolygonalGeometry("union", { type: "MultiPolygon", coordinates }, { type: "MultiPolygon", coordinates: [] });
+  if (union.type !== "MultiPolygon") return union;
+  // Restore d3-geo winding after the fixed-grid overlay.
+  return { ...union, coordinates: union.coordinates.map((polygon) => polygon.map((ring) => [...ring].reverse())) };
 }
 
 export function subtractGeoJsonGeometries(
   baseGeometry: Geometry,
   subtractGeometries: Geometry[],
-  options: { preserveCoordinates?: boolean } = {},
+  options: { preserveCoordinates?: boolean; boundaryTolerance?: number } = {},
 ): Geometry | null {
   if (!isPolygonalGeometry(baseGeometry)) return null;
   const readable = subtractGeometries.filter(isPolygonalGeometry);
   if (readable.length === 0) return baseGeometry;
 
   const base = readGeometry(baseGeometry);
-  const subtract = unionJstsGeometries(readable.map(readGeometry));
+  const unioned = unionJstsGeometries(readable.map(readGeometry));
+  const subtract = options.boundaryTolerance && options.boundaryTolerance > 0
+    ? BufferOp.bufferOp(unioned, options.boundaryTolerance) as JstsGeometry
+    : unioned;
   const difference = overlayPolygon("difference", base, subtract);
   if (difference.isEmpty()) return null;
   return options.preserveCoordinates ? rawWriteGeometry(difference) : writeGeometry(difference);

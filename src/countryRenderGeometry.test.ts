@@ -75,6 +75,47 @@ describe("country fills after dividing subdivisions", () => {
     expect(planarArea(fill)).toBe(100);
   });
 
+  it("keeps France out of Germany after dividing and transferring Elsass", async () => {
+    const original = createInitialSnapshot(data);
+    const regions = data.regions.filter(({ id }) => original.regionOwners[id] === "FRA");
+    const cutLine: Position[] = [[6.5, 49.6], [7.5, 47.4]];
+    const split = splitCountryGeometry([{ id: "FRA", name: "France", type: "Country", geometry: baseCountries.get("FRA")!.geometry }], cutLine);
+    expect(split.ok).toBe(true);
+    if (!split.ok) return;
+    const preview = buildDivideTerritories(split, split.defaultNewPieceIndex);
+    const divisions = completeDivisionLand(regions, divideRegions(regions, preview.newGeometry, { cutLine }), preview);
+    const divided = divideCountry(original, "FRA", new Map(regions.map((region) => [region.id, region])), divisions, "Elsass", "#a85f4f")!;
+    const annexed = transferRegions(divided.snapshot, divided.snapshot.entities[divided.entityId].regionIds, "DEU");
+    const decoded = await decodeSharePayload(await encodeSharePayload(createScenarioPayload(data, annexed)));
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    const restored = applyScenarioPayload(data, decoded.payload);
+    const germanyBase = baseCountries.get("DEU")!.geometry;
+    for (const snapshot of [divided.snapshot, annexed, restored]) {
+      const franceFill = (await renderFill(snapshot, "FRA"))!;
+      expect(planarArea(overlayPolygonalGeometry("intersection", franceFill, germanyBase))).toBeLessThan(0.00001);
+    }
+    const germanyFill = (await renderFill(restored, "DEU"))!;
+    expect(planarArea(overlayPolygonalGeometry("difference", germanyBase, germanyFill))).toBeLessThan(0.00001);
+    expect(planarArea(overlayPolygonalGeometry("difference", preview.newGeometry, germanyFill))).toBeLessThan(0.00001);
+  });
+
+  it("preserves acquired land outside a retired native subdivision", async () => {
+    const fixture = singleRegionMap();
+    const original = createInitialSnapshot(fixture);
+    const region = fixture.regions[0];
+    const divided = divideCountry(original, "AAA", new Map([[region.id, region]]), divideRegions([region], rectangle(8, 0, 10, 10)), "Native cut", "#a85f4f")!;
+    const remainder = divided.snapshot.customRegions[divided.snapshot.entities.AAA.regionIds[0]];
+    remainder.geometry = { type: "MultiPolygon", coordinates: [
+      ...(remainder.geometry.type === "Polygon" ? [remainder.geometry.coordinates] : remainder.geometry.type === "MultiPolygon" ? remainder.geometry.coordinates : []),
+      rectangle(20, 0, 30, 10).coordinates,
+    ] };
+    const fill = (await renderFill(divided.snapshot, "AAA", fixture))!;
+    expect(geoContains(fill, [5, 5])).toBe(true);
+    expect(geoContains(fill, [25, 5])).toBe(true);
+    expect(geoContains(fill, [9, 5])).toBe(false);
+  });
+
   it("preserves inland France land without restoring Elsass after annexation", async () => {
     const original = createInitialSnapshot(data);
     const france = baseCountries.get("FRA")!;

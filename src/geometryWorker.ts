@@ -23,6 +23,8 @@ export type GeometryWorkerRequest =
       kind: "custom-boundaries";
       activeRegions: RegionRecord[];
       customRegionIds: string[];
+      regionOwners?: Record<string, string>;
+      countryGeometries?: Record<string, Geometry>;
     }
   | {
       id: number;
@@ -52,7 +54,10 @@ self.addEventListener("message", (event: MessageEvent<GeometryWorkerRequest>) =>
     const response: GeometryWorkerResponse = {
       id: request.id,
       kind: request.kind,
-      edges: buildCustomBoundaryEdges(request.activeRegions, new Set(request.customRegionIds)),
+      edges: buildCustomBoundaryEdges(request.activeRegions, new Set(request.customRegionIds), {
+        regionOwners: request.regionOwners,
+        countryGeometries: request.countryGeometries,
+      }),
     };
     self.postMessage(response);
     return;

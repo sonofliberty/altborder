@@ -181,6 +181,7 @@ type SimpleMapLabel = {
 
 type CountryUnderlay = {
   id: string;
+  geometry: Geometry;
   pathData: string;
   bounds: ProjectedBounds;
   sealInternalSeams: boolean;
@@ -518,6 +519,7 @@ export default function App() {
 
     let cancelled = false;
     const activeRegions = effectiveRegions.filter((region) => Boolean(regionOwners[region.id]));
+    const modifiedOwners = new Set(modifiedRegionRecords.map((region) => regionOwners[region.id]));
     const worker = new Worker(new URL("./geometryWorker.ts", import.meta.url), { type: "module" });
     const requestId = geometryWorkerRequestIdRef.current + 1;
     geometryWorkerRequestIdRef.current = requestId;
@@ -530,6 +532,10 @@ export default function App() {
       kind: "custom-boundaries",
       activeRegions,
       customRegionIds: modifiedRegionRecords.map((region) => region.id),
+      regionOwners,
+      countryGeometries: Object.fromEntries(countryUnderlays
+        .filter((underlay) => modifiedOwners.has(underlay.id))
+        .map((underlay) => [underlay.id, underlay.geometry])),
     };
     worker.addEventListener("message", handleMessage);
     worker.postMessage(request);
@@ -539,7 +545,7 @@ export default function App() {
       worker.removeEventListener("message", handleMessage);
       worker.terminate();
     };
-  }, [modifiedRegionRecords, effectiveRegions, regionOwners]);
+  }, [modifiedRegionRecords, effectiveRegions, regionOwners, countryUnderlays]);
 
   const regionById = useMemo(() => {
     return new Map(effectiveRegions.map((region) => [region.id, region]));
@@ -887,9 +893,10 @@ export default function App() {
             const union = await unionOwnedRegionRenderGeometry(renderGeometries);
             if (cancelled) return;
             const projected = union ? projectGeometryToPathData(union, projection, getProjectedPathOptions(false, true)) : null;
-            if (projected) {
+            if (union && projected) {
               const underlay = {
                 id: entityId,
+                geometry: union,
                 pathData: projected.pathData,
                 bounds: projected.bounds,
                 sealInternalSeams: false,
@@ -969,6 +976,7 @@ export default function App() {
 
           const underlay = {
             id: entityId,
+            geometry: renderGeometry,
             pathData: composedFill?.pathData ?? projected.pathData,
             bounds: projected.bounds,
             sealInternalSeams: Boolean(composedFill),

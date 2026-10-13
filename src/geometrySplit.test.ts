@@ -8,7 +8,10 @@ import {
   buildDivideTerritories,
   separateCountryIsland,
   splitCountryGeometry,
+  unionGeoJsonGeometries,
+  unionGeoJsonGeometriesClosingGaps,
 } from "./geometrySplit";
+import { overlayPolygonalGeometry } from "./polygonOverlay.mjs";
 import type { MapData, RegionRecord } from "./types";
 
 describe("splitCountryGeometry", () => {
@@ -292,7 +295,36 @@ describe("splitCountryGeometry", () => {
   });
 });
 
+describe("country geometry unions", () => {
+  it.each([0, 0.02, 0.08])("retains narrow corners while closing gaps at tolerance %s", (tolerance) => {
+    const corner: Geometry = { type: "Polygon", coordinates: [[
+      [0, 0], [0, 1], [0.002, 1.01], [0.004, 1], [1, 1], [1, 0], [0, 0],
+    ]] };
+    const neighbor = square(1.01, 0, 2, 1);
+    const fill = unionGeoJsonGeometriesClosingGaps([corner, neighbor], tolerance)!;
+    for (const geometry of [corner, neighbor]) {
+      expect(overlayPolygonalGeometry("difference", geometry, fill)).toEqual({ type: "MultiPolygon", coordinates: [] });
+    }
+    const union = unionGeoJsonGeometries([corner, neighbor])!;
+    expect(overlayPolygonalGeometry("difference", corner, union)).toEqual({ type: "MultiPolygon", coordinates: [] });
+    if (tolerance > 0) {
+      const gap = square(1, 0.4, 1.01, 0.6);
+      expect(overlayPolygonalGeometry("difference", gap, fill)).toEqual({ type: "MultiPolygon", coordinates: [] });
+    }
+  });
+});
+
 describe("buildCustomBoundaryEdges", () => {
+  it("keeps custom borders inside the current country fills after transfer", () => {
+    const regions = [region("remainder", square(0, 0, 6, 10)), region("acquired", square(4, 0, 5, 10)), region("neighbor", square(5, 0, 10, 10))];
+    const edges = buildCustomBoundaryEdges(regions, new Set(["remainder", "acquired"]), {
+      regionOwners: { remainder: "AAA", acquired: "BBB", neighbor: "BBB" },
+      countryGeometries: { AAA: square(0, 0, 4, 10), BBB: square(4, 0, 10, 10) },
+    });
+    expect(edges.map((edge) => edge.regionIds)).toEqual([["acquired", "remainder"], ["acquired", "neighbor"]]);
+    expect(regions[0].geometry).toEqual(square(0, 0, 6, 10));
+  });
+
   it("creates one shared edge for a custom divide and its neighbor", () => {
     const edges = buildCustomBoundaryEdges(
       [region("custom", square(0, 0, 5, 10)), region("neighbor", square(5, 0, 10, 10))],

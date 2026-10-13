@@ -77,13 +77,26 @@ export async function buildStableBaseRenderGeometry({
     .filter((regionId) => !ownedRegionIds.has(regionId) && Boolean(regionOwners[regionId]))
     .map((regionId) => regionGeometryById.get(regionId))
     .filter((geometry): geometry is Geometry => Boolean(geometry));
+  const nativeCutFootprint = retiredBaseGeometries.length > 0
+    ? unionGeoJsonGeometries([baseCountry.geometry, ...retiredBaseGeometries])
+    : null;
+  const { overlayPolygonalGeometry } = await import("./polygonOverlay.mjs");
   const foreignGeometries = regionIds
     .filter((regionId) => baseOwnerByRegionId.get(regionId) !== entityId)
-    .map((regionId) => regionGeometryById.get(regionId))
+    .map((regionId) => {
+      const geometry = regionGeometryById.get(regionId);
+      if (!geometry || baseOwnerByRegionId.has(regionId) || !nativeCutFootprint) return geometry;
+      // Native cut pieces are already represented by ADM0 minus lost land.
+      // ADM1 can extend over a neighbor's border; adding it back would paint
+      // that neighbor with the source country's color. Keep only acquired land
+      // outside both the original country and its retired subdivisions.
+      // Match the overlay coordinate grid so rounding does not create false
+      // acquisitions along the original subdivision's boundary.
+      return subtractGeoJsonGeometries(geometry, [nativeCutFootprint], { preserveCoordinates: true, boundaryTolerance: 0.00002 });
+    })
     .filter((geometry): geometry is Geometry => Boolean(geometry));
 
   if (!ownsNativeRegion) {
-    const { overlayPolygonalGeometry } = await import("./polygonOverlay.mjs");
     const ownsRetiredNativeLand = retiredBaseGeometries.some((baseGeometry) =>
       customGeometries.some((geometry) => {
         const intersection = overlayPolygonalGeometry("intersection", baseGeometry, geometry);
@@ -112,7 +125,6 @@ export async function buildStableBaseRenderGeometry({
       : baseCountry.geometry;
 
   if (stableBaseGeometry && lostGeometries.length > 0) {
-    const { overlayPolygonalGeometry } = await import("./polygonOverlay.mjs");
     const ownedNativeGeometries = regionIds
       .filter((id) => baseOwnerByRegionId.get(id) === entityId || !baseOwnerByRegionId.has(id))
       .map((id) => regionGeometryById.get(id))
