@@ -51,6 +51,10 @@ Barlow Semibold (600) and Cinzel Medium (500), from Google Fonts:
 
 Both are distributed under the SIL Open Font License 1.1. Original license
 texts are included beside the self-hosted font files in `public/fonts`.
+The browser uses WOFF2 copies, converted from the supplied TTF files with
+FontTools and Brotli. The conversion retains every glyph and font metric.
+To regenerate, load each TTF with `fontTools.ttLib.TTFont`, set `flavor` to
+`"woff2"`, and save beside the source with the `.woff2` extension.
 
 ## Visual references
 

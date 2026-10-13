@@ -78,6 +78,7 @@ import { getMapTheme, getThemedEntities, setEntityColor, setMapTheme } from "./m
 import { MapThemeSelector } from "./MapThemeSelector";
 import { MapThemeCoasts, MapThemeLand, MapThemeOcean } from "./MapThemeLayers";
 import mapThemeRaster from "./mapThemeRaster.json";
+import { preloadMapThemeAssets } from "./mapThemeAssets";
 import { boundsIntersect, projectedViewportBounds, shouldCullPaths } from "./mapCulling";
 import { findRegionAtProjectedPoint } from "./geometryHitTest";
 import { customCountryAccentColor, getFallbackCountryColor } from "./colorRuntime";
@@ -424,6 +425,7 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    let clearPreloads: (() => void) | undefined;
 
     async function load() {
       try {
@@ -438,13 +440,6 @@ export default function App() {
         const mapData = applyPoliticalMapPalette(decodedMapData);
         await yieldToMainThread();
         if (cancelled) return;
-        const prepared = await prepareMapRendering(
-          mapData,
-          [[16, 18], [viewportWidth - 16, viewportHeight - 22]],
-          mapRenderSimplifyTolerance,
-          () => cancelled,
-        );
-        if (!prepared || cancelled) return;
         const encoded = readShareFromHash(window.location.hash);
         let initial = createInitialSnapshot(mapData);
         let shouldReadOnly = false;
@@ -459,6 +454,15 @@ export default function App() {
             setLoadError(decoded.error);
           }
         }
+
+        clearPreloads = preloadMapThemeAssets(getMapTheme(initial.mapTheme).id);
+        const prepared = await prepareMapRendering(
+          mapData,
+          [[16, 18], [viewportWidth - 16, viewportHeight - 22]],
+          mapRenderSimplifyTolerance,
+          () => cancelled,
+        );
+        if (!prepared || cancelled) return;
 
         if (!cancelled) {
           setPreparedMap(prepared);
@@ -475,6 +479,7 @@ export default function App() {
     load();
     return () => {
       cancelled = true;
+      clearPreloads?.();
     };
   }, []);
 

@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Barlow Map";
-  src: url("/fonts/barlow-semibold.ttf") format("truetype");
+  src: url("/fonts/barlow-semibold.woff2") format("woff2");
   font-style: normal;
   font-weight: 600;
   font-display: swap;
@@ -8,7 +8,7 @@
 
 @font-face {
   font-family: "Cinzel Map";
-  src: url("/fonts/cinzel-medium.ttf") format("truetype");
+  src: url("/fonts/cinzel-medium.woff2") format("woff2");
   font-style: normal;
   font-weight: 500;
   font-display: swap;
