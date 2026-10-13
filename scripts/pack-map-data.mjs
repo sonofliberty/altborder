@@ -17,15 +17,16 @@ function encodeNumber(number) {
   return encoded + alphabet[value];
 }
 
-function encodeLine(positions) {
+function encodeLine(positions, precision) {
+  const scale = 10 ** precision;
   let encoded = "";
   let previousLongitude = 0;
   let previousLatitude = 0;
   for (const [longitude, latitude] of positions) {
-    const nextLongitude = Math.round(longitude * 100);
-    const nextLatitude = Math.round(latitude * 100);
-    if (Math.abs(longitude - nextLongitude / 100) > 1e-8 || Math.abs(latitude - nextLatitude / 100) > 1e-8) {
-      throw new Error("Map coordinates must use two-decimal precision.");
+    const nextLongitude = Math.round(longitude * scale);
+    const nextLatitude = Math.round(latitude * scale);
+    if (Math.abs(longitude - nextLongitude / scale) > 1e-8 || Math.abs(latitude - nextLatitude / scale) > 1e-8) {
+      throw new Error("Map coordinates must use at most five-decimal precision.");
     }
     encoded += encodeNumber(nextLongitude - previousLongitude);
     encoded += encodeNumber(nextLatitude - previousLatitude);
@@ -37,19 +38,23 @@ function encodeLine(positions) {
 
 function encodeGeometry(geometry) {
   const { type, coordinates } = geometry;
-  if (type === "LineString") return { type, coordinates: encodeLine(coordinates) };
+  const lines = type === "LineString" ? [coordinates] : type === "MultiPolygon" ? coordinates.flat() : coordinates;
+  const precision = lines.every((line) => line.every((point) => point.every((value) => Math.abs(value - Math.round(value * 100) / 100) < 1e-8))) ? 2 : 5;
+  const metadata = precision === 2 ? {} : { precision };
+  const encode = (line) => encodeLine(line, precision);
+  if (type === "LineString") return { type, ...metadata, coordinates: encode(coordinates) };
   if (type === "MultiLineString" || type === "Polygon") {
-    return { type, coordinates: coordinates.map(encodeLine) };
+    return { type, ...metadata, coordinates: coordinates.map(encode) };
   }
   if (type === "MultiPolygon") {
-    return { type, coordinates: coordinates.map((polygon) => polygon.map(encodeLine)) };
+    return { type, ...metadata, coordinates: coordinates.map((polygon) => polygon.map(encode)) };
   }
   throw new Error(`Unsupported geometry: ${type}`);
 }
 
 const source = JSON.parse(await fs.readFile(sourcePath, "utf8"));
 const packed = {
-  format: "polyline-2",
+  format: "polyline-variable",
   version: source.version,
   attribution: source.attribution,
   countries: source.countries,

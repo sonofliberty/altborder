@@ -42,6 +42,7 @@ A scenario is carried in a compressed URL. Normal editing and sharing must conti
 - Choose a bundled flag or upload a supported image.
 - Transfer selected regions to another country, or separate a region as a new country.
 - Divide a country with a drawn cut or a keyboard cut. A separate island can also become a new country.
+- Divide also supports a two-point cut. Unchanged subdivisions keep their geometry and names. Only subdivisions crossed by the new border are split.
 - Merge selected countries into one entity.
 - Undo, redo, and reset edits in the current session.
 - Open shared scenarios in read-only mode by default. Remix/Edit makes the scenario editable.

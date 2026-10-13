@@ -11,12 +11,13 @@ for (let index = 0; index < alphabet.length; index += 1) {
 type PackedGeometry = {
   type: Geometry["type"];
   coordinates: string | string[] | string[][];
+  precision?: 2 | 5;
 };
 
 type PackedRecord<T> = Omit<T, "geometry"> & { geometry: PackedGeometry };
 
 type PackedMapData = {
-  format: "polyline-2";
+  format: "polyline-2" | "polyline-variable";
   version: number;
   attribution: string;
   baseCountries: PackedRecord<MapData["baseCountries"][number]>[];
@@ -25,7 +26,7 @@ type PackedMapData = {
   boundaryEdges: PackedRecord<MapData["boundaryEdges"][number]>[];
 };
 
-function decodeLine(encoded: string): Position[] {
+function decodeLine(encoded: string, scale: number): Position[] {
   const positions: Position[] = [];
   let value = 0;
   let shift = 0;
@@ -47,7 +48,7 @@ function decodeLine(encoded: string): Position[] {
     const delta = value & 1 ? -(value + 1) / 2 : value / 2;
     if (expectsLatitude) {
       latitude += delta;
-      positions.push([longitude / 100, latitude / 100]);
+      positions.push([longitude / scale, latitude / scale]);
     } else {
       longitude += delta;
     }
@@ -65,17 +66,20 @@ function decodeLine(encoded: string): Position[] {
 }
 
 function decodeGeometry(geometry: PackedGeometry): Geometry {
+  const precision = geometry.precision ?? 2;
+  if (precision !== 2 && precision !== 5) throw new Error("Map data contains an unsupported coordinate precision.");
+  const decode = (line: string) => decodeLine(line, 10 ** precision);
   switch (geometry.type) {
     case "LineString":
-      return { type: "LineString", coordinates: decodeLine(geometry.coordinates as string) };
+      return { type: "LineString", coordinates: decode(geometry.coordinates as string) };
     case "MultiLineString":
-      return { type: "MultiLineString", coordinates: (geometry.coordinates as string[]).map(decodeLine) };
+      return { type: "MultiLineString", coordinates: (geometry.coordinates as string[]).map(decode) };
     case "Polygon":
-      return { type: "Polygon", coordinates: (geometry.coordinates as string[]).map(decodeLine) };
+      return { type: "Polygon", coordinates: (geometry.coordinates as string[]).map(decode) };
     case "MultiPolygon":
       return {
         type: "MultiPolygon",
-        coordinates: (geometry.coordinates as string[][]).map((polygon) => polygon.map(decodeLine)),
+        coordinates: (geometry.coordinates as string[][]).map((polygon) => polygon.map(decode)),
       };
     default:
       throw new Error("Map data contains an unsupported geometry.");
@@ -83,7 +87,7 @@ function decodeGeometry(geometry: PackedGeometry): Geometry {
 }
 
 function readPackedMapData(value: unknown): PackedMapData {
-  if (!value || typeof value !== "object" || (value as { format?: string }).format !== "polyline-2") {
+  if (!value || typeof value !== "object" || !["polyline-2", "polyline-variable"].includes((value as { format?: string }).format ?? "")) {
     throw new Error("Map data has an unsupported format.");
   }
   return value as PackedMapData;

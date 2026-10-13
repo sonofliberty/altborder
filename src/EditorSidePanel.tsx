@@ -8,16 +8,20 @@ import {
   Eye,
   GitMerge,
   Image,
+  Keyboard,
+  MoveUpRight,
+  PencilLine,
   RotateCcw,
   Search,
   Split,
   Upload,
+  Waves,
   X,
 } from "lucide-react";
 import type { CountrySearchOption } from "./countrySearch";
 import { filterCountryOptions } from "./countrySearch";
 import { customCountryAccentColor } from "./colorRuntime";
-import type { CountryEntity, CountryFlag, EditMode } from "./types";
+import type { CountryEntity, CountryFlag, DivideMethod, EditMode } from "./types";
 import {
   builtinCountryFlag,
   countryFlagEquals,
@@ -75,6 +79,9 @@ type EditorSidePanelProps = {
   divideHasDraft: boolean;
   divideError: string;
   divideIsCalculating: boolean;
+  divideMethod: DivideMethod;
+  divideAwaitingEnd: boolean;
+  onChangeDivideMethod: (method: DivideMethod) => void;
   newCountryName: string;
   newCountryColor: string;
   onSwapDivideSides: () => void;
@@ -308,6 +315,15 @@ function TransferPanel(props: EditorSidePanelProps) {
 }
 
 function DividePanel(props: EditorSidePanelProps) {
+  const previewReady = props.divideCanSwap && !props.divideIsCalculating;
+  const instructions = props.divideMethod === "island"
+    ? ["Choose an island", "Select a separate island on the map. The mainland stays with the current country."]
+    : props.divideMethod === "draw"
+      ? ["Draw your new border", "Drag from one side of the country to the other. Start and finish outside its border."]
+      : props.divideAwaitingEnd
+        ? ["Place the second point", "Select a point on the other side of the country. The line between your points becomes the border."]
+        : ["A new border in two points", "Select a point just outside the country, then a point on the other side."];
+
   return (
     <>
       <CountryContext
@@ -327,51 +343,63 @@ function DividePanel(props: EditorSidePanelProps) {
       />
 
       {props.selectedEntity ? (
-        <div className="tool-card">
-          <div className="section-heading">New country</div>
-          {!props.readOnly ? (
-            <div className="keyboard-cut-controls">
-              <button id="keyboard-cut-start" className="compact" onClick={props.onStartKeyboardCut}>
-                {props.keyboardCutActive ? "Restart keyboard cut" : "Cut with keyboard"}
-              </button>
-              {props.keyboardCutActive ? (
-                <>
-                  <p id="keyboard-cut-help" className="hint" role="status">
-                    Use arrow keys to move the marker. Hold Shift to move faster. Press Enter to add a point.
-                    Add points on both sides of the country, then press F to finish. Backspace removes a point.
-                    Escape cancels. {props.keyboardCutPointCount} {props.keyboardCutPointCount === 1 ? "point" : "points"} placed.
-                  </p>
-                  <div className="switch-row">
-                    <button className="compact" disabled={props.keyboardCutPointCount < 2} onClick={props.onFinishKeyboardCut}>
-                      Finish cut
-                    </button>
-                    <button className="compact" onClick={props.onCancelKeyboardCut}>Cancel</button>
-                  </div>
-                </>
+        <div className="divide-workflow">
+          <ol className="divide-steps" aria-label="Divide steps">
+            <li className={previewReady ? "complete" : "current"} aria-current={!previewReady ? "step" : undefined}>
+              <span>{previewReady ? <Check size={13} aria-hidden="true" /> : "1"}</span> Set border
+            </li>
+            <li className={previewReady ? "current" : ""} aria-current={previewReady ? "step" : undefined}>
+              <span>2</span> Create country
+            </li>
+          </ol>
+
+          {!previewReady ? (
+            <>
+              <div className="divide-methods" role="group" aria-label="Border method">
+                <button className="compact" aria-pressed={props.divideMethod === "line"} disabled={props.readOnly} onClick={() => props.onChangeDivideMethod("line")}>
+                  <MoveUpRight size={16} aria-hidden="true" /> Two points
+                </button>
+                <button className="compact" aria-pressed={props.divideMethod === "draw"} disabled={props.readOnly} onClick={() => props.onChangeDivideMethod("draw")}>
+                  <PencilLine size={16} aria-hidden="true" /> Draw
+                </button>
+                <button className="compact" aria-pressed={props.divideMethod === "island"} disabled={props.readOnly} onClick={() => props.onChangeDivideMethod("island")}>
+                  <Waves size={16} aria-hidden="true" /> Island
+                </button>
+              </div>
+              {!props.keyboardCutActive && !props.divideIsCalculating ? (
+                <div className="divide-instructions" role="status">
+                  <h3>{instructions[0]}</h3>
+                  <p>{instructions[1]}</p>
+                </div>
               ) : null}
-            </div>
+              {props.divideIsCalculating ? <div className="tool-status" role="status">Checking your new border...</div> : null}
+            </>
           ) : null}
+
+          {props.divideError ? <div className="tool-error" role="alert">{props.divideError}</div> : null}
           {props.divideHasDraft ? (
-          <>
-            <div className="switch-row">
-              <button className="compact" disabled={props.readOnly || !props.divideCanSwap} onClick={props.onSwapDivideSides}>
-                <ArrowLeftRight size={15} /> Swap
-              </button>
-              <button className="compact" disabled={props.readOnly || !props.divideHasDraft} onClick={props.onClearDivideDraft}>
-                Clear
-              </button>
-            </div>
-            {props.divideIsCalculating ? <div className="tool-status" role="status">Calculating border...</div> : null}
-            {props.divideError ? <div className="tool-error" role="alert">{props.divideError}</div> : null}
-            {props.divideCanSwap ? (
+            <>
+              {previewReady ? (
               <>
+                <div className="divide-ready" role="status">
+                  <Check size={17} aria-hidden="true" /> Your border is ready
+                </div>
+                <div className="divide-preview-key">
+                  <span className="divide-color-key" style={{ backgroundColor: props.newCountryColor }} aria-hidden="true" />
+                  <span>{props.newCountryName.trim() || "New country"}</span>
+                  <button className="compact" disabled={props.readOnly} onClick={props.onSwapDivideSides}>
+                    <ArrowLeftRight size={14} aria-hidden="true" /> Other side
+                  </button>
+                </div>
+                <p className="hint">The colored side becomes your new country. Select either side on the map to change it.</p>
                 <label className="field">
-                  <span>Name</span>
+                  <span>Country name</span>
                   <input
+                    id="divide-country-name"
                     value={props.newCountryName}
                     disabled={props.readOnly}
                     onChange={(event) => props.onChangeNewCountryName(event.target.value)}
-                    placeholder="Required"
+                    placeholder="Name your new country"
                   />
                 </label>
                 <label className="field color-field">
@@ -389,14 +417,38 @@ function DividePanel(props: EditorSidePanelProps) {
                   disabled={props.readOnly || !props.canCreateDividedCountry}
                   onClick={props.onCreateDividedCountry}
                 >
-                  <Split size={16} /> Create country
+                  <Split size={16} aria-hidden="true" /> Create country
                 </button>
+                <p className="hint">{props.newCountryName.trim() ? "You can undo this change." : "Enter a name to create your country."}</p>
               </>
             ) : null}
-          </>
-        ) : (
-          <p className="hint">Draw a cut across the country, or select a separate island. Use two fingers to move or zoom the map.</p>
-        )}
+              <button className="compact divide-start-over" disabled={props.readOnly} onClick={props.onClearDivideDraft}>
+                <RotateCcw size={14} aria-hidden="true" /> Start over
+              </button>
+            </>
+          ) : null}
+
+          {!props.readOnly && !previewReady && props.divideMethod !== "island" ? (
+            <details className="keyboard-cut-controls">
+              <summary><Keyboard size={15} aria-hidden="true" /> Keyboard controls <ChevronDown size={14} className="disclosure-icon" aria-hidden="true" /></summary>
+              <button id="keyboard-cut-start" className="compact" onClick={props.onStartKeyboardCut}>
+                {props.keyboardCutActive ? "Restart keyboard cut" : "Cut with keyboard"}
+              </button>
+              {props.keyboardCutActive ? (
+                <>
+                  <p id="keyboard-cut-help" className="hint" role="status">
+                    Use arrow keys to move the marker. Hold Shift to move faster. Press Enter to add a point.
+                    Add points on both sides of the country, then press F to finish. Backspace removes a point.
+                    Escape cancels. {props.keyboardCutPointCount} {props.keyboardCutPointCount === 1 ? "point" : "points"} placed.
+                  </p>
+                  <div className="switch-row">
+                    <button className="compact" disabled={props.keyboardCutPointCount < 2} onClick={props.onFinishKeyboardCut}>Finish cut</button>
+                    <button className="compact" onClick={props.onCancelKeyboardCut}>Cancel</button>
+                  </div>
+                </>
+              ) : null}
+            </details>
+          ) : null}
         </div>
       ) : null}
     </>

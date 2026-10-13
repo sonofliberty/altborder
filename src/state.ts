@@ -1,4 +1,4 @@
-import type { CountryEntity, EditorSnapshot, MapData, RegionRecord, ScenarioPayload } from "./types";
+import type { CountryEntity, EditorSnapshot, MapData, RegionDivision, RegionRecord, ScenarioPayload } from "./types";
 import {
   countryFlagEquals,
   getCountryFlag,
@@ -43,6 +43,7 @@ export function cloneSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
     customRegions: Object.fromEntries(
       Object.entries(snapshot.customRegions).map(([id, region]) => [id, { ...region }]),
     ),
+    ...(snapshot.regionLandAdditions ? { regionLandAdditions: { ...snapshot.regionLandAdditions } } : {}),
   };
 }
 
@@ -73,6 +74,11 @@ export function updateEntityRegions(snapshot: EditorSnapshot): EditorSnapshot {
     next.customRegions[regionId] = withCurrentRegionOwner(region, ownerId);
   }
   next.regionNameOverrides = pruneInactiveRegionNameOverrides(next);
+  if (next.regionLandAdditions) {
+    next.regionLandAdditions = Object.fromEntries(Object.entries(next.regionLandAdditions)
+      .filter(([id]) => Boolean(next.regionOwners[id] && getOwnValue(next.entities, next.regionOwners[id]))));
+    if (Object.keys(next.regionLandAdditions).length === 0) delete next.regionLandAdditions;
+  }
   pruneEmptyCustomEntities(next.entities);
   return next;
 }
@@ -134,6 +140,14 @@ export function transferRegions(
   };
 
   const nextCustomRegions = { ...snapshot.customRegions };
+  const nextRegionNameOverrides = { ...snapshot.regionNameOverrides };
+  for (const [sourceEntityId, sourceMoved] of movedBySource) {
+    const sourceEntity = snapshot.entities[sourceEntityId];
+    if (sourceEntity.isCustom && sourceEntity.regionIds.length === 1 && sourceMoved.length === 1) {
+      const regionId = sourceMoved[0];
+      nextRegionNameOverrides[regionId] ||= sourceEntity.name;
+    }
+  }
   for (const regionId of movedRegionIds) {
     const customRegion = nextCustomRegions[regionId];
     if (customRegion) {
@@ -146,6 +160,7 @@ export function transferRegions(
     ...snapshot,
     entities: nextEntities,
     regionOwners: nextRegionOwners,
+    regionNameOverrides: nextRegionNameOverrides,
     customRegions: nextCustomRegions,
   };
 }
@@ -214,6 +229,71 @@ export function separateRegionAsCountry(
   };
 }
 
+export function divideCountry(
+  snapshot: EditorSnapshot,
+  sourceEntityId: string,
+  regionById: ReadonlyMap<string, RegionRecord>,
+  divisions: RegionDivision[],
+  name: string,
+  color: string,
+): { snapshot: EditorSnapshot; entityId: string } | null {
+  const source = snapshot.entities[sourceEntityId];
+  const regionIds = getEntityRegionIds(snapshot, sourceEntityId);
+  const dividedIds = new Set(divisions.map((division) => division.regionId));
+  if (
+    !source || !name.trim() ||
+    dividedIds.size !== divisions.length || dividedIds.size !== regionIds.length ||
+    !regionIds.every((id) => dividedIds.has(id) && regionById.has(id)) ||
+    !divisions.some((division) => division.kind !== "keep") ||
+    !divisions.some((division) => division.kind !== "move")
+  ) return null;
+
+  const next = cloneSnapshot(snapshot);
+  const entityId = allocateCustomEntityId(next);
+  next.entities[entityId] = {
+    id: entityId,
+    name: name.trim(),
+    color,
+    flag: { ...neutralCountryFlag },
+    regionIds: [],
+    isCustom: true,
+  };
+
+  divisions.forEach((division, index) => {
+    if (division.kind !== "split" && division.landAddition) {
+      next.regionLandAdditions ??= {};
+      next.regionLandAdditions[division.regionId] = division.landAddition;
+    }
+    if (division.kind === "keep") return;
+    if (division.kind === "move") {
+      next.regionOwners[division.regionId] = entityId;
+      return;
+    }
+    const region = regionById.get(division.regionId)!;
+    const regionNameOverride = snapshot.regionNameOverrides[region.id];
+    const regionName = regionNameOverride || region.name;
+    if (next.regionLandAdditions) delete next.regionLandAdditions[region.id];
+    if (next.customRegions[region.id]) {
+      delete next.customRegions[region.id];
+      delete next.regionOwners[region.id];
+    } else {
+      next.regionOwners[region.id] = "";
+    }
+    delete next.regionNameOverrides[region.id];
+    for (const [suffix, ownerId, geometry] of [
+      ["REMAINDER", sourceEntityId, division.existingGeometry],
+      ["TERRITORY", entityId, division.newGeometry],
+    ] as const) {
+      const id = `${entityId}-REGION-${index}-${suffix}`;
+      next.customRegions[id] = { ...region, id, name: regionName, ownerId, geometry };
+      next.regionOwners[id] = ownerId;
+      if (regionNameOverride) next.regionNameOverrides[id] = regionNameOverride;
+    }
+  });
+
+  return { entityId, snapshot: updateEntityRegions(next) };
+}
+
 function makeCustomEntityId(counter: number): string {
   return `CUSTOM_${String(counter).padStart(3, "0")}`;
 }
@@ -254,6 +334,7 @@ export function createScenarioPayload(data: MapData, snapshot: EditorSnapshot): 
     entityChanges,
     regionOwnerChanges,
     regionNameOverrides: pruneInactiveRegionNameOverrides(normalizedSnapshot),
+    ...(normalizedSnapshot.regionLandAdditions ? { regionLandAdditions: normalizedSnapshot.regionLandAdditions } : {}),
     customRegions: Object.values(normalizedSnapshot.customRegions)
       .filter((region) => {
         const ownerId = normalizedSnapshot.regionOwners[region.id];
@@ -289,6 +370,7 @@ export function applyScenarioPayload(data: MapData, payload: ScenarioPayload): E
     regionOwners: { ...base.regionOwners },
     regionNameOverrides: { ...(payload.regionNameOverrides || {}) },
     customRegions: {},
+    ...(payload.regionLandAdditions ? { regionLandAdditions: { ...payload.regionLandAdditions } } : {}),
   };
   normalizeEntityCustomFlags(base, next.entities);
   normalizeEntityFlags(base, next.entities);

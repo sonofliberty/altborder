@@ -12,6 +12,7 @@ import BufferOp from "jsts/org/locationtech/jts/operation/buffer/BufferOp.js";
 import OverlayOp from "jsts/org/locationtech/jts/operation/overlay/OverlayOp.js";
 import UnaryUnionOp from "jsts/org/locationtech/jts/operation/union/UnaryUnionOp.js";
 import ArrayList from "jsts/java/util/ArrayList.js";
+import { restoreCountryComponents } from "./restore-country-components.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -348,6 +349,8 @@ async function main() {
 
   attachNonSovereignFallbacks({ countries, baseCountries, nonSovereignFallbacks, errors });
   addFrenchOverseasRegions({ countries, regions, baseCountries, usedRegionIds });
+  const completeRegions = restoreCountryComponents({ countries, regions, baseCountries });
+  regions.splice(0, regions.length, ...completeRegions);
   assignCountryColors({ countries, baseCountries, colorScheme });
   const boundaryEdges = buildBoundaryEdges(countries, regions, baseCountries);
 

@@ -96,6 +96,7 @@ function isScenarioPayloadShape(payload: Record<string, unknown>): payload is Sc
     optionalRegionOwnerChanges(payload.regionOwnerChanges) &&
     optionalStringRecord(payload.regionNameOverrides) &&
     optionalCustomRegions(payload.customRegions) &&
+    optionalRegionLandAdditions(payload.regionLandAdditions) &&
     customOwnersHaveEntityChanges(payload) &&
     customRegionOwnerChangesAreConsistent(payload)
   );
@@ -136,6 +137,11 @@ function optionalCustomRegions(value: unknown): boolean {
   if (value === undefined) return true;
   if (!Array.isArray(value) || !value.every(isRegionRecord)) return false;
   return new Set(value.map((region) => region.id)).size === value.length;
+}
+
+function optionalRegionLandAdditions(value: unknown): boolean {
+  return value === undefined || (isRecord(value) && Object.entries(value)
+    .every(([id, geometry]) => isSafeId(id) && isGeometry(geometry)));
 }
 
 function optionalRegionOwnerChanges(value: unknown): boolean {

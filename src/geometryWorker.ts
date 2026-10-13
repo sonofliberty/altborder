@@ -1,10 +1,12 @@
 /// <reference lib="webworker" />
 
-import type { Position } from "geojson";
-import type { BoundaryEdgeRecord, RegionRecord } from "./types";
+import type { Geometry, Position } from "geojson";
+import { completeDivisionLand } from "./divisionLandCoverage";
+import type { BoundaryEdgeRecord, RegionDivision, RegionRecord } from "./types";
 import {
   buildCustomBoundaryEdges,
   buildDivideTerritories,
+  divideRegions,
   separateCountryIsland,
   splitCountryGeometry,
   type CountrySplit,
@@ -12,7 +14,7 @@ import {
 
 export type DivideWorkerResult = {
   split: CountrySplit;
-  territories: Array<ReturnType<typeof buildDivideTerritories>> | null;
+  territories: Array<ReturnType<typeof buildDivideTerritories> & { regionDivisions: RegionDivision[] }> | null;
 };
 
 export type GeometryWorkerRequest =
@@ -26,8 +28,10 @@ export type GeometryWorkerRequest =
       id: number;
       kind: "divide";
       regions: RegionRecord[];
+      subdivisions: RegionRecord[];
       cutLine: Position[];
       islandPoint: Position | null;
+      regionLandAdditions?: Record<string, Geometry>;
     };
 
 export type GeometryWorkerResponse =
@@ -57,15 +61,34 @@ self.addEventListener("message", (event: MessageEvent<GeometryWorkerRequest>) =>
   const split = request.islandPoint
     ? separateCountryIsland(request.regions, request.islandPoint)
     : splitCountryGeometry(request.regions, request.cutLine);
+  let result: DivideWorkerResult;
+  try {
+    result = {
+      split,
+      territories: split.ok
+        ? [buildDivideTerritories(split, 0), buildDivideTerritories(split, 1)].map((territory) => {
+            const regionDivisions = completeDivisionLand(request.subdivisions,
+              divideRegions(request.subdivisions, territory.newGeometry,
+                request.islandPoint ? { island: true } : { cutLine: request.cutLine }),
+              territory, request.regionLandAdditions);
+            if (!regionDivisions.some((region) => region.kind !== "keep") ||
+                !regionDivisions.some((region) => region.kind !== "move")) {
+              throw new Error("The cut must leave regions on both sides.");
+            }
+            return { ...territory, regionDivisions };
+          })
+        : null,
+    };
+  } catch {
+    result = {
+      split: { ok: false, reason: "Could not preserve the regions with this cut. Try a different border." },
+      territories: null,
+    };
+  }
   const response: GeometryWorkerResponse = {
     id: request.id,
     kind: request.kind,
-    result: {
-      split,
-      territories: split.ok
-        ? [buildDivideTerritories(split, 0), buildDivideTerritories(split, 1)]
-        : null,
-    },
+    result,
   };
   self.postMessage(response);
 });

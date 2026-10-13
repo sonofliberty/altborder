@@ -3,13 +3,15 @@ import GeoJSONWriter from "jsts/org/locationtech/jts/io/GeoJSONWriter.js";
 import GeometryFactory from "jsts/org/locationtech/jts/geom/GeometryFactory.js";
 import BufferOp from "jsts/org/locationtech/jts/operation/buffer/BufferOp.js";
 import OverlayOp from "jsts/org/locationtech/jts/operation/overlay/OverlayOp.js";
+import TopologyException from "jsts/org/locationtech/jts/geom/TopologyException.js";
 import Polygonizer from "jsts/org/locationtech/jts/operation/polygonize/Polygonizer.js";
 import RelateOp from "jsts/org/locationtech/jts/operation/relate/RelateOp.js";
 import UnaryUnionOp from "jsts/org/locationtech/jts/operation/union/UnaryUnionOp.js";
 import ArrayList from "jsts/java/util/ArrayList.js";
 import type { Geometry, LineString, MultiLineString, Position } from "geojson";
-import type { BoundaryEdgeRecord, RegionRecord } from "./types";
+import type { BoundaryEdgeRecord, RegionDivision, RegionRecord } from "./types";
 import { simplifyPolygonalGeometry } from "./geometrySimplify";
+import { overlayPolygonalGeometry } from "./polygonOverlay.mjs";
 
 type JstsGeometry = {
   getArea(): number;
@@ -116,7 +118,7 @@ export function splitCountryGeometry(regions: RegionRecord[], cutLine: Position[
 
   try {
     const countryGeometry = unionJstsGeometries(
-      regions.map((region) => readGeometry(simplifyGeometry(region.geometry))),
+      regions.map((region) => readGeometry(region.geometry)),
     );
     const components = decomposePolygonComponents(countryGeometry);
     const originalLine = readGeometry({
@@ -145,7 +147,7 @@ export function splitCountryGeometry(regions: RegionRecord[], cutLine: Position[
     }
 
     const pieces = splitComponents[0].map((piece) => ({
-      geometry: writeGeometry(piece),
+      geometry: writeValidPolygonGeometry(piece),
       area: piece.getArea(),
     })) as [SplitPiece, SplitPiece];
 
@@ -224,6 +226,78 @@ export function buildDivideTerritories(
   };
 }
 
+export function divideRegions(
+  regions: RegionRecord[],
+  newCountryGeometry: Geometry,
+  options: { cutLine?: Position[]; island?: boolean } = {},
+): RegionDivision[] {
+  const newCountry = readGeometry(newCountryGeometry);
+  const newBounds = boundsForGeometry(newCountry);
+  const regionBounds = boundsForCoordinates(regions.flatMap((region) => {
+    const bounds = boundsForPolygonalGeometry(region.geometry);
+    return [[bounds[0], bounds[1]], [bounds[2], bounds[3]]];
+  }));
+  const cut = options.cutLine?.length && options.cutLine.length >= 2
+    ? extendLineToBounds(options.cutLine, regionBounds)
+    : null;
+  const line = cut ? readGeometry({ type: "LineString", coordinates: cut }) : null;
+
+  return regions.map((region): RegionDivision => {
+    if (!boundsOverlap(boundsForPolygonalGeometry(region.geometry), newBounds)) {
+      return { regionId: region.id, kind: "keep" };
+    }
+    const original = readGeometry(region.geometry);
+    const newPart = overlayPolygon("intersection", original, newCountry) as JstsGeometry;
+    const tolerance = line ? minArea : Math.max(minArea, original.getArea() * 1e-8);
+    if (newPart.getArea() <= tolerance) return { regionId: region.id, kind: "keep" };
+    if (line || options.island) {
+      const existingParts: JstsGeometry[] = [];
+      const newParts: JstsGeometry[] = [];
+      for (const component of decomposePolygonComponents(original)) {
+        const overlap = (overlayPolygon("intersection", component, newCountry) as JstsGeometry).getArea();
+        if (overlap <= tolerance) {
+          existingParts.push(component);
+          continue;
+        }
+        // A bent cut can cross this region many times. Keep all fragments separate:
+        // the country preview, rather than a second local side grouping, decides ownership.
+        const fragments = line
+          ? polygonizeSplitCandidates(component, line, minArea)
+          : [];
+        if (fragments.length > 0 && !splitCoversComponent(component.getArea(), fragments.map(({ geometry }) => geometry))) {
+          throw new Error("The region fragments must preserve the original area.");
+        }
+        for (const piece of fragments.length > 0 ? fragments.map(({ geometry }) => geometry) : [component]) {
+          const selectedArea = (overlayPolygon("intersection", piece, newCountry) as JstsGeometry).getArea();
+          (selectedArea > piece.getArea() / 2 ? newParts : existingParts).push(piece);
+        }
+      }
+      if (newParts.length === 0) return { regionId: region.id, kind: "keep" };
+      if (existingParts.length === 0) return { regionId: region.id, kind: "move" };
+      const selectedFragments = unionJstsGeometries(newParts);
+      const selected = overlayPolygon("intersection", selectedFragments, newCountry) as JstsGeometry;
+      const outsidePreview = overlayPolygon("difference", selectedFragments, newCountry) as JstsGeometry;
+      if (!outsidePreview.isEmpty()) existingParts.push(outsidePreview);
+      return {
+        regionId: region.id,
+        kind: "split",
+        existingGeometry: writeValidPolygonGeometry(unionJstsGeometries(existingParts)),
+        newGeometry: writeValidPolygonGeometry(selected),
+      };
+    }
+    const existingPart = overlayPolygon("difference", original, newCountry) as JstsGeometry;
+    if (existingPart.getArea() <= tolerance) return { regionId: region.id, kind: "move" };
+
+    // Keep administrative edges at their original precision. Only the cut adds an edge.
+    return {
+      regionId: region.id,
+      kind: "split",
+      existingGeometry: writeValidPolygonGeometry(BufferOp.bufferOp(existingPart, 0) as JstsGeometry),
+      newGeometry: writeValidPolygonGeometry(BufferOp.bufferOp(newPart, 0) as JstsGeometry),
+    };
+  });
+}
+
 export function unionGeoJsonGeometries(geometries: Geometry[]): Geometry | null {
   const readable = geometries.filter(isPolygonalGeometry);
   if (readable.length === 0) return null;
@@ -250,6 +324,7 @@ export function unionGeoJsonGeometriesClosingGaps(
 export function subtractGeoJsonGeometries(
   baseGeometry: Geometry,
   subtractGeometries: Geometry[],
+  options: { preserveCoordinates?: boolean } = {},
 ): Geometry | null {
   if (!isPolygonalGeometry(baseGeometry)) return null;
   const readable = subtractGeometries.filter(isPolygonalGeometry);
@@ -257,9 +332,9 @@ export function subtractGeoJsonGeometries(
 
   const base = readGeometry(baseGeometry);
   const subtract = unionJstsGeometries(readable.map(readGeometry));
-  const difference = OverlayOp.difference(base, subtract) as JstsGeometry;
+  const difference = overlayPolygon("difference", base, subtract);
   if (difference.isEmpty()) return null;
-  return writeGeometry(difference);
+  return options.preserveCoordinates ? rawWriteGeometry(difference) : writeGeometry(difference);
 }
 
 function splitPolygonComponent(
@@ -304,19 +379,8 @@ function splitPolygonComponentWithLine(
   cutLineCoordinates: Position[],
 ): [JstsGeometry, JstsGeometry] | null {
   try {
-    const splitLineGeoJson = rawWriteGeometry(splitLine);
-    if (!isLinealGeometry(splitLineGeoJson)) {
-      return null;
-    }
-
-    const polygonizer = new Polygonizer();
-    polygonizer.add(OverlayOp.union(component.getBoundary(), splitLine));
-    const polygonized = polygonizer.getPolygons().array as JstsGeometry[];
     const artifactArea = artifactAreaThreshold(componentArea);
-    const pieces = polygonized
-      .map((polygon) => OverlayOp.intersection(component, polygon) as JstsGeometry)
-      .map((geometry) => ({ geometry, geoJson: rawWriteGeometry(geometry), area: geometry.getArea() }))
-      .filter((piece): piece is SplitCandidate => piece.area > artifactArea && isPolygonalGeometry(piece.geoJson));
+    const pieces = polygonizeSplitCandidates(component, splitLine, artifactArea);
 
     if (pieces.length === 2) {
       return validateSplitPair(componentArea, artifactArea, [pieces[0].geometry, pieces[1].geometry]);
@@ -330,6 +394,26 @@ function splitPolygonComponentWithLine(
   } catch {
     return null;
   }
+}
+
+function polygonizeSplitCandidates(
+  component: JstsGeometry,
+  splitLine: JstsGeometry,
+  minimumArea: number,
+): SplitCandidate[] {
+  if (!isLinealGeometry(rawWriteGeometry(splitLine))) return [];
+  const polygonizer = new Polygonizer();
+  polygonizer.add(OverlayOp.union(component.getBoundary(), splitLine));
+  const polygonized = polygonizer.getPolygons().array as JstsGeometry[];
+  return polygonized
+    .map((polygon) => OverlayOp.intersection(component, polygon) as JstsGeometry)
+    .map((geometry) => ({ geometry, geoJson: rawWriteGeometry(geometry), area: geometry.getArea() }))
+    .filter((piece): piece is SplitCandidate => piece.area > minimumArea && isPolygonalGeometry(piece.geoJson));
+}
+
+function splitCoversComponent(componentArea: number, pieces: JstsGeometry[]): boolean {
+  const coverageTolerance = Math.max(componentArea * 1e-5, 1e-9);
+  return Math.abs(pieces.reduce((total, piece) => total + piece.getArea(), 0) - componentArea) <= coverageTolerance;
 }
 
 function groupSplitCandidatesByCutSide(
@@ -373,8 +457,7 @@ function validateSplitPair(
     return null;
   }
 
-  const coverageTolerance = Math.max(componentArea * 1e-5, 1e-9);
-  if (Math.abs(firstArea + secondArea - componentArea) > coverageTolerance) {
+  if (!splitCoversComponent(componentArea, pair)) {
     return null;
   }
 
@@ -554,6 +637,15 @@ function decomposePolygonComponents(geometry: JstsGeometry): JstsGeometry[] {
   return components;
 }
 
+function overlayPolygon(operation: "difference" | "intersection", left: JstsGeometry, right: JstsGeometry): JstsGeometry {
+  try {
+    return OverlayOp[operation](left, right) as JstsGeometry;
+  } catch (error) {
+    if (!(error instanceof TopologyException)) throw error;
+    return readGeometry(overlayPolygonalGeometry(operation, rawWriteGeometry(left), rawWriteGeometry(right)));
+  }
+}
+
 function readGeometry(geometry: Geometry): JstsGeometry {
   const jstsGeometry = reader.read(geometry) as JstsGeometry;
   return isPolygonalGeometry(geometry) ? (BufferOp.bufferOp(jstsGeometry, 0) as JstsGeometry) : jstsGeometry;
@@ -565,6 +657,40 @@ function writeGeometry(geometry: JstsGeometry): Geometry {
 
 function rawWriteGeometry(geometry: JstsGeometry): Geometry {
   return writer.write(geometry) as Geometry;
+}
+
+function writeValidPolygonGeometry(geometry: JstsGeometry): Geometry {
+  const output = rawWriteGeometry(geometry);
+  if (output.type === "Polygon") {
+    const coordinates = removeDegeneratePolygonRings(output.coordinates);
+    if (coordinates.length > 0) return { ...output, coordinates };
+  } else if (output.type === "MultiPolygon") {
+    const coordinates = output.coordinates.map(removeDegeneratePolygonRings).filter((polygon) => polygon.length > 0);
+    if (coordinates.length > 0) return { ...output, coordinates };
+  }
+  throw new Error("The split must contain a valid polygon.");
+}
+
+function removeDegeneratePolygonRings(polygon: Position[][]): Position[][] {
+  if (!polygon[0] || !isNondegenerateRing(polygon[0])) return [];
+  return [polygon[0], ...polygon.slice(1).filter(isNondegenerateRing)];
+}
+
+function isNondegenerateRing(ring: Position[]): boolean {
+  if (ring.length < 4) return false;
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) return false;
+  if (new Set(ring.map((position) => `${position[0]},${position[1]}`)).size < 3) return false;
+  // Overlay results can contain collapsed rings even after a zero-width buffer.
+  // Test the saved coordinates directly; keep every nonzero ring without rounding.
+  let area = 0;
+  for (let index = 0; index < ring.length - 1; index += 1) {
+    const current = ring[index];
+    const next = ring[index + 1];
+    area += current[0] * next[1] - next[0] * current[1];
+  }
+  return Math.abs(area) > 0;
 }
 
 function boundsForGeometry(geometry: JstsGeometry): [number, number, number, number] {

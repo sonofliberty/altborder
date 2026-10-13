@@ -64,6 +64,20 @@ typography:
     fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
     fontSize: "12px"
     fontWeight: 650
+  editor-hint:
+    fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: 1.5
+  editor-tool-heading:
+    fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
+    fontSize: "15px"
+    fontWeight: 600
+    lineHeight: 1.4
+  editor-status:
+    fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
   editor-wordmark:
     fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
     fontSize: "15px"
@@ -216,6 +230,20 @@ Four compact tabs share one dark container. The active mode has a gold bottom ma
 ### Editor cards and country markers
 
 Tool cards use an elevated surface, a thin border, and padding (12px). Country swatches show the actual country color. Flags remain in country summaries and appearance controls.
+
+### Divide workflow
+
+Divide starts with Two points. The user selects one point on each side of the country. A gold dashed line follows the pointer after the first point. Solid lines and fixed-size endpoint marks show a completed cut. Draw and Island remain explicit choices. Keyboard controls open in a disclosure.
+
+The panel shows two steps: Set border and Create country. A short guide stays on the map when the phone panel is closed or scrolled. A valid preview shows the new country's color, a success mark, and the name and color fields. The user can select either piece on the map or use Other side. These actions keep the border intact. Start over clears the draft. Creation requires a name, uses the existing map-change feedback, and stays reversible with Undo.
+
+Keep the workflow on the existing panel surface. Instructions use the editor sans-serif at (13px), headings at (15px), and success text at (14px). Method controls use the normal button height and reach (44px) on touch layouts. Step numbers identify the two actions in this sequence. Endpoint marks and status changes add no looping animation.
+
+Divide preserves administrative subdivisions. Regions outside the new country stay unchanged. Whole regions inside it change ownership. Only intersected regions receive clipped geometry, and both pieces keep the region name, including a user rename. Use the existing scenario format to store these pieces.
+
+Keep all land shown in the divide preview. Store missing administrative land as small additions to existing region IDs. Split regions carry their added land in their geometry. These additions follow transfers, later cuts, Undo, Redo, and shared links. Country fills use a polygon union so overlapping subdivisions cannot create gaps. Remove collapsed rings before saving split geometry; keep valid small fragments at their original precision.
+
+When a custom country with one region is annexed, keep its country name as the region name. Preserve an explicit region rename. Keep the original country fill when it still owns all its original regions, even after it acquires a custom region.
 
 ## Do's and Don'ts
 

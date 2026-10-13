@@ -4,6 +4,36 @@ import packed from "../public/data/map-data.packed.json";
 import { decodePackedMapData, decodePackedMapDataInBatches } from "./mapDataPacking";
 
 describe("packed map data", () => {
+  const minimal = { version: 1, attribution: "Test", countries: [], regions: [], boundaryEdges: [] };
+
+  it("decodes coastal coordinates at five-decimal precision", async () => {
+    const data = { ...minimal, format: "polyline-variable", baseCountries: [
+      { entityId: "AAA", geometry: { type: "LineString", precision: 5, coordinates: "CD" } },
+      { entityId: "BBB", geometry: { type: "LineString", coordinates: "CD" } },
+    ] };
+    const decoded = decodePackedMapData(data);
+    expect(decoded.baseCountries.map(({ geometry }) => geometry)).toEqual([
+      { type: "LineString", coordinates: [[0.00001, -0.00002]] },
+      { type: "LineString", coordinates: [[0.01, -0.02]] },
+    ]);
+    await expect(decodePackedMapDataInBatches(data, () => false)).resolves.toEqual(decoded);
+  });
+
+  it("decodes existing two-decimal bundles", () => {
+    const data = { ...minimal, format: "polyline-2", baseCountries: [
+      { entityId: "AAA", geometry: { type: "LineString", coordinates: "CD" } },
+    ] };
+    expect(decodePackedMapData(data).baseCountries[0].geometry).toEqual({ type: "LineString", coordinates: [[0.01, -0.02]] });
+  });
+
+  it("rejects unsupported coordinate precision", async () => {
+    const data = { ...minimal, format: "polyline-variable", baseCountries: [
+      { entityId: "AAA", geometry: { type: "LineString", precision: 3, coordinates: "CD" } },
+    ] };
+    expect(() => decodePackedMapData(data)).toThrow("unsupported coordinate precision");
+    await expect(decodePackedMapDataInBatches(data, () => false)).rejects.toThrow("unsupported coordinate precision");
+  });
+
   it("preserves every country, region, and boundary coordinate", () => {
     expect(decodePackedMapData(packed)).toEqual(source);
   });

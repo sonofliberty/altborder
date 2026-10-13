@@ -2,6 +2,8 @@ import type { Geometry, LineString, MultiLineString } from "geojson";
 
 export type EditMode = "inspect" | "transfer" | "divide" | "merge";
 
+export type DivideMethod = "line" | "draw" | "island";
+
 export type CountryFlag =
   | { kind: "builtin"; id: string }
   | { kind: "custom"; dataUrl: string };
@@ -22,6 +24,11 @@ export type RegionRecord = {
   type: string;
   geometry: Geometry;
 };
+
+export type RegionDivision =
+  | { regionId: string; kind: "keep"; landAddition?: Geometry }
+  | { regionId: string; kind: "move"; landAddition?: Geometry }
+  | { regionId: string; kind: "split"; existingGeometry: Geometry; newGeometry: Geometry };
 
 type BaseCountryRecord = {
   entityId: string;
@@ -49,6 +56,7 @@ export type EditorSnapshot = {
   regionOwners: Record<string, string>;
   regionNameOverrides: Record<string, string>;
   customRegions: Record<string, RegionRecord>;
+  regionLandAdditions?: Record<string, Geometry>;
   customCounter: number;
 };
 
@@ -66,4 +74,5 @@ export type ScenarioPayload = {
   regionOwnerChanges: Array<[regionId: string, ownerId: string]>;
   regionNameOverrides?: Record<string, string>;
   customRegions?: RegionRecord[];
+  regionLandAdditions?: Record<string, Geometry>;
 };

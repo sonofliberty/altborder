@@ -12,9 +12,11 @@ it("preserves existing map bundles when ADM1 sources fail or return no features"
   try {
     await mkdir(join(fixture, "scripts"));
     await mkdir(join(fixture, "src"));
+    await copyFile(join(root, "src/polygonOverlay.mjs"), join(fixture, "src/polygonOverlay.mjs"));
     await mkdir(join(fixture, "public/data"), { recursive: true });
     await symlink(join(root, "node_modules"), join(fixture, "node_modules"));
     await copyFile(join(root, "scripts/build-map-data.mjs"), join(fixture, "scripts/build-map-data.mjs"));
+    await copyFile(join(root, "scripts/restore-country-components.mjs"), join(fixture, "scripts/restore-country-components.mjs"));
     await copyFile(join(root, "src/color-scheme.json"), join(fixture, "src/color-scheme.json"));
     const bundleNames = ["map-data.json", "map-data.packed.json"];
     for (const name of bundleNames) {

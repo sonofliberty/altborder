@@ -18,11 +18,15 @@ import {
   X,
 } from "lucide-react";
 import { geoGraticule, geoNaturalEarth1, geoPath } from "d3-geo";
+import { getCompleteBaseCountryGroups } from "./countryRenderGroups";
+import { buildStableBaseRenderGeometry, shouldUseStableBaseRenderGeometry, unionOwnedRegionRenderGeometry } from "./countryRenderGeometry";
+import { withRegionLandAddition } from "./regionLandGeometry";
 import type { Geometry, Position } from "geojson";
 import type { GeoProjection } from "d3-geo";
 import type {
   BoundaryEdgeRecord,
   CountryFlag,
+  DivideMethod,
   EditMode,
   EditorSnapshot,
   HistoryState,
@@ -38,7 +42,7 @@ import {
   cloneSnapshot,
   createInitialSnapshot,
   createScenarioPayload,
-  getEntityRegionIds,
+  divideCountry,
   allocateCustomEntityId,
   renameRegion,
   separateRegionAsCountry,
@@ -200,6 +204,8 @@ export default function App() {
   const [brushEnabled, setBrushEnabled] = useState(false);
   const [isBrushDown, setIsBrushDown] = useState(false);
   const [divideLine, setDivideLine] = useState<SvgPoint[]>([]);
+  const [divideMethod, setDivideMethod] = useState<DivideMethod>("line");
+  const [divideCursor, setDivideCursor] = useState<SvgPoint | null>(null);
   const [keyboardCutActive, setKeyboardCutActive] = useState(false);
   const [keyboardCutCursor, setKeyboardCutCursor] = useState<SvgPoint | null>(null);
   const [divideIslandPoint, setDivideIslandPoint] = useState<Position | null>(null);
@@ -262,11 +268,17 @@ export default function App() {
   const touchSequenceNavigatedRef = useRef(false);
   const touchDivideDraftRef = useRef<{
     line: SvgPoint[];
+    cursor: SvgPoint | null;
     island: Position | null;
     piece: 0 | 1 | null;
     error: string;
+    drawing: boolean;
+    keyboardActive: boolean;
+    keyboardCursor: SvgPoint | null;
   } | null>(null);
   const divideDrawRef = useRef<{ pointerId: number; moved: boolean } | null>(null);
+  const divideTapRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
+  const keyboardCutFinishRef = useRef(false);
   const countryLabelLayoutCacheRef = useRef(new Map<string, FittedCountryLabel>());
   const countryUnderlayCacheRef = useRef(new Map<string, CountryUnderlay>());
   const countryUnderlaysInitializedRef = useRef(false);
@@ -466,13 +478,21 @@ export default function App() {
     return Object.values(snapshot?.customRegions ?? {});
   }, [snapshot?.customRegions]);
 
+  const regionLandAdditions = useMemo(() => snapshot?.regionLandAdditions ?? {}, [snapshot?.regionLandAdditions]);
+
   const effectiveRegions = useMemo(() => {
     if (!data) return [];
-    return [...data.regions, ...customRegionRecords];
-  }, [customRegionRecords, data]);
+    return [...data.regions, ...customRegionRecords]
+      .map((region) => withRegionLandAddition(region, regionLandAdditions[region.id]));
+  }, [customRegionRecords, data, regionLandAdditions]);
+
+  const modifiedRegionRecords = useMemo(() => {
+    const customIds = new Set(customRegionRecords.map((region) => region.id));
+    return effectiveRegions.filter((region) => customIds.has(region.id) || Boolean(regionLandAdditions[region.id]));
+  }, [customRegionRecords, effectiveRegions, regionLandAdditions]);
 
   useEffect(() => {
-    if (!regionOwners || customRegionRecords.length === 0) {
+    if (!regionOwners || modifiedRegionRecords.length === 0) {
       setCustomBoundaryEdges([]);
       return;
     }
@@ -490,7 +510,7 @@ export default function App() {
       id: requestId,
       kind: "custom-boundaries",
       activeRegions,
-      customRegionIds: customRegionRecords.map((region) => region.id),
+      customRegionIds: modifiedRegionRecords.map((region) => region.id),
     };
     worker.addEventListener("message", handleMessage);
     worker.postMessage(request);
@@ -500,7 +520,7 @@ export default function App() {
       worker.removeEventListener("message", handleMessage);
       worker.terminate();
     };
-  }, [customRegionRecords, effectiveRegions, regionOwners]);
+  }, [modifiedRegionRecords, effectiveRegions, regionOwners]);
 
   const regionById = useMemo(() => {
     return new Map(effectiveRegions.map((region) => [region.id, region]));
@@ -508,11 +528,11 @@ export default function App() {
 
   const renderRegionTopologyGeometryById = useMemo(() => {
     const geometries = new Map(preparedMap?.topologyGeometryById);
-    for (const region of customRegionRecords) {
+    for (const region of modifiedRegionRecords) {
       geometries.set(region.id, removePolygonalGeometryHoles(region.geometry));
     }
     return geometries;
-  }, [customRegionRecords, preparedMap]);
+  }, [modifiedRegionRecords, preparedMap]);
 
   const getRegionDisplayName = useCallback((regionId: string): string => {
     return regionNameOverrides[regionId] || regionById.get(regionId)?.name || regionId;
@@ -543,16 +563,16 @@ export default function App() {
 
   const renderRegionGeometryById = useMemo(() => {
     const geometries = new Map(preparedMap?.renderGeometryById);
-    for (const region of customRegionRecords) {
+    for (const region of modifiedRegionRecords) {
       geometries.set(region.id, renderRegionTopologyGeometryById.get(region.id) ?? region.geometry);
     }
     return geometries;
-  }, [customRegionRecords, preparedMap, renderRegionTopologyGeometryById]);
+  }, [modifiedRegionRecords, preparedMap, renderRegionTopologyGeometryById]);
 
   useEffect(() => {
     countryUnderlayCacheRef.current.clear();
     countryLabelLayoutCacheRef.current.clear();
-  }, [customRegionRecords]);
+  }, [modifiedRegionRecords]);
 
   const renderBaseCountryByEntityId = useMemo(() => {
     if (!data) return new Map<string, { geometry: Geometry }>();
@@ -583,11 +603,11 @@ export default function App() {
     baseProjectedRegionCacheRef.current.clear();
     baseRegionBoundsCacheRef.current.clear();
     baseProjectedRegionDetailStrokeCacheRef.current.clear();
-  }, [data, projection]);
+  }, [data, projection, regionLandAdditions]);
 
   const customProjectedRegionById = useMemo(() => {
     const projectedRegions = new Map<string, ProjectedPathData>();
-    for (const region of customRegionRecords) {
+    for (const region of modifiedRegionRecords) {
       const geometry = renderRegionTopologyGeometryById.get(region.id) ?? region.geometry;
       const projected = projectGeometryToPathData(geometry, projection, getProjectedPathOptions());
       if (projected) {
@@ -595,7 +615,7 @@ export default function App() {
       }
     }
     return projectedRegions;
-  }, [customRegionRecords, projection, renderRegionTopologyGeometryById]);
+  }, [modifiedRegionRecords, projection, renderRegionTopologyGeometryById]);
 
   const getBaseProjectedRegion = useCallback((regionId: string, preferManualFill = false) => {
     const cacheKey = `${projectedPathCacheVersion}|${preferManualFill ? "manual-fill" : "d3-fill"}|${regionId}`;
@@ -756,19 +776,9 @@ export default function App() {
         baseEntityById,
         baseOwnerByRegionId,
       );
-      const groupedRegionIds = new Map<string, string[]>();
+      const groupedRegionIds = getCompleteBaseCountryGroups(regionIds, baseEntityById, baseOwnerByRegionId);
       const consumedRegionIds = new Set<string>();
       const geometries: Geometry[] = [];
-
-      for (const regionId of regionIds) {
-        const region = regionById.get(regionId);
-        if (!region) continue;
-        const originalOwnerId = region.ownerId ?? baseOwnerByRegionId.get(regionId);
-        if (!originalOwnerId) continue;
-        const group = groupedRegionIds.get(originalOwnerId) ?? [];
-        group.push(regionId);
-        groupedRegionIds.set(originalOwnerId, group);
-      }
 
       for (const [baseEntityId, groupedIds] of groupedRegionIds) {
         const baseEntity = baseEntityById.get(baseEntityId);
@@ -854,22 +864,16 @@ export default function App() {
           }
 
           const renderGeometries = renderGeometriesByEntityId.get(entityId) ?? [];
-          if (!baseEntityById.has(entityId) && renderGeometries.length > 1) {
-            const composed = combineProjectedPathData(
-              renderGeometries.map((geometry) =>
-                projectGeometryToPathData(
-                  geometry,
-                  projection,
-                  getProjectedPathOptions(false, true),
-                ),
-              ),
-            );
-            if (composed) {
+          if (!baseEntityById.has(entityId)) {
+            const union = await unionOwnedRegionRenderGeometry(renderGeometries);
+            if (cancelled) return;
+            const projected = union ? projectGeometryToPathData(union, projection, getProjectedPathOptions(false, true)) : null;
+            if (projected) {
               const underlay = {
                 id: entityId,
-                pathData: composed.pathData,
-                bounds: composed.bounds,
-                sealInternalSeams: true,
+                pathData: projected.pathData,
+                bounds: projected.bounds,
+                sealInternalSeams: false,
               };
               countryUnderlayCacheRef.current.set(cacheKey, underlay);
               nextUnderlays.push(underlay);
@@ -882,7 +886,7 @@ export default function App() {
           );
           const geometry = await (async () => {
             if (
-              shouldUseStableBaseRenderGeometry(entityId, regionIds, baseEntityById, baseCountryByEntityId)
+              shouldUseStableBaseRenderGeometry(entityId, regionIds, baseEntityById, baseCountryByEntityId, baseGeometryUnionSensitiveEntityIds, regionOwners ?? {})
             ) {
               if (!hasOwnershipChanges) return baseCountryByEntityId.get(entityId)?.geometry;
               subtractGeoJsonGeometries ??= (await import("./geometrySplit")).subtractGeoJsonGeometries;
@@ -895,6 +899,7 @@ export default function App() {
                 entityId,
                 regionGeometryById: renderRegionTopologyGeometryById,
                 regionIds,
+                regionOwners: regionOwners ?? {},
                 subtractGeoJsonGeometries,
                 unionGeoJsonGeometries,
                 unionGeoJsonGeometriesClosingGaps,
@@ -974,6 +979,7 @@ export default function App() {
     projection,
     renderRegionTopologyGeometryById,
     regionIdsByEntityId,
+    regionOwners,
     renderGeometriesByEntityId,
   ]);
 
@@ -1359,8 +1365,10 @@ export default function App() {
       id: requestId,
       kind: "divide",
       regions: selectedEntitySplitRegions,
+      subdivisions: selectedEntityRegions,
       cutLine: divideLineCoordinates,
       islandPoint: divideIslandPoint,
+      regionLandAdditions,
     };
     worker.addEventListener("message", handleMessage);
     worker.postMessage(request);
@@ -1376,6 +1384,8 @@ export default function App() {
     isDrawingDivideLine,
     mode,
     selectedEntitySplitRegions,
+    selectedEntityRegions,
+    regionLandAdditions,
   ]);
 
   const divideSplit = divideWorkerResult.split;
@@ -1394,9 +1404,34 @@ export default function App() {
   const divideLinePath = svgLineToPath(
     keyboardCutActive && keyboardCutCursor && divideLine.length > 0
       ? [...divideLine, keyboardCutCursor]
+      : divideMethod === "line" && isDrawingDivideLine && divideCursor && divideLine.length === 1
+        ? [...divideLine, divideCursor]
       : divideLine,
   );
+  const divideAwaitingEnd = divideMethod === "line" && isDrawingDivideLine && !keyboardCutActive;
   const visibleDivideError = divideError || (!divideSplit.ok ? divideSplit.reason : "");
+  const divideMapHint = keyboardCutActive
+    ? "Place border points with the arrow keys and Enter."
+    : divideIsCalculating
+      ? "Checking your new border..."
+      : divideTerritories
+        ? "Select either side for the new country."
+        : divideMethod === "island"
+          ? "Select an island to make it a country."
+          : divideMethod === "draw"
+            ? "Drag across the country to draw a border."
+            : divideAwaitingEnd
+              ? "Place the second point across the country."
+              : "Place the first point near the country’s edge.";
+  useEffect(() => {
+    if (!keyboardCutFinishRef.current || (!divideSplit.ok && !divideSplit.reason)) return;
+    keyboardCutFinishRef.current = false;
+    if (divideSplit.ok) {
+      document.getElementById("divide-country-name")?.focus();
+    } else {
+      focusKeyboardCutStart();
+    }
+  }, [divideSplit]);
   useEffect(() => {
     if (!snapshot) return;
 
@@ -1526,6 +1561,7 @@ export default function App() {
     setIsBrushDown(false);
     setIsDrawingDivideLine(false);
     divideDrawRef.current = null;
+    keyboardCutFinishRef.current = false;
     panRef.current = null;
     setShare(null);
     setIsPresenting((current) => !current);
@@ -1619,13 +1655,25 @@ export default function App() {
   }
 
   function clearDivideDraft() {
+    keyboardCutFinishRef.current = false;
     setDivideLine([]);
+    setDivideCursor(null);
+    divideTapRef.current = null;
+    divideDrawRef.current = null;
     setKeyboardCutActive(false);
     setKeyboardCutCursor(null);
     setDivideIslandPoint(null);
     setDivideNewPieceIndex(null);
     setDivideError("");
     setIsDrawingDivideLine(false);
+    setDivideWorkerResult(emptyDivideWorkerResult);
+    setDivideIsCalculating(false);
+  }
+
+  function changeDivideMethod(nextMethod: DivideMethod) {
+    clearDivideDraft();
+    setDivideMethod(nextMethod);
+    setMapNavigationEnabled(false);
   }
 
   function changeSelectedEntity(entityId: string) {
@@ -1897,18 +1945,24 @@ export default function App() {
 
   function finishKeyboardCut() {
     if (!keyboardCutActive || divideLine.length < 2) return;
+    keyboardCutFinishRef.current = true;
     setKeyboardCutActive(false);
     setKeyboardCutCursor(null);
     setIsDrawingDivideLine(false);
-    window.requestAnimationFrame(() => document.getElementById("keyboard-cut-start")?.focus());
+    window.requestAnimationFrame(focusKeyboardCutStart);
   }
 
   function cancelKeyboardCut() {
     clearDivideDraft();
-    window.requestAnimationFrame(() => document.getElementById("keyboard-cut-start")?.focus());
+    window.requestAnimationFrame(focusKeyboardCutStart);
   }
 
   function handleMapKeyDown(event: React.KeyboardEvent<SVGSVGElement>) {
+    if (!keyboardCutActive && mode === "divide" && event.key === "Escape") {
+      event.preventDefault();
+      clearDivideDraft();
+      return;
+    }
     if (!keyboardCutActive || !keyboardCutCursor) return;
     if (event.key.startsWith("Arrow")) {
       event.preventDefault();
@@ -1956,6 +2010,47 @@ export default function App() {
       const active = current ?? (divideSplit.ok ? divideSplit.defaultNewPieceIndex : 0);
       return active === 0 ? 1 : 0;
     });
+  }
+
+  function handleDivideMapTap(point: SvgPoint) {
+    if (divideIsCalculating) return;
+    if (divideSplit.ok) {
+      const pieceId = findRegionAtProjectedPoint(
+        [point.x, point.y],
+        divideSplit.pieces.map((piece, index) => ({
+          id: String(index),
+          geometry: piece.geometry,
+          bounds: projectedGeometryBounds(piece.geometry, projection),
+        })),
+        (position) => projection(position as [number, number]),
+      );
+      if (pieceId !== null) setDivideNewPieceIndex(Number(pieceId) as 0 | 1);
+      return;
+    }
+    if (divideMethod === "island") {
+      const position = projection.invert?.([point.x, point.y]);
+      clearDivideDraft();
+      if (position && Number.isFinite(position[0]) && Number.isFinite(position[1])) {
+        setDivideIslandPoint(position);
+      }
+      return;
+    }
+    if (divideAwaitingEnd && divideLine[0]) {
+      const start = divideLine[0];
+      if (Math.hypot(point.x - start.x, point.y - start.y) * zoomRef.current.k * mapViewScale < 8) {
+        setDivideError("Place the second point farther from the first point.");
+        return;
+      }
+      setDivideLine([start, point]);
+      setDivideCursor(null);
+      setDivideError("");
+      setIsDrawingDivideLine(false);
+    } else {
+      clearDivideDraft();
+      setDivideLine([point]);
+      setDivideCursor(point);
+      setIsDrawingDivideLine(true);
+    }
   }
 
   function removeMergeCountry(entityId: string) {
@@ -2069,6 +2164,8 @@ export default function App() {
 
     const color = newCountryColor;
     const territories = divideTerritories;
+    const result = divideCountry(snapshot, selectedEntity.id, regionById, territories.regionDivisions, name, color);
+    if (!result) return;
     const newBounds = projectedGeometryBounds(territories.newGeometry, projection);
     if (newBounds) {
       const diagonal = Math.hypot(newBounds.maxX - newBounds.minX, newBounds.maxY - newBounds.minY);
@@ -2085,47 +2182,9 @@ export default function App() {
           extent: diagonal + 4,
         });
     }
-    let newEntityId = "";
+    commit(() => result.snapshot, { preserveGeometryCaches: true });
 
-    commit((draft) => {
-      newEntityId = allocateCustomEntityId(draft);
-      const existingRegionId = `${newEntityId}-REMAINDER`;
-      const newRegionId = `${newEntityId}-TERRITORY`;
-      const sourceRegionIds = getEntityRegionIds(draft, selectedEntity.id);
-
-      for (const regionId of sourceRegionIds) {
-        draft.regionOwners[regionId] = "";
-        delete draft.customRegions[regionId];
-      }
-
-      draft.entities[newEntityId] = {
-        id: newEntityId,
-        name,
-        color,
-        flag: { ...neutralCountryFlag },
-        regionIds: [newRegionId],
-        isCustom: true,
-      };
-      draft.customRegions[existingRegionId] = {
-        id: existingRegionId,
-        name: `${selectedEntity.name} remainder`,
-        ownerId: selectedEntity.id,
-        type: "Custom divide remainder",
-        geometry: territories.existingGeometry,
-      };
-      draft.customRegions[newRegionId] = {
-        id: newRegionId,
-        name,
-        ownerId: newEntityId,
-        type: "Custom divided territory",
-        geometry: territories.newGeometry,
-      };
-      draft.regionOwners[existingRegionId] = selectedEntity.id;
-      draft.regionOwners[newRegionId] = newEntityId;
-      return draft;
-    }, { preserveGeometryCaches: true });
-
-    setSelectedEntityId(newEntityId);
+    setSelectedEntityId(result.entityId);
     setSelectedRegions(new Set());
     setNewCountryName("");
     clearDivideDraft();
@@ -2319,19 +2378,33 @@ export default function App() {
       touchPointersRef.current.set(event.pointerId, getSvgPoint(event.currentTarget, event.clientX, event.clientY));
       if (touchPointersRef.current.size === 1) {
         touchSequenceNavigatedRef.current = false;
-        touchDivideDraftRef.current = { line: divideLine, island: divideIslandPoint, piece: divideNewPieceIndex, error: divideError };
+        touchDivideDraftRef.current = {
+          line: divideLine,
+          cursor: divideCursor,
+          island: divideIslandPoint,
+          piece: divideNewPieceIndex,
+          error: divideError,
+          drawing: isDrawingDivideLine,
+          keyboardActive: keyboardCutActive,
+          keyboardCursor: keyboardCutCursor,
+        };
       } else {
+        const startsGesture = !touchSequenceNavigatedRef.current;
         touchSequenceNavigatedRef.current = true;
         panRef.current = null;
         divideDrawRef.current = null;
-        setIsDrawingDivideLine(false);
+        divideTapRef.current = null;
         setIsBrushDown(false);
         const draft = touchDivideDraftRef.current;
-        if (draft) {
+        if (startsGesture && draft) {
           setDivideLine(draft.line);
+          setDivideCursor(draft.cursor);
           setDivideIslandPoint(draft.island);
           setDivideNewPieceIndex(draft.piece);
           setDivideError(draft.error);
+          setIsDrawingDivideLine(draft.drawing);
+          setKeyboardCutActive(draft.keyboardActive);
+          setKeyboardCutCursor(draft.keyboardCursor);
         }
         const [first, second] = [...touchPointersRef.current.values()];
         touchGestureRef.current = { start: [first, second], zoom: { ...zoomRef.current } };
@@ -2376,6 +2449,7 @@ export default function App() {
 
     if (mode === "divide" && !readOnly) {
       if (keyboardCutActive) clearDivideDraft();
+      event.currentTarget.focus({ preventScroll: true });
       const ownerId = regionId && snapshot ? snapshot.regionOwners[regionId] : "";
       if (!selectedEntityId && ownerId) {
         setSelectedEntityId(ownerId);
@@ -2383,6 +2457,11 @@ export default function App() {
         return;
       }
       if (selectedEntityId) {
+        if (divideMethod !== "draw" || divideSplit.ok || divideIsCalculating) {
+          divideTapRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+          event.currentTarget.setPointerCapture(event.pointerId);
+          return;
+        }
         divideDrawRef.current = { pointerId: event.pointerId, moved: false };
         setDivideLine([clickedMapPoint]);
         setDivideIslandPoint(null);
@@ -2432,6 +2511,14 @@ export default function App() {
         if (regionId) addRegionByBrush(regionId);
         return;
       }
+    }
+    if (divideTapRef.current) {
+      if (Math.hypot(event.clientX - divideTapRef.current.x, event.clientY - divideTapRef.current.y) > 8) {
+        divideTapRef.current.moved = true;
+      }
+    }
+    if (divideAwaitingEnd && !mapNavigationEnabled && !isPresenting) {
+      setDivideCursor(getMapPoint(event.currentTarget, event.clientX, event.clientY, zoomRef.current));
     }
     if (divideDrawRef.current) {
       const point = getMapPoint(event.currentTarget, event.clientX, event.clientY, zoomRef.current);
@@ -2487,6 +2574,15 @@ export default function App() {
         const regionId = findRegionAtMapPoint(getMapPoint(event.currentTarget, event.clientX, event.clientY, zoomRef.current));
         if (regionId) handleRegionClick(regionId);
       }
+    }
+    if (divideTapRef.current) {
+      const { pointerId, moved } = divideTapRef.current;
+      divideTapRef.current = null;
+      releasePointerCaptureIfHeld(event.currentTarget, pointerId);
+      if (!moved && event.type !== "pointercancel") {
+        handleDivideMapTap(getMapPoint(event.currentTarget, event.clientX, event.clientY, zoomRef.current));
+      }
+      return;
     }
     if (divideDrawRef.current && event.type === "pointercancel") {
       divideDrawRef.current = null;
@@ -2636,7 +2732,7 @@ export default function App() {
             data-region-id={regionId}
             className={regionClasses}
             fill="transparent"
-            fillRule="evenodd"
+            fillRule={customProjectedRegionById.has(regionId) ? "nonzero" : "evenodd"}
             onPointerEnter={() => addRegionByBrush(regionId)}
           >
             <title>
@@ -2652,6 +2748,7 @@ export default function App() {
     getRegionDisplayName,
     getRegionPath,
     entities,
+    customProjectedRegionById,
     isMapMoving,
     isPresenting,
     regionOwners,
@@ -2740,7 +2837,7 @@ export default function App() {
           <path
             className="selected-region-tint"
             d={getRegionPath(region.id)}
-            fillRule="evenodd"
+            fillRule={customProjectedRegionById.has(region.id) ? "nonzero" : "evenodd"}
             aria-hidden="true"
           />
           <path
@@ -2751,7 +2848,7 @@ export default function App() {
           />
         </g>
       ));
-  }, [getRegionPath, getRegionStrokePath, selectedRegions, useDetailedRegionBorderStrokes, visibleRegions]);
+  }, [customProjectedRegionById, getRegionPath, getRegionStrokePath, selectedRegions, useDetailedRegionBorderStrokes, visibleRegions]);
 
   const selectedCountryOverlayElement = useMemo(() => {
     if (!selectedEntityId) return null;
@@ -2907,12 +3004,12 @@ export default function App() {
               "map",
               administrativeBorderZoomClass,
               brushEnabled && activeModeUsesRegions && !isPresenting ? "brush-map" : "",
-              mode === "divide" && !readOnly && !isPresenting ? "divide-map" : "",
+              mode === "divide" && !readOnly && !isPresenting && !mapNavigationEnabled ? "divide-map" : "",
             ].join(" ")}
             role={keyboardCutActive ? "application" : "img"}
             aria-label={keyboardCutActive ? "Keyboard cut map" : isPresenting || readOnly ? "World map" : "Editable world map"}
             aria-describedby={keyboardCutActive ? "keyboard-cut-help" : undefined}
-            tabIndex={keyboardCutActive ? 0 : undefined}
+            tabIndex={keyboardCutActive || (mode === "divide" && !readOnly && !isPresenting) ? 0 : undefined}
             onKeyDown={handleMapKeyDown}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -2966,7 +3063,14 @@ export default function App() {
                 </g>
               ) : null}
               {!isPresenting && divideLinePath ? (
-                <path className="divide-line" d={divideLinePath} aria-hidden="true" />
+                <path className={`divide-line${divideAwaitingEnd ? " divide-line-pending" : ""}`} d={divideLinePath} aria-hidden="true" />
+              ) : null}
+              {!isPresenting && divideLine.length > 0 ? (
+                <g className="divide-endpoints" aria-hidden="true">
+                  {[divideLine[0], ...(divideLine.length > 1 ? [divideLine[divideLine.length - 1]] : [])].map((point, index) => (
+                    <circle key={index} cx={point.x} cy={point.y} r={4 / Math.max(zoom.k * mapViewScale, 0.01)} />
+                  ))}
+                </g>
               ) : null}
               {!isPresenting && mapChange ? (
                 <g
@@ -3111,6 +3215,14 @@ export default function App() {
               </g>
             </g>
           </svg>
+          {mode === "divide" && selectedEntity && !readOnly && !isPresenting ? (
+            <div className="divide-map-guide">
+              <span>{mapNavigationEnabled ? "Move the map. Turn off Move map to continue your cut." : divideMapHint}</span>
+              {divideLine.length > 0 || divideIslandPoint ? (
+                <button className="compact" onClick={clearDivideDraft} aria-label="Clear border and start over"><RotateCcw size={14} aria-hidden="true" /></button>
+              ) : null}
+            </div>
+          ) : null}
           <div className="map-controls" role="group" aria-label="Map zoom controls">
             <button onClick={() => zoomBy(1.25)} disabled={zoom.k >= maxZoom} title="Zoom in" aria-label="Zoom in">
               <Plus size={17} />
@@ -3187,6 +3299,9 @@ export default function App() {
           divideHasDraft={divideLine.length > 0 || Boolean(divideIslandPoint)}
           divideError={visibleDivideError}
           divideIsCalculating={divideIsCalculating}
+          divideMethod={divideMethod}
+          divideAwaitingEnd={divideAwaitingEnd}
+          onChangeDivideMethod={changeDivideMethod}
           newCountryName={newCountryName}
           newCountryColor={newCountryColor}
           onSwapDivideSides={swapDivideSides}
@@ -3405,6 +3520,13 @@ function getMapPoint(svg: SVGSVGElement, clientX: number, clientY: number, zoom:
   };
 }
 
+function focusKeyboardCutStart() {
+  const button = document.getElementById("keyboard-cut-start");
+  const disclosure = button?.closest("details");
+  if (disclosure) disclosure.open = true;
+  button?.focus();
+}
+
 function svgLineToPath(points: SvgPoint[]): string {
   if (points.length < 2) return "";
   return points.map((point, index) => `${index === 0 ? "M" : "L"}${formatPoint([point.x, point.y])}`).join("");
@@ -3493,21 +3615,6 @@ function shouldKeepDetailedRegionsForUnion(
   return baseGeometryUnionSensitiveEntityIds.has(baseEntityId);
 }
 
-function shouldUseStableBaseRenderGeometry(
-  entityId: string,
-  regionIds: string[],
-  baseEntityById: Map<string, { regionIds: string[] }>,
-  baseCountryByEntityId: Map<string, { geometry: Geometry }>,
-): boolean {
-  const baseEntity = baseEntityById.get(entityId);
-  return Boolean(
-    baseGeometryUnionSensitiveEntityIds.has(entityId) &&
-    baseEntity &&
-    baseCountryByEntityId.has(entityId) &&
-    regionIds.some((regionId) => baseEntity.regionIds.includes(regionId)),
-  );
-}
-
 function ownsTransferredRegions(
   entityId: string,
   regionIds: string[],
@@ -3517,56 +3624,6 @@ function ownsTransferredRegions(
     const baseOwnerId = baseOwnerByRegionId.get(regionId);
     return Boolean(baseOwnerId && baseOwnerId !== entityId);
   });
-}
-
-function buildStableBaseRenderGeometry({
-  baseCountryByEntityId,
-  baseEntityById,
-  baseOwnerByRegionId,
-  entityId,
-  regionGeometryById,
-  regionIds,
-  subtractGeoJsonGeometries,
-  unionGeoJsonGeometries,
-  unionGeoJsonGeometriesClosingGaps,
-  unionGapTolerance,
-}: {
-  baseCountryByEntityId: Map<string, { geometry: Geometry }>;
-  baseEntityById: Map<string, { regionIds: string[] }>;
-  baseOwnerByRegionId: Map<string, string>;
-  entityId: string;
-  regionGeometryById: Map<string, Geometry>;
-  regionIds: string[];
-  subtractGeoJsonGeometries: GeometrySplitModule["subtractGeoJsonGeometries"];
-  unionGeoJsonGeometries: GeometrySplitModule["unionGeoJsonGeometries"];
-  unionGeoJsonGeometriesClosingGaps?: GeometrySplitModule["unionGeoJsonGeometriesClosingGaps"];
-  unionGapTolerance?: number;
-}): Geometry | null {
-  const baseEntity = baseEntityById.get(entityId);
-  const baseCountry = baseCountryByEntityId.get(entityId);
-  if (!baseEntity || !baseCountry) return null;
-
-  const ownedRegionIds = new Set(regionIds);
-  const missingBaseGeometries = baseEntity.regionIds
-    .filter((regionId) => !ownedRegionIds.has(regionId))
-    .map((regionId) => regionGeometryById.get(regionId))
-    .filter((geometry): geometry is Geometry => Boolean(geometry));
-  const foreignGeometries = regionIds
-    .filter((regionId) => baseOwnerByRegionId.get(regionId) !== entityId)
-    .map((regionId) => regionGeometryById.get(regionId))
-    .filter((geometry): geometry is Geometry => Boolean(geometry));
-
-  const stableBaseGeometry =
-    missingBaseGeometries.length > 0
-      ? subtractGeoJsonGeometries(baseCountry.geometry, missingBaseGeometries)
-      : baseCountry.geometry;
-
-  if (!stableBaseGeometry) return foreignGeometries.length > 0 ? unionGeoJsonGeometries(foreignGeometries) : null;
-  if (foreignGeometries.length === 0) return stableBaseGeometry;
-  const expandedGeometries = [stableBaseGeometry, ...foreignGeometries];
-  return unionGeoJsonGeometriesClosingGaps
-    ? unionGeoJsonGeometriesClosingGaps(expandedGeometries, unionGapTolerance ?? 0)
-    : unionGeoJsonGeometries(expandedGeometries);
 }
 
 function combineProjectedPathData(projectedPaths: Array<ProjectedPathData | null>): ProjectedPathData | null {

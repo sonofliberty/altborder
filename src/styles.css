@@ -494,6 +494,37 @@ textarea {
   cursor: crosshair;
 }
 
+.map:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.divide-map-guide {
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+  color: var(--color-text-strong);
+  display: flex;
+  font-size: 13px;
+  gap: 12px;
+  left: 16px;
+  line-height: 1.4;
+  max-width: calc(100% - 32px);
+  padding: 9px 12px;
+  pointer-events: none;
+  position: absolute;
+  top: 16px;
+  z-index: 3;
+}
+
+.divide-map-guide button {
+  flex-shrink: 0;
+  min-width: 32px;
+  padding: 0;
+  pointer-events: auto;
+}
+
 .ocean {
   fill: var(--color-map-ocean);
 }
@@ -699,10 +730,25 @@ textarea {
 .divide-line {
   fill: none;
   pointer-events: none;
-  stroke: #ffe98f;
+  stroke: var(--color-primary-hover);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.divide-line-pending {
+  stroke-dasharray: 6 5;
+}
+
+.divide-endpoints {
+  fill: var(--color-primary-hover);
+  pointer-events: none;
+  stroke: var(--color-primary-ink);
+  stroke-width: 1.5;
+}
+
+.divide-endpoints circle {
   vector-effect: non-scaling-stroke;
 }
 
@@ -1309,14 +1355,159 @@ details[open] > summary > .disclosure-icon {
 }
 
 .keyboard-cut-controls {
-  border-bottom: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border);
   display: grid;
   gap: 9px;
-  padding-bottom: 12px;
+  padding-top: 12px;
+}
+
+.keyboard-cut-controls > summary {
+  align-items: center;
+  color: var(--color-muted);
+  cursor: pointer;
+  display: flex;
+  font-size: 12px;
+  gap: 7px;
+  list-style: none;
+}
+
+.keyboard-cut-controls > summary::-webkit-details-marker {
+  display: none;
+}
+
+.keyboard-cut-controls > summary .disclosure-icon {
+  margin-left: auto;
+}
+
+.keyboard-cut-controls[open] > summary {
+  margin-bottom: 10px;
+}
+
+.keyboard-cut-controls > .hint,
+.keyboard-cut-controls > .switch-row {
+  margin-top: 10px;
 }
 
 .keyboard-cut-controls > button {
   justify-self: start;
+}
+
+.divide-workflow {
+  display: grid;
+  gap: 14px;
+}
+
+.divide-steps {
+  display: flex;
+  gap: 18px;
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.divide-steps li {
+  align-items: center;
+  color: var(--color-muted);
+  display: flex;
+  font-size: 12px;
+  gap: 7px;
+}
+
+.divide-steps li > span {
+  align-items: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  display: flex;
+  height: 23px;
+  justify-content: center;
+  width: 23px;
+}
+
+.divide-steps .current {
+  color: var(--color-primary-hover);
+}
+
+.divide-steps .current > span {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.divide-steps .complete > span {
+  background: var(--color-success-bg);
+  border-color: var(--color-success-text);
+  color: var(--color-success-text);
+}
+
+.divide-methods {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 1.35fr 1fr 1fr;
+}
+
+.divide-methods button {
+  font-size: 12px;
+  gap: 5px;
+  min-height: var(--control-height);
+  padding-inline: 6px;
+}
+
+.divide-methods button[aria-pressed="true"] {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+  color: var(--color-primary-hover);
+}
+
+.divide-instructions h3 {
+  color: var(--color-text-strong);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0 0 6px;
+}
+
+.divide-instructions p {
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.divide-ready {
+  align-items: center;
+  color: var(--color-success-text);
+  display: flex;
+  font-size: 14px;
+  gap: 8px;
+}
+
+.divide-preview-key {
+  align-items: center;
+  display: grid;
+  gap: 9px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  font-size: 13px;
+}
+
+.divide-color-key {
+  border: 1px solid var(--color-input-border);
+  border-radius: 5px;
+  height: 18px;
+  width: 18px;
+}
+
+.divide-preview-key > span:nth-child(2) {
+  overflow-wrap: anywhere;
+}
+
+.divide-preview-key button {
+  font-size: 12px;
+  padding-inline: 8px;
+}
+
+.divide-start-over {
+  justify-self: start;
+  font-size: 12px;
 }
 
 .region-browser > summary {

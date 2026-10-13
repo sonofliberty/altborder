@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { geoContains } from "d3-geo";
+import type { Geometry } from "geojson";
 import appSource from "./App.tsx?raw";
+import { unionOwnedRegionRenderGeometry } from "./countryRenderGeometry";
+import { withRegionLandAddition } from "./regionLandGeometry";
 
 describe("country label rendering", () => {
   it("renders country labels as one unclipped SVG text element", () => {
@@ -47,10 +51,14 @@ describe("country underlay rendering", () => {
     expect(appSource).toContain("style={{ color: selectedEntity?.color ?? customCountryAccentColor }}");
   });
 
-  it("clears derived geometry caches when custom region geometry changes", () => {
-    expect(appSource).toMatch(
-      /useEffect\(\(\) => \{\s+countryUnderlayCacheRef\.current\.clear\(\);\s+countryLabelLayoutCacheRef\.current\.clear\(\);\s+\}, \[customRegionRecords\]\);/,
-    );
+  it("keeps added land separate from the original region geometry", () => {
+    const region = { id: "west", name: "West", type: "Region", geometry: rectangle(0, 0, 4.9, 10) };
+    const geometry = structuredClone(region.geometry);
+    const modified = withRegionLandAddition(region, rectangle(4.9, 0, 5.1, 10));
+    expect(geoContains(modified.geometry, [5, 5])).toBe(true);
+    expect(geoContains(region.geometry, [5, 5])).toBe(false);
+    expect(region.geometry).toEqual(geometry);
+    expect(withRegionLandAddition(region)).toBe(region);
   });
 
   it("builds changed-country underlay fills from unioned render topology geometry", () => {
@@ -71,12 +79,21 @@ describe("country underlay rendering", () => {
     expect(appSource).toContain("combineProjectedPathData(");
   });
 
-  it("renders merged custom countries as compound paths without a polygon union", () => {
-    expect(appSource).toContain("!baseEntityById.has(entityId) && renderGeometries.length > 1");
-    expect(appSource).toContain("sealInternalSeams: true");
-    expect(appSource).toContain("preserveGeometryCaches: true");
+  it("fills overlapping country parts while keeping uncovered holes and outside land excluded", async () => {
+    const west = rectangle(0, 0, 6, 10);
+    if (west.type !== "Polygon") throw new Error("Expected polygon fixture");
+    west.coordinates.push([[1, 1], [2, 1], [2, 2], [1, 2], [1, 1]]);
+    const fill = await unionOwnedRegionRenderGeometry([west, rectangle(4, 0, 10, 10)]);
+    expect(fill).not.toBeNull();
+    expect(geoContains(fill!, [5, 5])).toBe(true);
+    expect(geoContains(fill!, [1.5, 1.5])).toBe(false);
+    expect(geoContains(fill!, [20, 5])).toBe(false);
   });
 });
+
+function rectangle(minX: number, minY: number, maxX: number, maxY: number): Geometry {
+  return { type: "Polygon", coordinates: [[[minX, minY], [minX, maxY], [maxX, maxY], [maxX, minY], [minX, minY]]] };
+}
 
 describe("region border rendering", () => {
   it("uses holeless topology geometry for detailed visible border strokes", () => {
