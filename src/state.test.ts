@@ -524,6 +524,7 @@ describe("region transfers", () => {
     expect(next.entities.AAA.regionIds).toEqual(["AAA_ALL", "BBB_1"]);
     expect(next.entities.BBB.regionIds).toEqual(["BBB_2"]);
     expect(next.entities.CCC).toBe(snapshot.entities.CCC);
+    expect(next.customRegions).toBe(snapshot.customRegions);
   });
 
   it("returns the same snapshot when nothing changes", () => {

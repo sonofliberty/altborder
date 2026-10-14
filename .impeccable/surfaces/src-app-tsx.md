@@ -2,7 +2,7 @@
 version: 1
 slug: "src-app-tsx"
 primary_target: "src/App.tsx"
-related_targets: ["src/styles.css","src/mapVisualStyle.ts","src/labelLayout.ts","src/mapThemes.ts","src/MapThemeLayers.tsx","src/mapThemeLayers.css","src/MapThemeSelector.tsx","src/mapThemeSelector.css","src/main.tsx"]
+related_targets: ["src/styles.css","src/mapVisualStyle.ts","src/labelLayout.ts","src/mapThemes.ts","src/MapThemeLayers.tsx","src/mapThemeLayers.css","src/MapThemeSelector.tsx","src/mapThemeSelector.css","src/main.tsx","src/MapChangeOverlay.tsx","src/mapChange.ts","src/boundaryEdges.ts"]
 ---
 
 # World map
@@ -22,3 +22,9 @@ FIRST VIEWPORT: The map fills the existing canvas. A compact two-choice theme co
 FORM: Explicit user-pinned HOI4 and EU4 directions, approved from revised code-rendered mockups. Build path: code. Approved reference: output/theme-study/comparison-v2.png; user correction: thinner HOI4 borders. Existing direction seed key: 19df7bdf; the user's two named themes replace its single-theme choice.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+
+## Transfer motion refinement
+
+Focal moment: destination color crosses the transferred land from its shared border, with a thin gold front and natural deceleration. Keep terrain visible. Continuity: finished country shapes and custom edges share one ownership state; only changed borders crossfade at the handoff. Feedback: retain the existing completion message and reversible edits. Budget: one bounded SVG sweep below the terrain, no new library or raster assets, and no recalculation of unrelated countries for a native transfer. Reduced motion uses a short color fade and border handoff. Rapid transfers must retain earlier destination colors until the current geometry is ready.
+
+Reviewed 2026-10-14 in the production build: HOI4 at 1280×800 and EU4 at 390×844. Checked slow geometry, rapid native transfers, divided-region transfers, reduced motion, and Undo/Redo. Fill and border effects have distinct keys and finish together. The design scan found no primary issues. Verdict: ready. No new raster assets.

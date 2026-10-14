@@ -164,7 +164,7 @@ export function transferRegions(
     entities: nextEntities,
     regionOwners: nextRegionOwners,
     regionNameOverrides: nextRegionNameOverrides,
-    customRegions: nextCustomRegions,
+    customRegions: movedRegionIds.some((id) => snapshot.customRegions[id]) ? nextCustomRegions : snapshot.customRegions,
   };
 }
 

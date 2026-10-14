@@ -277,7 +277,7 @@ Country names fit within their country geometry. The label layout checks several
 
 Projected raster layers add geographic texture. The ocean raster sits below country fills, at opacity (0.6) for HOI4 and (0.17) for EU4. Theme land rasters sit above country fills and are clipped to the current land paths. HOI4 carries strong shaded relief; EU4 carries subtle relief. Raster alpha is part of the prepared assets. Political colors are not baked into the textures.
 
-EU4 adds three pale coastal shelf strokes below the country fills. Their outer, middle, and inner widths are (18px), (10px), and (4px), with opacity (0.08), (0.12), and (0.18). The graticule keeps width (0.6px), with opacity (0.035) for HOI4 and (0.07) for EU4. Country outlines and editing feedback stay above the land texture.
+EU4 adds three pale coastal shelf strokes below the country fills. Their outer, middle, and inner widths are (18px), (10px), and (4px), with opacity (0.08), (0.12), and (0.18). The graticule keeps width (0.6px), with opacity (0.035) for HOI4 and (0.07) for EU4. Country outlines and selection feedback stay above the land texture. Transfer color sweeps sit below the terrain so land detail remains visible throughout the change.
 
 The editor keeps its existing header, panel, and dialog shadows. The sidecar records their exact values. Reduced-motion rules continue to control editing feedback. Theme changes add no decorative animation.
 
@@ -347,6 +347,14 @@ Divide preserves administrative subdivisions. Regions outside the new country st
 Keep all land shown in the divide preview. Store missing administrative land as small additions to existing region IDs. Split regions carry their added land in their geometry. These additions follow transfers, later cuts, Undo, Redo, and shared links. Country fills use a polygon union so overlapping subdivisions cannot create gaps. Remove collapsed rings before saving split geometry; keep valid small fragments at their original precision.
 
 When a custom country with one region is annexed, keep its country name as the region name. Preserve an explicit region rename. Keep the original country fill when it still owns all its original regions, even after it acquires a custom region.
+
+### Territory change motion
+
+Transfer color starts at the shared destination border. Disconnected territory uses the side nearest the destination. A (680ms) sweep decelerates with `cubic-bezier(0.22, 0.68, 0.3, 1)`. Its gold front stays (1.6px) wide on screen at every zoom. Bound SVG masks to the changed territory and the prepared viewport. Keep terrain, coastlines, labels, and input targets live.
+
+Keep the destination color visible until the matching country shapes and custom boundaries finish. Calculate custom boundaries against those completed shapes. Then fade the color cover and crossfade only changed political and administrative edges over (220ms). Use animation completion and geometry readiness to remove the effect. A fixed cleanup timer must not expose old shapes or cause a late border adjustment.
+
+Rapid transfers keep earlier destination colors below the latest sweep, in transfer order. Undo, Redo, and theme changes clear obsolete feedback. Native transfers retain unrelated geometry caches. Reduced motion uses a (180ms) color fade and a (140ms) border handoff, with no traveling front.
 
 ## Do's and Don'ts
 

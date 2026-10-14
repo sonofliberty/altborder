@@ -73,6 +73,29 @@ export function batchBoundaryPaths(
   return paths;
 }
 
+/** Fade only edges whose political or editing role changes with ownership. */
+export function batchBoundaryTransitionPaths(
+  edges: readonly ProjectedBoundaryEdge[],
+  previousOwners: Record<string, string>,
+  nextOwners: Record<string, string>,
+  options: Parameters<typeof batchBoundaryPaths>[2] = {},
+): { stable: BatchedBoundaryPaths; previous: BatchedBoundaryPaths; next: BatchedBoundaryPaths } {
+  const stable: ProjectedBoundaryEdge[] = [];
+  const changed: ProjectedBoundaryEdge[] = [];
+  for (const edge of edges) {
+    const previousKind = classifyBoundaryEdge(edge, previousOwners);
+    const nextKind = classifyBoundaryEdge(edge, nextOwners);
+    const wasActive = previousKind === "administrative" && previousOwners[edge.regionIds[0]] === options.activeAdministrativeEntityId;
+    const isActive = nextKind === "administrative" && nextOwners[edge.regionIds[0]] === options.activeAdministrativeEntityId;
+    (previousKind === nextKind && wasActive === isActive ? stable : changed).push(edge);
+  }
+  return {
+    stable: batchBoundaryPaths(stable, nextOwners, options),
+    previous: batchBoundaryPaths(changed, previousOwners, options),
+    next: batchBoundaryPaths(changed, nextOwners, options),
+  };
+}
+
 function getOwnValue<T>(record: Record<string, T>, key: string): T | undefined {
   return Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined;
 }

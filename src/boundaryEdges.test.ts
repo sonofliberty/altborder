@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { batchBoundaryPaths, classifyBoundaryEdge } from "./boundaryEdges";
+import { batchBoundaryPaths, batchBoundaryTransitionPaths, classifyBoundaryEdge } from "./boundaryEdges";
 
 const internalEdge = {
   regionIds: ["left", "right"] as [string, string],
@@ -72,5 +72,30 @@ describe("boundary path batching", () => {
     const paths = batchBoundaryPaths(edges, { ...owners, foreign: "AAA" });
     expect(paths.countryPath).toBe("");
     expect(paths.administrativePath).toBe("COUNTRYADMIN");
+  });
+
+  it("crossfades the old and new political border without fading the coastline", () => {
+    const transition = batchBoundaryTransitionPaths(edges, owners, { ...owners, left: "BBB" });
+    expect(transition.stable.coastlinePath).toBe("COAST");
+    expect(transition.stable.countryPath).toBe("");
+    expect(transition.previous.countryPath).toBe("COUNTRY");
+    expect(transition.previous.administrativePath).toBe("ADMIN");
+    expect(transition.next.countryPath).toBe("ADMIN");
+    expect(transition.next.administrativePath).toBe("COUNTRY");
+  });
+
+  it("keeps boundaries within a transferred group administrative", () => {
+    const transition = batchBoundaryTransitionPaths(edges, owners, { ...owners, left: "BBB", right: "BBB" });
+    expect(transition.stable.administrativePath).toBe("ADMIN");
+    expect(transition.previous.countryPath).toBe("COUNTRY");
+    expect(transition.next.countryPath).toBe("");
+  });
+
+  it("changes active administrative emphasis when the transferred group joins the destination", () => {
+    const transition = batchBoundaryTransitionPaths(edges, owners, { ...owners, left: "BBB", right: "BBB" }, {
+      activeAdministrativeEntityId: "BBB",
+    });
+    expect(transition.previous.administrativePath).toBe("ADMIN");
+    expect(transition.next.activeAdministrativePath).toBe("COUNTRYADMIN");
   });
 });

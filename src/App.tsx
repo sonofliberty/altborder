@@ -78,6 +78,8 @@ import { applyPoliticalMapPalette, getAdministrativeBorderZoomClass, getCountryB
 import { getMapTheme, getThemedEntities, setEntityColor, setMapTheme } from "./mapThemes";
 import { MapThemeSelector } from "./MapThemeSelector";
 import { MapThemeCoasts, MapThemeLand, MapThemeOcean } from "./MapThemeLayers";
+import { MapChangeBorders, MapChangeOverlay } from "./MapChangeOverlay";
+import { createMapChange, getTransferReveal, type MapChangeAnimation } from "./mapChange";
 import { clipMapThemeCountryPaths, clipMapThemePolygonPath } from "./mapThemeClip";
 import { clipProjectedLinePath } from "./projectedLineClipping";
 import mapThemeRaster from "./mapThemeRaster.json";
@@ -92,7 +94,7 @@ import {
   isValidTransferTarget,
   orderTransferTargetEntities,
 } from "./transferContext";
-import { batchBoundaryPaths, type ProjectedBoundaryEdge } from "./boundaryEdges";
+import { batchBoundaryPaths, batchBoundaryTransitionPaths, type BatchedBoundaryPaths, type ProjectedBoundaryEdge } from "./boundaryEdges";
 import { buildSelectedRegionAdjacency } from "./regionAdjacency";
 import { EditorSidePanel } from "./EditorSidePanel";
 import { mapInBatches, yieldToMainThread } from "./mapWork";
@@ -167,14 +169,6 @@ type TransferConfirmation = {
   message: string;
 };
 
-type MapChangeAnimation = {
-  id: number;
-  pieces: { path: string; fromColor: string; toColor: string }[];
-  reveal:
-    | { kind: "edge"; path: string; extent: number }
-    | { kind: "point"; x: number; y: number; extent: number };
-};
-
 type SimpleMapLabel = {
   id: string;
   name: string;
@@ -240,10 +234,22 @@ export default function App() {
   const [settledZoom, setSettledZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
   const [cullingZoom, setCullingZoom] = useState<ZoomState>({ x: 0, y: 0, k: 1 });
   const [isMapMoving, setIsMapMoving] = useState(false);
-  const [projectedBoundaryEdges, setProjectedBoundaryEdges] = useState<ProjectedBoundaryEdgeWithBounds[]>([]);
-  const [countryUnderlays, setCountryUnderlays] = useState<CountryUnderlay[]>([]);
+  const [projectedBoundaries, setProjectedBoundaries] = useState<{
+    edges: ProjectedBoundaryEdgeWithBounds[];
+    regionOwners: Record<string, string> | null;
+  }>({ edges: [], regionOwners: null });
+  const projectedBoundaryEdges = projectedBoundaries.edges;
+  const [countryRender, setCountryRender] = useState<{
+    underlays: CountryUnderlay[];
+    regionOwners: Record<string, string> | null;
+  }>({ underlays: [], regionOwners: null });
+  const countryUnderlays = countryRender.underlays;
   const [countryLabelLayouts, setCountryLabelLayouts] = useState<FittedCountryLabel[]>([]);
-  const [customBoundaryEdges, setCustomBoundaryEdges] = useState<BoundaryEdgeRecord[]>([]);
+  const [customBoundaries, setCustomBoundaries] = useState<{
+    edges: BoundaryEdgeRecord[];
+    regionOwners: Record<string, string> | null;
+  }>({ edges: [], regionOwners: null });
+  const customBoundaryEdges = customBoundaries.edges;
   const [inspectFocusedRegionId, setInspectFocusedRegionId] = useState("");
   const [transferFocusedRegionId, setTransferFocusedRegionId] = useState("");
   const [neighborTargetEntityIds, setNeighborTargetEntityIds] = useState<Set<string>>(new Set());
@@ -428,12 +434,6 @@ export default function App() {
   }, [transferConfirmation]);
 
   useEffect(() => {
-    if (!mapChange) return;
-    const timer = window.setTimeout(() => setMapChange(null), 1650);
-    return () => window.clearTimeout(timer);
-  }, [mapChange]);
-
-  useEffect(() => {
     if (!share || isPresenting || !shareDialogRef.current || shareDialogRef.current.open) return;
     shareDialogRef.current.showModal();
     shareUrlRef.current?.focus();
@@ -551,9 +551,12 @@ export default function App() {
 
   useEffect(() => {
     if (!regionOwners || modifiedRegionRecords.length === 0) {
-      setCustomBoundaryEdges([]);
+      setCustomBoundaries((current) => current.edges.length === 0 ? current : { edges: [], regionOwners: null });
       return;
     }
+    // Custom edges must be clipped to the matching completed country shapes.
+    // Starting with old underlays caused a second border adjustment later.
+    if (countryRender.regionOwners !== regionOwners) return;
 
     let cancelled = false;
     const activeRegions = effectiveRegions.filter((region) => Boolean(regionOwners[region.id]));
@@ -563,7 +566,7 @@ export default function App() {
     geometryWorkerRequestIdRef.current = requestId;
     const handleMessage = (event: MessageEvent<GeometryWorkerResponse>) => {
       if (cancelled || event.data.id !== requestId || event.data.kind !== "custom-boundaries") return;
-      setCustomBoundaryEdges(event.data.edges);
+      setCustomBoundaries({ edges: event.data.edges, regionOwners });
     };
     const request: GeometryWorkerRequest = {
       id: requestId,
@@ -583,7 +586,7 @@ export default function App() {
       worker.removeEventListener("message", handleMessage);
       worker.terminate();
     };
-  }, [modifiedRegionRecords, effectiveRegions, regionOwners, countryUnderlays]);
+  }, [modifiedRegionRecords, effectiveRegions, regionOwners, countryUnderlays, countryRender.regionOwners]);
 
   const regionById = useMemo(() => {
     return new Map(effectiveRegions.map((region) => [region.id, region]));
@@ -749,10 +752,13 @@ export default function App() {
       },
       () => cancelled,
     ).then((edges) => {
-      if (!cancelled && edges) setProjectedBoundaryEdges(edges.filter((edge): edge is ProjectedBoundaryEdgeWithBounds => edge !== null));
+      if (!cancelled && edges) setProjectedBoundaries({
+        edges: edges.filter((edge): edge is ProjectedBoundaryEdgeWithBounds => edge !== null),
+        regionOwners: customBoundaries.regionOwners,
+      });
     });
     return () => { cancelled = true; };
-  }, [customBoundaryEdges, data?.boundaryEdges, projection]);
+  }, [customBoundaryEdges, customBoundaries.regionOwners, data?.boundaryEdges, projection]);
 
   const logicalViewportBounds = useMemo(() => svgViewportBounds(mapViewportSize.width, mapViewportSize.height), [mapViewportSize]);
 
@@ -897,7 +903,7 @@ export default function App() {
 
   useEffect(() => {
     if (!data) {
-      setCountryUnderlays([]);
+      setCountryRender({ underlays: [], regionOwners: null });
       countryUnderlaysInitializedRef.current = false;
       return;
     }
@@ -923,7 +929,7 @@ export default function App() {
         for (const { entityId, regionIds, hasOwnershipChanges, needsWorker } of jobs) {
           // A large changed country must not delay the rest of a shared map.
           if (needsWorker && !publishedInitialUnderlays && !countryUnderlaysInitializedRef.current && nextUnderlays.length > 0) {
-            setCountryUnderlays([...nextUnderlays]);
+            setCountryRender({ underlays: [...nextUnderlays], regionOwners: null });
             publishedInitialUnderlays = true;
           }
           if (performance.now() >= chunkDeadline) {
@@ -1029,7 +1035,7 @@ export default function App() {
         pruneMapCache(countryUnderlayCacheRef.current, activeCacheKeys, 420);
         if (!cancelled) {
           countryUnderlaysInitializedRef.current = true;
-          setCountryUnderlays(nextUnderlays);
+          setCountryRender({ underlays: nextUnderlays, regionOwners: regionOwners ?? null });
         }
       })().catch(() => {
         if (!cancelled) setLoadError("Could not update the map. Reload the page and try again.");
@@ -1479,6 +1485,24 @@ export default function App() {
     ...piece,
     path: clipMapThemePolygonPath(piece.path, shouldCullMapPaths ? renderViewportBounds : undefined),
   })) ?? [], [mapChange, renderViewportBounds, shouldCullMapPaths]);
+  const visibleMapChangeBackground = useMemo(() => mapChange?.backgroundPieces.map((piece) => ({
+    ...piece,
+    path: clipMapThemePolygonPath(piece.path, shouldCullMapPaths ? renderViewportBounds : undefined),
+  })) ?? [], [mapChange, renderViewportBounds, shouldCullMapPaths]);
+  const mapChangeGeometryReady = countryRender.regionOwners === regionOwners &&
+    (modifiedRegionRecords.length === 0 || projectedBoundaries.regionOwners === regionOwners);
+  useEffect(() => {
+    if (!mapChange?.sweepComplete || mapChange.settling || !mapChangeGeometryReady) return;
+    setMapChange((current) => current?.id === mapChange.id ? { ...current, settling: true } : current);
+  }, [mapChange, mapChangeGeometryReady]);
+
+  const finishMapChangeSweep = useCallback((id: number) => {
+    setMapChange((current) => current?.id === id && !current.sweepComplete ? { ...current, sweepComplete: true } : current);
+  }, []);
+
+  const finishMapChange = useCallback((id: number) => {
+    setMapChange((current) => current?.id === id ? null : current);
+  }, []);
   const divideLinePath = svgLineToPath(
     keyboardCutActive && keyboardCutCursor && divideLine.length > 0
       ? [...divideLine, keyboardCutCursor]
@@ -1633,22 +1657,17 @@ export default function App() {
   function showMapChange(
     pieces: MapChangeAnimation["pieces"],
     reveal: MapChangeAnimation["reveal"],
+    bounds: ProjectedBounds,
   ) {
-    const groupedPieces = new Map<string, MapChangeAnimation["pieces"][number]>();
-    for (const piece of pieces) {
-      if (!piece.path) continue;
-      const key = `${piece.fromColor}|${piece.toColor}`;
-      const previous = groupedPieces.get(key);
-      groupedPieces.set(key, previous ? { ...previous, path: previous.path + piece.path } : piece);
-    }
-    const visiblePieces = [...groupedPieces.values()];
-    if (visiblePieces.length === 0) return;
-    mapChangeIdRef.current += 1;
-    setMapChange({
-      id: mapChangeIdRef.current,
-      pieces: visiblePieces,
+    if (!pieces.some((piece) => piece.path)) return;
+    const id = ++mapChangeIdRef.current;
+    setMapChange((previous) => createMapChange({
+      id,
+      pieces,
       reveal,
-    });
+      bounds,
+      previousRegionOwners: regionOwners ?? {},
+    }, previous));
   }
 
   function togglePresentation() {
@@ -1712,7 +1731,6 @@ export default function App() {
     setMapNavigationEnabled(false);
     if (nextMode === mode) return;
     finishMetadataEdit();
-    setMapChange(null);
     setMode(nextMode);
     setSelectedRegions(new Set());
     setTransferFocusedRegionId("");
@@ -1745,7 +1763,16 @@ export default function App() {
     clearDivideDraft();
   }
 
-  function clearGeometryRenderCaches() {
+  function clearGeometryRenderCaches(affectedEntities?: ReadonlySet<string>) {
+    if (affectedEntities) {
+      for (const [key, underlay] of countryUnderlayCacheRef.current) {
+        if (affectedEntities.has(underlay.id)) countryUnderlayCacheRef.current.delete(key);
+      }
+      for (const [key, label] of countryLabelLayoutCacheRef.current) {
+        if (affectedEntities.has(label.id)) countryLabelLayoutCacheRef.current.delete(key);
+      }
+      return;
+    }
     countryUnderlayCacheRef.current.clear();
     countryLabelLayoutCacheRef.current.clear();
   }
@@ -1901,7 +1928,7 @@ export default function App() {
         x: (bounds.minX + bounds.maxX) / 2,
         y: (bounds.minY + bounds.maxY) / 2,
         extent: Math.hypot(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) + 4,
-      });
+      }, bounds);
     }
 
     setShare(null);
@@ -2222,10 +2249,14 @@ export default function App() {
         path: getRegionPath(regionId),
         fromColor: entities[regionOwners?.[regionId] ?? ""]?.color ?? "#d7d2c8",
         toColor: entities[nextSelectedEntityId]?.color ?? "#d7d2c8",
-      })), reveal);
+      })), reveal, regionBounds);
     }
     setShare(null);
-    clearGeometryRenderCaches();
+    if (regionIds.some((id) => snapshot.customRegions[id])) {
+      clearGeometryRenderCaches();
+    } else {
+      clearGeometryRenderCaches(new Set([nextSelectedEntityId, ...regionIds.map((id) => snapshot.regionOwners[id])]));
+    }
     setHistory((currentHistory) => {
       if (!currentHistory || readOnly) return currentHistory;
       const next = transferRegions(currentHistory.present, regionIds, nextSelectedEntityId);
@@ -2280,7 +2311,7 @@ export default function App() {
           x: (newBounds.minX + newBounds.maxX) / 2,
           y: (newBounds.minY + newBounds.maxY) / 2,
           extent: diagonal + 4,
-        });
+        }, newBounds);
     }
     commit(() => result.snapshot, { preserveGeometryCaches: true });
 
@@ -2854,7 +2885,7 @@ export default function App() {
     regionsToRender,
   ]);
 
-  const boundaryPaths = useMemo(() => {
+  const boundaryRenderPaths = useMemo(() => {
     if (!regionOwners) return null;
     const visibleEdges = shouldCullMapPaths
       ? projectedBoundaryEdges.filter((edge) => boundsIntersect(edge.bounds, renderViewportBounds))
@@ -2863,15 +2894,25 @@ export default function App() {
       !isPresenting && selectedEntityId && (mode === "transfer" || mode === "divide")
         ? selectedEntityId
         : undefined;
-    const paths = batchBoundaryPaths(visibleEdges, regionOwners, {
+    const options = {
       activeAdministrativeEntityId,
       selectedEntityId: isPresenting ? undefined : selectedEntityId || undefined,
-    });
-    if (!shouldCullMapPaths) return paths;
-    return Object.fromEntries(Object.entries(paths).map(([kind, pathData]) =>
-      [kind, clipProjectedLinePath(pathData, renderViewportBounds)])) as typeof paths;
+    };
+    const result = mapChange
+      ? batchBoundaryTransitionPaths(visibleEdges, mapChange.previousRegionOwners, regionOwners, options)
+      : { stable: batchBoundaryPaths(visibleEdges, regionOwners, options), previous: null, next: null };
+    if (mapChange) {
+      result.stable.selectedCountryPath = batchBoundaryPaths(
+        visibleEdges, mapChange.settling ? regionOwners : mapChange.previousRegionOwners, options,
+      ).selectedCountryPath;
+    }
+    const clip = (paths: BatchedBoundaryPaths | null) => !paths || !shouldCullMapPaths ? paths
+      : Object.fromEntries(Object.entries(paths).map(([kind, pathData]) =>
+        [kind, clipProjectedLinePath(pathData, renderViewportBounds)])) as BatchedBoundaryPaths;
+    return { stable: clip(result.stable)!, previous: clip(result.previous), next: clip(result.next) };
   }, [
     isPresenting,
+    mapChange,
     mode,
     projectedBoundaryEdges,
     regionOwners,
@@ -2879,6 +2920,7 @@ export default function App() {
     renderViewportBounds,
     shouldCullMapPaths,
   ]);
+  const boundaryPaths = boundaryRenderPaths?.stable;
 
   const boundaryElements = boundaryPaths ? (
     <g
@@ -3170,9 +3212,29 @@ export default function App() {
               <g aria-hidden="true">
                 {countryUnderlayElements}
               </g>
+              {!isPresenting && mapChange ? (
+                <MapChangeOverlay
+                  key={`fill-${mapChange.id}`}
+                  change={mapChange}
+                  pieces={visibleMapChangePieces}
+                  backgroundPieces={visibleMapChangeBackground}
+                  viewport={renderViewportBounds}
+                  screenScale={cullingZoom.k * mapViewScale}
+                  onSweepComplete={finishMapChangeSweep}
+                  onComplete={finishMapChange}
+                />
+              ) : null}
               <MapThemeLand theme={mapTheme.id} projection={projection} detail={detailedMapRaster} viewportBounds={renderViewportBounds} countryPaths={visibleCountryUnderlays} />
               {!isPresenting && selectedCountryOverlayElement}
               {boundaryElements}
+              {!isPresenting && mapChange && boundaryRenderPaths?.previous && boundaryRenderPaths.next ? (
+                <MapChangeBorders
+                  key={`borders-${mapChange.id}`}
+                  previous={boundaryRenderPaths.previous}
+                  next={boundaryRenderPaths.next}
+                  settling={mapChange.settling}
+                />
+              ) : null}
               <g pointerEvents={isPresenting ? "none" : undefined}>
                 {regionInteractionElements}
               </g>
@@ -3194,98 +3256,6 @@ export default function App() {
                 <g className="divide-endpoints" aria-hidden="true">
                   {[divideLine[0], ...(divideLine.length > 1 ? [divideLine[divideLine.length - 1]] : [])].map((point, index) => (
                     <circle key={index} cx={point.x} cy={point.y} r={4 / Math.max(cullingZoom.k * mapViewScale, 0.01)} />
-                  ))}
-                </g>
-              ) : null}
-              {!isPresenting && mapChange ? (
-                <g
-                  key={mapChange.id}
-                  className="map-change"
-                  aria-hidden="true"
-                  style={{ "--creep-extent": `${mapChange.reveal.extent}px` } as CSSProperties}
-                >
-                  <defs>
-                    <mask
-                      id={`map-change-mask-${mapChange.id}`}
-                      maskUnits="userSpaceOnUse"
-                      x={renderViewportBounds.minX}
-                      y={renderViewportBounds.minY}
-                      width={renderViewportBounds.maxX - renderViewportBounds.minX}
-                      height={renderViewportBounds.maxY - renderViewportBounds.minY}
-                    >
-                      <rect x={renderViewportBounds.minX} y={renderViewportBounds.minY} width={renderViewportBounds.maxX - renderViewportBounds.minX} height={renderViewportBounds.maxY - renderViewportBounds.minY} fill="white" />
-                      <path
-                        className="map-change-reveal"
-                        d={mapChange.reveal.kind === "edge"
-                          ? mapChange.reveal.path
-                          : `M${mapChange.reveal.x},${mapChange.reveal.y}h0.01`}
-                        fill="none"
-                        stroke="black"
-                      />
-                    </mask>
-                    <mask
-                      id={`map-change-front-mask-${mapChange.id}`}
-                      maskUnits="userSpaceOnUse"
-                      x={renderViewportBounds.minX}
-                      y={renderViewportBounds.minY}
-                      width={renderViewportBounds.maxX - renderViewportBounds.minX}
-                      height={renderViewportBounds.maxY - renderViewportBounds.minY}
-                    >
-                      <rect x={renderViewportBounds.minX} y={renderViewportBounds.minY} width={renderViewportBounds.maxX - renderViewportBounds.minX} height={renderViewportBounds.maxY - renderViewportBounds.minY} fill="black" />
-                      <path
-                        className="map-change-front-outer"
-                        d={mapChange.reveal.kind === "edge"
-                          ? mapChange.reveal.path
-                          : `M${mapChange.reveal.x},${mapChange.reveal.y}h0.01`}
-                        fill="none"
-                        stroke="white"
-                      />
-                      <path
-                        className="map-change-front-inner"
-                        d={mapChange.reveal.kind === "edge"
-                          ? mapChange.reveal.path
-                          : `M${mapChange.reveal.x},${mapChange.reveal.y}h0.01`}
-                        fill="none"
-                        stroke="black"
-                      />
-                    </mask>
-                  </defs>
-                  {visibleMapChangePieces.map((piece, index) => (
-                    <path
-                      key={`${index}-destination`}
-                      className="map-change-destination"
-                      d={piece.path}
-                      fillRule="evenodd"
-                      fill={piece.toColor}
-                    />
-                  ))}
-                  {visibleMapChangePieces.map((piece, index) => (
-                    <path
-                      key={`${index}-fill`}
-                      className="map-change-cover"
-                      d={piece.path}
-                      fillRule="evenodd"
-                      fill={piece.fromColor}
-                      mask={`url(#map-change-mask-${mapChange.id})`}
-                    />
-                  ))}
-                  {visibleMapChangePieces.map((piece, index) => (
-                    <path
-                      key={`${index}-front`}
-                      className="map-change-front"
-                      d={piece.path}
-                      fillRule="evenodd"
-                      fill="#f9dfaa"
-                      mask={`url(#map-change-front-mask-${mapChange.id})`}
-                    />
-                  ))}
-                  {visibleMapChangePieces.map((piece, index) => (
-                    <path
-                      key={`${index}-outline`}
-                      className="map-change-outline"
-                      d={piece.path}
-                      fill="none"
-                    />
                   ))}
                 </g>
               ) : null}
@@ -3561,62 +3531,6 @@ function mergeBounds(a: ProjectedBounds | null, b: ProjectedBounds): ProjectedBo
     maxX: Math.max(a.maxX, b.maxX),
     maxY: Math.max(a.maxY, b.maxY),
   };
-}
-
-function getTransferReveal(
-  regionIds: string[],
-  destinationId: string,
-  regionOwners: Record<string, string>,
-  edges: ProjectedBoundaryEdgeWithBounds[],
-  bounds: ProjectedBounds,
-  destinationBounds: ProjectedBounds | null,
-): MapChangeAnimation["reveal"] {
-  const selected = new Set(regionIds);
-  let sharedBorder = "";
-  let sharedBounds: ProjectedBounds | null = null;
-  for (const edge of edges) {
-    const [first, second] = edge.regionIds;
-    if (second === null || !(
-      (selected.has(first) && regionOwners[second] === destinationId) ||
-      (selected.has(second) && regionOwners[first] === destinationId)
-    )) continue;
-    sharedBorder += edge.pathData;
-    sharedBounds = mergeBounds(sharedBounds, edge.bounds);
-  }
-  if (sharedBorder && sharedBounds) {
-    const acrossX = Math.max(
-      Math.abs(bounds.minX - sharedBounds.minX),
-      Math.abs(bounds.maxX - sharedBounds.maxX),
-    );
-    const acrossY = Math.max(
-      Math.abs(bounds.minY - sharedBounds.minY),
-      Math.abs(bounds.maxY - sharedBounds.maxY),
-    );
-    return {
-      kind: "edge",
-      path: sharedBorder,
-      extent: Math.max(
-        Math.hypot(acrossX, acrossY) * 2,
-        Math.min(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 1.5,
-      ) + 4,
-    };
-  }
-
-  const destinationX = destinationBounds
-    ? (destinationBounds.minX + destinationBounds.maxX) / 2
-    : bounds.minX;
-  const destinationY = destinationBounds
-    ? (destinationBounds.minY + destinationBounds.maxY) / 2
-    : (bounds.minY + bounds.maxY) / 2;
-  const dx = destinationX - (bounds.minX + bounds.maxX) / 2;
-  const dy = destinationY - (bounds.minY + bounds.maxY) / 2;
-  const path = Math.abs(dx) >= Math.abs(dy)
-    ? `M${dx < 0 ? bounds.minX : bounds.maxX},${bounds.minY}V${bounds.maxY}`
-    : `M${bounds.minX},${dy < 0 ? bounds.minY : bounds.maxY}H${bounds.maxX}`;
-  const depth = Math.abs(dx) >= Math.abs(dy)
-    ? bounds.maxX - bounds.minX
-    : bounds.maxY - bounds.minY;
-  return { kind: "edge", path, extent: depth * 2 + 4 };
 }
 
 function getCountryLabelBoxSize(label: FittedCountryLabel, scale: number, viewScale: number) {

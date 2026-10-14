@@ -597,6 +597,9 @@ function polygonsForGeometry(geometry: Geometry): Position[][][] {
   if (geometry.type === "MultiPolygon") {
     return geometry.coordinates;
   }
+  if (geometry.type === "GeometryCollection") {
+    return geometry.geometries.flatMap(polygonsForGeometry);
+  }
   return [];
 }
 
@@ -695,13 +698,13 @@ function rawWriteGeometry(geometry: JstsGeometry): Geometry {
 
 function writeValidPolygonGeometry(geometry: JstsGeometry): Geometry {
   const output = rawWriteGeometry(geometry);
-  if (output.type === "Polygon") {
-    const coordinates = removeDegeneratePolygonRings(output.coordinates);
-    if (coordinates.length > 0) return { ...output, coordinates };
-  } else if (output.type === "MultiPolygon") {
-    const coordinates = output.coordinates.map(removeDegeneratePolygonRings).filter((polygon) => polygon.length > 0);
-    if (coordinates.length > 0) return { ...output, coordinates };
-  }
+  // Polygon overlays can also return isolated boundary lines and points.
+  // Keep all land from these mixed results at its original precision.
+  const coordinates = polygonsForGeometry(output)
+    .map(removeDegeneratePolygonRings)
+    .filter((polygon) => polygon.length > 0);
+  if (coordinates.length === 1 && output.type === "Polygon") return { ...output, coordinates: coordinates[0] };
+  if (coordinates.length > 0) return { type: "MultiPolygon", coordinates };
   throw new Error("The split must contain a valid polygon.");
 }
 

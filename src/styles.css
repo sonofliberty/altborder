@@ -771,11 +771,13 @@ textarea {
 }
 
 .map-change {
+  --map-change-duration: 680ms;
+  --map-change-easing: cubic-bezier(0.22, 0.68, 0.3, 1);
   pointer-events: none;
 }
 
 .map-change-reveal {
-  animation: map-change-creep 1450ms linear both;
+  animation: map-change-sweep var(--map-change-duration) var(--map-change-easing) both;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: var(--creep-extent);
@@ -788,27 +790,48 @@ textarea {
 }
 
 .map-change-front-outer {
-  animation: map-change-front-outer 1450ms linear both;
-  stroke-width: calc(var(--creep-extent) + 0.7px);
+  animation: map-change-front-outer var(--map-change-duration) var(--map-change-easing) both;
+  stroke-width: calc(var(--creep-extent) + var(--map-change-front-width));
 }
 
 .map-change-front-inner {
-  animation: map-change-front-inner 1450ms linear both;
-  stroke-width: calc(var(--creep-extent) - 0.7px);
+  animation: map-change-front-inner var(--map-change-duration) var(--map-change-easing) both;
+  stroke-width: max(0px, calc(var(--creep-extent) - var(--map-change-front-width)));
 }
 
 .map-change-front {
-  animation: map-change-front-life 1450ms linear both;
+  animation: map-change-front-life var(--map-change-duration) ease-out both;
 }
 
-.map-change-outline {
-  animation: map-change-outline-life 1450ms linear both;
-  fill: none;
-  stroke: #f9dfaa;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.4;
-  vector-effect: non-scaling-stroke;
+.map-change-borders {
+  pointer-events: none;
+}
+
+.map-change-border-before,
+.map-change-border-after {
+  transition: opacity 220ms ease-out;
+}
+
+.map-change-border-after,
+.map-change-borders-settling .map-change-border-before {
+  opacity: 0;
+}
+
+.map-change-borders-settling .map-change-border-after {
+  opacity: 1;
+}
+
+.selected-country-tint,
+.selected-country-boundary-highlight {
+  transition: opacity 220ms ease-out;
+}
+
+.map-stage:has(.map-change) .selected-country-tint {
+  opacity: 0;
+}
+
+.map-stage:has(.map-change) .selected-country-boundary-highlight {
+  opacity: 0.35;
 }
 
 .keyboard-cut-cursor {
@@ -2025,35 +2048,26 @@ details[open] > summary > .disclosure-icon {
   }
 }
 
-@keyframes map-change-creep {
+@keyframes map-change-sweep {
   from { stroke-width: 0; }
   to { stroke-width: var(--creep-extent); }
 }
 
 @keyframes map-change-front-outer {
   from { stroke-width: 0; }
-  to { stroke-width: calc(var(--creep-extent) + 0.7px); }
+  to { stroke-width: calc(var(--creep-extent) + var(--map-change-front-width)); }
 }
 
 @keyframes map-change-front-inner {
   from { stroke-width: 0; }
-  to { stroke-width: calc(var(--creep-extent) - 0.7px); }
+  to { stroke-width: max(0px, calc(var(--creep-extent) - var(--map-change-front-width))); }
 }
 
 @keyframes map-change-front-life {
-  0%, 8%, 82% { opacity: 0.8; }
-  100% { opacity: 0; }
-}
-
-@keyframes map-change-outline-life {
   0% { opacity: 0; }
-  12%, 74% { opacity: 0.9; }
+  12% { opacity: 0.75; }
+  70% { opacity: 0.4; }
   100% { opacity: 0; }
-}
-
-@keyframes map-change-outline-reduced {
-  from { opacity: 0.9; }
-  to { opacity: 0; }
 }
 
 @keyframes map-change-cover-reduced {
@@ -2587,8 +2601,11 @@ details[open] > summary > .disclosure-icon {
     display: none;
   }
 
-  .map-change-outline {
-    animation: map-change-outline-reduced 900ms ease-out both;
+  .map-change-border-before,
+  .map-change-border-after,
+  .selected-country-tint,
+  .selected-country-boundary-highlight {
+    transition-duration: 140ms;
   }
 
   .panel-mode-content,

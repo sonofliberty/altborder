@@ -5,6 +5,7 @@ import GeometryFactory from "jsts/org/locationtech/jts/geom/GeometryFactory.js";
 import BufferOp from "jsts/org/locationtech/jts/operation/buffer/BufferOp.js";
 import OverlayOp from "jsts/org/locationtech/jts/operation/overlay/OverlayOp.js";
 import mapDataFixture from "../public/data/map-data.json";
+import { completeDivisionLand } from "./divisionLandCoverage";
 import { buildDivideTerritories, divideRegions, separateCountryIsland, splitCountryGeometry } from "./geometrySplit";
 import { applyScenarioPayload, createInitialSnapshot, createScenarioPayload, divideCountry, renameRegion, transferRegions } from "./state";
 import { decodeSharePayload, encodeSharePayload } from "./share";
@@ -12,6 +13,55 @@ import { overlayPolygonalGeometry } from "./polygonOverlay.mjs";
 import type { MapData, RegionRecord } from "./types";
 
 describe("country division with subdivisions", () => {
+  it("keeps polygon land when the preview also touches a fragment along an edge", () => {
+    const regions: RegionRecord[] = [{ id: "square", name: "Square", type: "Region", geometry: square(0, 0, 10, 10) }];
+    const preview: Geometry = {
+      type: "MultiPolygon",
+      coordinates: [square(0, 0, 5, 9), square(-1, 9.5, 0, 10)]
+        .flatMap((geometry) => geometry.type === "Polygon" ? [geometry.coordinates] : []),
+    };
+    const divisions = divideRegions(regions, preview, { cutLine: [[5, -1], [5, 11]] });
+    expect(divisions[0].kind).toBe("split");
+    if (divisions[0].kind !== "split") return;
+    expect(area(divisions[0].newGeometry)).toBeCloseTo(45, 10);
+    expect(area(divisions[0].existingGeometry)).toBeCloseTo(55, 10);
+    expect(OverlayOp.intersection(readPolygon(divisions[0].newGeometry), readPolygon(divisions[0].existingGeometry)).getArea()).toBe(0);
+  });
+
+  it("divides either side of northern Poland after three regions are transferred", async () => {
+    const data = mapDataFixture as MapData;
+    const original = transferRegions(createInitialSnapshot(data), ["POL-PL-ZP", "POL-PL-LB", "POL-PL-WN"], "DEU");
+    const regions = data.regions.filter(({ id }) => original.regionOwners[id] === "POL");
+    expect(regions).toHaveLength(13);
+    const cutLine: Position[] = [[15, 53.3], [16.4, 53.35], [17.5, 53.4], [18.5, 53.4], [19.2, 53.5]];
+    const split = splitCountryGeometry(regions, cutLine);
+    expect(split.ok, split.ok ? "" : split.reason).toBe(true);
+    if (!split.ok) return;
+
+    for (const side of [0, 1] as const) {
+      const territory = buildDivideTerritories(split, side);
+      const divisions = divideRegions(regions, territory.newGeometry, { cutLine });
+      expect(divisions).toHaveLength(13);
+      expect(divisions.some(({ kind }) => kind !== "keep")).toBe(true);
+      expect(divisions.some(({ kind }) => kind !== "move")).toBe(true);
+      for (const division of divisions) {
+        if (division.kind !== "split") continue;
+        const region = regions.find(({ id }) => id === division.regionId)!;
+        // Fallback overlays use the map's five-decimal coordinate grid.
+        expect(area(division.existingGeometry) + area(division.newGeometry), region.id).toBeCloseTo(area(region.geometry), 5);
+        expect(OverlayOp.intersection(readPolygon(division.existingGeometry), readPolygon(division.newGeometry)).getArea(), region.id).toBeLessThan(1e-8);
+      }
+      const completeDivisions = completeDivisionLand(regions, divisions, territory);
+      const result = divideCountry(original, "POL", byId(regions), completeDivisions, "Northern Poland", "#a85f4f");
+      expect(result).not.toBeNull();
+      if (!result) continue;
+      expect(new Set(result.snapshot.entities.DEU.regionIds)).toEqual(new Set(original.entities.DEU.regionIds));
+      const decoded = await decodeSharePayload(await encodeSharePayload(createScenarioPayload(data, result.snapshot)));
+      expect(decoded.ok, decoded.ok ? "" : decoded.error).toBe(true);
+      if (decoded.ok) expect(applyScenarioPayload(data, decoded.payload).customRegions).toEqual(result.snapshot.customRegions);
+    }
+  });
+
   it("keeps the name of a single-region country after annexation and sharing", async () => {
     const data = smallMap();
     const original = createInitialSnapshot(data);
