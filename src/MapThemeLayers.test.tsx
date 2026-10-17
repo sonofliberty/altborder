@@ -14,7 +14,10 @@ describe("map theme texture fallback", () => {
     expect(html).not.toContain(`/${theme}.webp`);
     expect(html).toContain('d="M500,110L520,110L520,130Z"');
     expect(html).not.toContain("M1,2L3,4L5,6Z");
-    expect(html).toContain('clip-rule="evenodd"');
+    expect(html).toContain('fill-rule="evenodd"');
+    expect(html).toContain('maskUnits="userSpaceOnUse" x="480" y="100" width="70" height="60"');
+    expect(html).toContain('mask-type:alpha');
+    expect(html).toContain('fill="white"');
   });
 
   it("keeps the complete ocean overview while visible cells load", () => {
@@ -22,5 +25,16 @@ describe("map theme texture fallback", () => {
     expect(html).toContain("ocean-overview.webp");
     expect(html).not.toContain("/ocean.webp");
     expect(html).toContain('class="map-theme-ocean"');
+  });
+
+  it("paints overlapping countries separately so their terrain mask remains a union", () => {
+    const paths = [
+      { id: "west", pathData: "M490,110L520,110L520,140L490,140Z" },
+      { id: "east", pathData: "M510,110L540,110L540,140L510,140Z" },
+    ];
+    const html = renderToStaticMarkup(<MapThemeLand theme="hoi4" projection={projection} detail={false} viewportBounds={viewportBounds} countryPaths={paths} />);
+    const mask = html.match(/<mask\b[^>]*>(.*?)<\/mask>/)?.[1] ?? "";
+    expect(mask.match(/<path\b/g)).toHaveLength(2);
+    for (const { pathData } of paths) expect(mask).toContain(`d="${pathData}"`);
   });
 });

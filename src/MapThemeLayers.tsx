@@ -104,19 +104,29 @@ const MapThemeRaster = memo(function MapThemeRaster({
   );
 });
 
-const MapThemeLandClip = memo(function MapThemeLandClip({
-  clipId,
+const MapThemeLandMask = memo(function MapThemeLandMask({
+  maskId,
   countryPaths,
   viewportBounds,
-}: { clipId: string; countryPaths: readonly MapThemeCountryPath[]; viewportBounds?: ProjectedBounds }) {
+}: { maskId: string; countryPaths: readonly MapThemeCountryPath[]; viewportBounds?: ProjectedBounds }) {
   const clippedPaths = useMemo(() => clipMapThemeCountryPaths(countryPaths, viewportBounds), [countryPaths, viewportBounds]);
   return (
     <defs>
-      <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
+      {/* Paint the land union instead of asking SVG to combine every country
+          into one clip path during prepaint. Keep the mask within the camera. */}
+      <mask
+        id={maskId}
+        maskUnits="userSpaceOnUse"
+        x={viewportBounds?.minX}
+        y={viewportBounds?.minY}
+        width={viewportBounds ? viewportBounds.maxX - viewportBounds.minX : undefined}
+        height={viewportBounds ? viewportBounds.maxY - viewportBounds.minY : undefined}
+        style={{ maskType: "alpha" }}
+      >
         {clippedPaths.map((country) => (
-          <path key={country.id} d={country.pathData} clipRule="evenodd" fillRule="evenodd" />
+          <path key={country.id} d={country.pathData} fill="white" fillRule="evenodd" />
         ))}
-      </clipPath>
+      </mask>
     </defs>
   );
 });
@@ -147,11 +157,11 @@ export const MapThemeLand = memo(function MapThemeLand({
   viewportBounds,
   countryPaths,
 }: ThemeLayerProps & { countryPaths: readonly MapThemeCountryPath[] }) {
-  const clipId = `map-theme-land-${useId()}`;
+  const maskId = `map-theme-land-${useId()}`;
   return (
     <g className="map-theme-land" pointerEvents="none" aria-hidden="true">
-      <MapThemeLandClip clipId={clipId} countryPaths={countryPaths} viewportBounds={viewportBounds} />
-      <g clipPath={`url(#${clipId})`}>
+      <MapThemeLandMask maskId={maskId} countryPaths={countryPaths} viewportBounds={viewportBounds} />
+      <g mask={`url(#${maskId})`}>
         <MapThemeRaster name={theme} projection={projection} detail={detail} viewportBounds={viewportBounds} />
       </g>
     </g>

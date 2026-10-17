@@ -310,6 +310,8 @@ Country outlines remain stronger than region outlines. Region detail increases a
 
 Active region borders use width (0.6px) and opacity (0.7) in both themes. Country labels contain no flags. Ocean labels retain full opacity where visible. Theme land and sea textures move with the existing zoom group; they do not change hit areas or country geometry.
 
+Use an alpha mask bounded by the prepared viewport for land textures. Paint each current country path separately with its even-odd fill rule. This preserves overlapping land and holes without the browser combining all country paths into one clip during zoom.
+
 ### Map theme control
 
 A fieldset named Map theme contains native radio inputs for HOI4 and EU4. Keep one radio group, its visible label, full theme-name tooltips, and keyboard focus. The selected option uses editor gold and dark text; hover uses the brighter gold. Other options use editor text and gain a muted surface with a gold border on hover.
