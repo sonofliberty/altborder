@@ -35,17 +35,14 @@ describe("editor side panel", () => {
     expect(appSource).toContain("<EditorSidePanel");
     expect(appSource).not.toContain("selectedEntity || inspectFocusedRegion");
     expect(panelSource).toContain("<CountrySearchSelect");
-    expect(panelSource).toContain('label="Country"');
+    expect(appSource).toContain('label="Find a country"');
     expect(panelSource).not.toContain('className="welcome-card"');
   });
 
-  it("shows only available transfer sections in source, region, destination order", () => {
-    const sourceStep = panelSource.indexOf(">Source country</div>");
-    const regionStep = panelSource.indexOf(">Regions</div>");
-    const destinationStep = panelSource.indexOf(">Destination</div>");
-
-    expect(sourceStep).toBeGreaterThan(-1);
-    expect(regionStep).toBeGreaterThan(sourceStep);
+  it("keeps region selection before the destination while country context stays in the heading", () => {
+    const regionStep = panelSource.indexOf('workflow-step transfer-selection');
+    const destinationStep = panelSource.indexOf('className="workflow-step transfer-destination"');
+    expect(regionStep).toBeGreaterThan(-1);
     expect(destinationStep).toBeGreaterThan(regionStep);
     expect(panelSource).toContain("{props.selectedEntity ? (");
     expect(panelSource).toContain("{selectedCount > 0 ? (");
@@ -64,8 +61,8 @@ describe("editor side panel", () => {
   });
 
   it("animates mode and country changes without keeping duplicate panels mounted", () => {
-    expect(panelSource).toContain('<div key={props.mode} className="panel-mode-content" role="tabpanel"');
-    expect(panelSource).toContain("key={selectedEntity.id}");
+    expect(panelSource).toContain('<div key={props.mode} className="panel-mode-content"');
+    expect(panelSource).toContain('role="tabpanel" id="editor-mode-panel"');
     expect(appSource).toContain("function animateZoomTo(nextZoom: ZoomState, duration = 380)");
     expect(appSource).toContain('window.matchMedia("(prefers-reduced-motion: reduce)").matches');
   });

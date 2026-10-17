@@ -130,7 +130,7 @@ describe("splitCountryGeometry", () => {
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.reason).toBe("Draw the line so it clearly enters and exits the selected country.");
+    expect(result.reason).toBe("The line must cross the country. Place both ends outside its border.");
   });
 
   it("cuts across a bay when interior endpoints are joined without an exterior sample", () => {
@@ -182,7 +182,7 @@ describe("splitCountryGeometry", () => {
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.reason).toBe("Draw a border that cuts one continuous part of the country.");
+    expect(result.reason).toBe("The border crosses separate land areas. Cut one land area at a time.");
   });
 
   it("separates the clicked island component into a new country", () => {

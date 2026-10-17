@@ -4,12 +4,14 @@ import {
   Brush,
   Check,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Eye,
   GitMerge,
   Image,
   Keyboard,
   MoveUpRight,
+  MousePointer2,
   PencilLine,
   RotateCcw,
   Search,
@@ -115,48 +117,90 @@ export function EditorSidePanel(props: EditorSidePanelProps) {
   }, [props.mode]);
 
   return (
-    <aside className="side-panel" aria-label="Country editor">
+    <aside className={`side-panel hud-panel${props.selectedEntity ? " has-country" : ""}`} aria-label="Country editor">
       <button
         className="mobile-panel-toggle"
-        aria-label={props.mobileExpanded ? "Show more map" : "Show editor"}
+        aria-label={props.mobileExpanded ? "Hide tools to show more map" : "Show tools"}
         aria-expanded={props.mobileExpanded}
         aria-controls="editor-panel-content"
         onClick={props.onToggleMobilePanel}
       >
-        <span title={props.selectedEntity?.name}>{props.mobileExpanded ? "Country editor" : props.selectedEntity?.name || "Find a country"}</span>
+        <span className="mobile-country-title" title={props.selectedEntity?.name}>
+          {props.selectedEntity ? <img src={getCountryFlagUrl(getCountryFlag(props.selectedEntity))} alt="" /> : null}
+          <span>{props.selectedEntity?.name || "Country tools"}</span>
+        </span>
         <span className="mobile-panel-toggle-action">
-          {props.mobileExpanded ? "Map" : "Tools"}
+          {props.mobileExpanded ? "Hide tools" : "Show tools"}
           {props.mobileExpanded ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
         </span>
       </button>
+      {!props.compactLayout ? (
+        <div className="hud-panel-heading">
+          {props.selectedEntity ? (
+            <CountrySummary key={props.selectedEntity.id} entity={props.selectedEntity} onClear={() => props.onSelectEntity("")} />
+          ) : (
+            <h2>{props.mode === "merge" ? "Merge countries" : "Country tools"}</h2>
+          )}
+        </div>
+      ) : null}
       <PanelNav mode={props.mode} readOnly={props.readOnly} onChangeMode={props.onChangeMode} />
 
-      <div ref={panelScrollRef} id="editor-panel-content" className="panel-scroll" hidden={props.compactLayout && !props.mobileExpanded}>
-        <div key={props.mode} className="panel-mode-content" role="tabpanel" id="editor-mode-panel" aria-labelledby={`editor-mode-${props.mode}`}>
+      <div id="editor-panel-content" className="hud-panel-body" hidden={props.compactLayout && !props.mobileExpanded}>
+        <div className="hud-mode-panel" role="tabpanel" id="editor-mode-panel" aria-labelledby={`editor-mode-${props.mode}`}>
+          <div ref={panelScrollRef} className="panel-scroll">
+            <div key={props.mode} className="panel-mode-content">
           {props.mode === "inspect" ? <InspectPanel {...props} /> : null}
           {props.mode === "transfer" ? <TransferPanel {...props} /> : null}
           {props.mode === "divide" ? <DividePanel {...props} /> : null}
           {props.mode === "merge" ? <MergePanel {...props} /> : null}
         </div>
 
-        <details className="panel-about">
+        {props.mode === "inspect" ? <details className="panel-about">
           <summary>About map data <ChevronDown className="disclosure-icon" size={14} aria-hidden="true" /></summary>
           <p>{props.attribution}</p>
-        </details>
+        </details> : null}
+        </div>
+        <PanelAction {...props} />
+        </div>
       </div>
     </aside>
   );
+}
+
+function PanelAction(props: EditorSidePanelProps) {
+  if (props.readOnly || !props.selectedEntity) return null;
+  const count = props.selectedTransferRegions.length;
+  if (props.mode === "transfer") {
+    const target = props.transferTargetOptions.find((option) => option.id === props.targetEntityId);
+    return (
+      <footer className="panel-action">
+        {target && count > 0 ? <p className="transfer-route"><span>{props.selectedEntity.name}</span><ChevronRight size={14} aria-hidden="true" /><strong>{target.name}</strong></p> : null}
+        <button className="primary wide" disabled={!props.canTransfer} onClick={props.onApplyTransfer}>
+          <span>Transfer {count} {count === 1 ? "region" : "regions"}</span><ChevronRight size={17} aria-hidden="true" />
+        </button>
+        <p className="action-hint">{count === 0 ? "Select regions on the map or by name." : !target ? "Choose a destination country." : "You can undo this change."}</p>
+      </footer>
+    );
+  }
+  if (props.mode === "divide" && props.divideCanSwap && !props.divideIsCalculating) {
+    return (
+      <footer className="panel-action">
+        <button className="primary wide" disabled={!props.canCreateDividedCountry} onClick={props.onCreateDividedCountry}>
+          <span>Create country</span><ChevronRight size={17} aria-hidden="true" />
+        </button>
+        <p className="action-hint">{props.newCountryName.trim() ? "You can undo this change." : "Enter a name for the new country."}</p>
+      </footer>
+    );
+  }
+  return null;
 }
 
 function InspectPanel(props: EditorSidePanelProps) {
   return (
     <>
       <CountryContext
-        entityOptions={props.entityOptions}
         selectedEntity={props.selectedEntity}
-        selectedEntityId={props.selectedEntityId}
         readOnly={props.readOnly}
-        onSelectEntity={props.onSelectEntity}
         onUpdateEntityName={props.onUpdateEntityName}
         onUpdateEntityColor={props.onUpdateEntityColor}
         flagOptions={props.flagOptions}
@@ -169,7 +213,7 @@ function InspectPanel(props: EditorSidePanelProps) {
       {props.selectedEntity ? (
         <section className="context-section">
           {props.inspectFocusedRegion ? (
-            <RegionSummary title="Focused region" name={props.inspectFocusedRegion.displayName}>
+            <RegionSummary title="Selected region" name={props.inspectFocusedRegion.displayName}>
               <label className="field">
                 <span>Region name</span>
                 <input
@@ -206,132 +250,85 @@ function InspectPanel(props: EditorSidePanelProps) {
 
 function TransferPanel(props: EditorSidePanelProps) {
   const selectedCount = props.selectedTransferRegions.length;
-
+  if (!props.selectedEntity) return (
+    <div className="country-intro tool-intro">
+      <h3>Transfer regions</h3>
+      <p>Select the country that owns the regions, or use Find a country.</p>
+    </div>
+  );
+  const selectedRow = (region: RegionPanelRow) => (
+    <div className="transfer-selected-row" key={region.id}>
+      <Check size={14} aria-hidden="true" />
+      <button className="transfer-selected-name" onClick={() => props.onFocusTransferRegion(region.id)}>{region.displayName}</button>
+      <button className="transfer-selected-remove" aria-label={`Deselect ${region.displayName}`} disabled={props.readOnly} onClick={() => props.onToggleTransferRegion(region.id)}><X size={14} /></button>
+    </div>
+  );
   return (
     <>
-      <section className="context-section compact-context-card">
-        <div className="section-heading">Source country</div>
-        {props.selectedEntity ? (
-          <CountrySummary key={props.selectedEntity.id} entity={props.selectedEntity} onClear={() => props.onSelectEntity("")} />
-        ) : (
-          <CountrySearchSelect
-            label="Country"
-            value={props.selectedEntityId}
-            options={props.entityOptions}
-            onChange={props.onSelectEntity}
-            disabled={props.readOnly}
-            placeholder="Search countries"
-          />
-        )}
+      <section className={`workflow-step transfer-selection${selectedCount > 0 ? " has-selection" : ""}`}>
+        <div className="section-title-row">
+          <h3 className="section-heading">Choose regions</h3>
+          <span aria-live="polite">{selectedCount} selected</span>
+        </div>
+        <TransferSelectionControls {...props} />
+        {selectedCount === 0 ? <p className="hint">{props.brushEnabled ? "Drag across regions to select them." : "Select regions on the map or from the list below."}</p> : null}
+        <TransferRegionPicker
+          key={props.selectedEntityId}
+          regions={props.transferRegionRows}
+          selectedRegions={props.selectedTransferRegions}
+          readOnly={props.readOnly}
+          onToggle={props.onToggleTransferRegion}
+          selectionControls={<TransferSelectionControls {...props} />}
+        >
+          {props.focusedTransferRegion ? <details className="transfer-extra">
+            <summary>More region tools <ChevronDown size={14} aria-hidden="true" /></summary>
+            <p className="hint">{props.focusedTransferRegion.displayName}</p>
+            <button className="compact" disabled={props.readOnly} onClick={() => props.onSeparateRegion(props.focusedTransferRegion!.id)}><Split size={15} /> Make region a country</button>
+          </details> : null}
+        </TransferRegionPicker>
+        {selectedCount > 0 ? <div className="transfer-selected-list">
+          {props.selectedTransferRegions.slice(0, 3).map(selectedRow)}
+          {selectedCount > 3 ? <details className="transfer-more-regions"><summary>Show {selectedCount - 3} more selected {selectedCount === 4 ? "region" : "regions"} <ChevronDown size={14} aria-hidden="true" /></summary>{props.selectedTransferRegions.slice(3).map(selectedRow)}</details> : null}
+        </div> : null}
       </section>
-
-      {props.selectedEntity ? (
-        <section className="workflow-step">
-          <div className="section-title-row">
-            <div className="section-heading">Regions</div>
-            <span>{selectedCount} selected</span>
-          </div>
-            <div className="switch-row">
-              <button
-                className={props.brushEnabled ? "active compact" : "compact"}
-                disabled={props.readOnly}
-                aria-pressed={props.brushEnabled}
-                onClick={props.onToggleBrush}
-              >
-                <Brush size={15} /> Brush
-              </button>
-              <button className="compact" disabled={props.readOnly} onClick={props.onSelectAllTransferRegions}>
-                All regions
-              </button>
-              <button
-                className="compact"
-                disabled={props.readOnly || selectedCount === 0}
-                onClick={props.onClearTransferSelection}
-              >
-                Clear
-              </button>
-            </div>
-
-            <TransferRegionPicker
-              key={props.selectedEntityId}
-              regions={props.transferRegionRows}
-              selectedRegions={props.selectedTransferRegions}
-              readOnly={props.readOnly}
-              onToggle={props.onToggleTransferRegion}
-            />
-
-            {props.focusedTransferRegion ? (
-              <RegionSummary
-                title="Focused region"
-                name={props.focusedTransferRegion.displayName}
-                className="transfer-region-detail"
-              >
-                <div className="region-actions">
-                  <button
-                    onClick={() => props.onSeparateRegion(props.focusedTransferRegion!.id)}
-                    disabled={props.readOnly}
-                  >
-                    <Split size={15} /> Separate as country
-                  </button>
-                </div>
-              </RegionSummary>
-            ) : (
-              <p className="hint">Select regions on the map.</p>
-            )}
-
-            {selectedCount > 1 ? (
-              <RegionList
-                regions={props.selectedTransferRegions}
-                focusedRegionId={props.focusedTransferRegion?.id ?? ""}
-                onSelect={props.onFocusTransferRegion}
-                className="transfer-region-list"
-              />
-            ) : null}
-        </section>
-      ) : null}
-
       {selectedCount > 0 ? (
         <section className="workflow-step transfer-destination">
-            <div className="section-heading">Destination</div>
-            <CountrySearchSelect
-              label="Country"
-              value={props.targetEntityId}
-              options={props.transferTargetOptions}
-              onChange={props.onSelectTransferTarget}
-              disabled={props.readOnly}
-              placeholder="Search destinations"
-            />
-            <button
-              className="primary wide"
-              disabled={props.readOnly || !props.canTransfer}
-              onClick={props.onApplyTransfer}
-            >
-              <Check size={16} /> Transfer {selectedCount} {selectedCount === 1 ? "region" : "regions"}
-            </button>
+          <CountrySearchSelect label="Destination country" clearLabel="Clear destination country" value={props.targetEntityId} options={props.transferTargetOptions} onChange={props.onSelectTransferTarget} disabled={props.readOnly} placeholder="Find a country" />
+          <p className="hint">Selected regions will become part of this country.</p>
         </section>
       ) : null}
+
     </>
+  );
+}
+
+function TransferSelectionControls(props: EditorSidePanelProps) {
+  return (
+    <div className="switch-row selection-methods" role="group" aria-label="Region selection">
+      <button className="compact" aria-pressed={!props.brushEnabled} disabled={props.readOnly} onClick={() => { if (props.brushEnabled) props.onToggleBrush(); }}><MousePointer2 size={15} /> Select</button>
+      <button className="compact" aria-pressed={props.brushEnabled} disabled={props.readOnly} onClick={() => { if (!props.brushEnabled) props.onToggleBrush(); }}><Brush size={15} /> Brush</button>
+      <button className="compact" disabled={props.readOnly} onClick={props.onSelectAllTransferRegions}>Select all</button>
+      <button className="compact quiet-action" aria-label="Clear selected regions" disabled={props.readOnly || props.selectedTransferRegions.length === 0} onClick={props.onClearTransferSelection}>Clear</button>
+    </div>
   );
 }
 
 function DividePanel(props: EditorSidePanelProps) {
   const previewReady = props.divideCanSwap && !props.divideIsCalculating;
   const instructions = props.divideMethod === "island"
-    ? ["Choose an island", "Select a separate island on the map. The mainland stays with the current country."]
+    ? ["Choose an island", "Select the island that will become a new country."]
     : props.divideMethod === "draw"
       ? ["Draw your new border", "Drag from one side of the country to the other. Start and finish outside its border."]
       : props.divideAwaitingEnd
-        ? ["Place the second point", "Select a point on the other side of the country. The line between your points becomes the border."]
-        : ["A new border in two points", "Select a point just outside the country, then a point on the other side."];
+        ? ["Place the second point", "Place it outside the opposite edge so the line crosses the country."]
+        : ["Place the first point", "Place it just outside the country. The second point goes outside the opposite edge."];
 
   return (
     <>
+      {!props.selectedEntity ? (
       <CountryContext
-        entityOptions={props.entityOptions}
         selectedEntity={props.selectedEntity}
-        selectedEntityId={props.selectedEntityId}
         readOnly={props.readOnly}
-        onSelectEntity={props.onSelectEntity}
         onUpdateEntityName={props.onUpdateEntityName}
         onUpdateEntityColor={props.onUpdateEntityColor}
         flagOptions={props.flagOptions}
@@ -341,9 +338,10 @@ function DividePanel(props: EditorSidePanelProps) {
         onFinishMetadataEdit={props.onFinishMetadataEdit}
         showEditingFields={false}
       />
+      ) : null}
 
       {props.selectedEntity ? (
-        <div className="divide-workflow">
+        <div className={`divide-workflow${previewReady ? " is-ready" : ""}`}>
           <ol className="divide-steps" aria-label="Divide steps">
             <li className={previewReady ? "complete" : "current"} aria-current={!previewReady ? "step" : undefined}>
               <span>{previewReady ? <Check size={13} aria-hidden="true" /> : "1"}</span> Set border
@@ -381,50 +379,27 @@ function DividePanel(props: EditorSidePanelProps) {
             <>
               {previewReady ? (
               <>
-                <div className="divide-ready" role="status">
-                  <Check size={17} aria-hidden="true" /> Your border is ready
+                <div className="divide-border-review">
+                  <span className="divide-ready" role="status"><Check size={16} aria-hidden="true" /> Border ready</span>
+                  <button className="compact quiet-action" disabled={props.readOnly} onClick={props.onClearDivideDraft}>Reset border</button>
                 </div>
-                <div className="divide-preview-key">
-                  <span className="divide-color-key" style={{ backgroundColor: props.newCountryColor }} aria-hidden="true" />
-                  <span>{props.newCountryName.trim() || "New country"}</span>
-                  <button className="compact" disabled={props.readOnly} onClick={props.onSwapDivideSides}>
-                    <ArrowLeftRight size={14} aria-hidden="true" /> Other side
-                  </button>
-                </div>
-                <p className="hint">The colored side becomes your new country. Select either side on the map to change it.</p>
                 <label className="field">
-                  <span>Country name</span>
-                  <input
-                    id="divide-country-name"
-                    value={props.newCountryName}
-                    disabled={props.readOnly}
-                    onChange={(event) => props.onChangeNewCountryName(event.target.value)}
-                    placeholder="Name your new country"
-                  />
+                  <span>New country name</span>
+                  <input id="divide-country-name" value={props.newCountryName} disabled={props.readOnly} onChange={(event) => props.onChangeNewCountryName(event.target.value)} placeholder="e.g. South Germany" />
                 </label>
-                <label className="field color-field">
-                  <span>Color</span>
-                  <input
-                    type="color"
-                    value={props.newCountryColor}
-                    disabled={props.readOnly}
-                    onInput={(event) => props.onChangeNewCountryColor(event.currentTarget.value)}
-                    onChange={(event) => props.onChangeNewCountryColor(event.target.value)}
-                  />
-                </label>
-                <button
-                  className="primary wide"
-                  disabled={props.readOnly || !props.canCreateDividedCountry}
-                  onClick={props.onCreateDividedCountry}
-                >
-                  <Split size={16} aria-hidden="true" /> Create country
-                </button>
-                <p className="hint">{props.newCountryName.trim() ? "You can undo this change." : "Enter a name to create your country."}</p>
+                <div className="divide-side-row">
+                  <label className="divide-color-field">
+                    <input type="color" aria-label="New country color" value={props.newCountryColor} disabled={props.readOnly} onInput={(event) => props.onChangeNewCountryColor(event.currentTarget.value)} onChange={(event) => props.onChangeNewCountryColor(event.target.value)} />
+                    <span>Country color</span>
+                  </label>
+                  <button className="compact quiet-action" disabled={props.readOnly} onClick={props.onSwapDivideSides}><ArrowLeftRight size={14} aria-hidden="true" /> Switch side</button>
+                </div>
+                <p className="hint divide-side-hint">The highlighted land becomes the new country. Use Switch side to choose the other part.</p>
               </>
             ) : null}
-              <button className="compact divide-start-over" disabled={props.readOnly} onClick={props.onClearDivideDraft}>
-                <RotateCcw size={14} aria-hidden="true" /> Start over
-              </button>
+              {!previewReady ? <button className="compact divide-start-over" disabled={props.readOnly} onClick={props.onClearDivideDraft}>
+                <RotateCcw size={14} aria-hidden="true" /> Reset border
+              </button> : null}
             </>
           ) : null}
 
@@ -432,7 +407,7 @@ function DividePanel(props: EditorSidePanelProps) {
             <details className="keyboard-cut-controls">
               <summary><Keyboard size={15} aria-hidden="true" /> Keyboard controls <ChevronDown size={14} className="disclosure-icon" aria-hidden="true" /></summary>
               <button id="keyboard-cut-start" className="compact" onClick={props.onStartKeyboardCut}>
-                {props.keyboardCutActive ? "Restart keyboard cut" : "Cut with keyboard"}
+                {props.keyboardCutActive ? "Restart keyboard border" : "Set border with keyboard"}
               </button>
               {props.keyboardCutActive ? (
                 <>
@@ -442,8 +417,8 @@ function DividePanel(props: EditorSidePanelProps) {
                     Escape cancels. {props.keyboardCutPointCount} {props.keyboardCutPointCount === 1 ? "point" : "points"} placed.
                   </p>
                   <div className="switch-row">
-                    <button className="compact" disabled={props.keyboardCutPointCount < 2} onClick={props.onFinishKeyboardCut}>Finish cut</button>
-                    <button className="compact" onClick={props.onCancelKeyboardCut}>Cancel</button>
+                    <button className="compact" disabled={props.keyboardCutPointCount < 2} onClick={props.onFinishKeyboardCut}>Preview border</button>
+                    <button className="compact" onClick={props.onCancelKeyboardCut}>Cancel border</button>
                   </div>
                 </>
               ) : null}
@@ -460,11 +435,15 @@ function TransferRegionPicker({
   selectedRegions,
   readOnly,
   onToggle,
+  selectionControls,
+  children,
 }: {
   regions: RegionPanelRow[];
   selectedRegions: RegionPanelRow[];
   readOnly: boolean;
   onToggle: (regionId: string) => void;
+  selectionControls: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const selectedIds = useMemo(() => new Set(selectedRegions.map((region) => region.id)), [selectedRegions]);
@@ -475,10 +454,11 @@ function TransferRegionPicker({
 
   return (
     <details className="region-picker">
-      <summary>Choose regions by name <ChevronDown className="disclosure-icon" size={16} aria-hidden="true" /></summary>
+      <summary><span className="region-picker-desktop-label">Choose regions by name</span><span className="region-picker-mobile-label">{selectedRegions.length > 0 ? `${selectedRegions.length} ${selectedRegions.length === 1 ? "region" : "regions"} selected · Edit` : "Choose regions by name"}</span><ChevronDown className="disclosure-icon" size={16} aria-hidden="true" /></summary>
       <div className="region-picker-body">
+        <div className="transfer-picker-methods">{selectionControls}</div>
         <label className="field">
-          <span>Find region</span>
+          <span>Find a region</span>
           <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} />
         </label>
         <div className="region-picker-list" role="group" aria-label="Source regions">
@@ -492,8 +472,9 @@ function TransferRegionPicker({
               />
               <span>{region.displayName}</span>
             </label>
-          )) : <p className="hint">No matching regions.</p>}
+          )) : <p className="hint">No regions found. Try another name.</p>}
         </div>
+        {children}
       </div>
     </details>
   );
@@ -530,21 +511,22 @@ function MergePanel(props: EditorSidePanelProps) {
             onRemove={props.onRemoveMergeEntity}
           />
           <div className="switch-row">
-            <button className="compact" onClick={props.onClearMergeSelection}>Clear</button>
+            <button className="compact" onClick={props.onClearMergeSelection}>Clear selected countries</button>
           </div>
           {props.canMerge ? (
             <>
               <label className="field">
-                <span>Name</span>
+                <span>New country name (optional)</span>
                 <input
                   value={props.mergeName}
                   disabled={props.readOnly}
                   onChange={(event) => props.onChangeMergeName(event.target.value)}
-                  placeholder="Generated if blank"
+                  placeholder="e.g. Baltic Union"
                 />
               </label>
+              <p className="hint">Leave blank for an automatic name.</p>
               <button className="primary wide" disabled={props.readOnly} onClick={props.onMerge}>
-                <GitMerge size={16} /> Merge selected
+                <GitMerge size={16} /> Merge {props.mergeSelectedEntities.length} countries
               </button>
             </>
           ) : (
@@ -557,11 +539,8 @@ function MergePanel(props: EditorSidePanelProps) {
 }
 
 function CountryContext({
-  entityOptions,
   selectedEntity,
-  selectedEntityId,
   readOnly,
-  onSelectEntity,
   onUpdateEntityName,
   onUpdateEntityColor,
   flagOptions,
@@ -571,11 +550,8 @@ function CountryContext({
   onFinishMetadataEdit,
   showEditingFields = true,
 }: {
-  entityOptions: CountrySearchOption[];
   selectedEntity?: CountryEntity;
-  selectedEntityId: string;
   readOnly: boolean;
-  onSelectEntity: (entityId: string) => void;
   onUpdateEntityName: (name: string) => void;
   onUpdateEntityColor: (color: string) => void;
   flagOptions: FlagOption[];
@@ -587,27 +563,19 @@ function CountryContext({
 }) {
   return (
     <section className={`context-section country-context${showEditingFields ? "" : " compact-context-card"}`}>
-      {selectedEntity ? (
-        <CountrySummary key={selectedEntity.id} entity={selectedEntity} onClear={() => onSelectEntity("")} />
-      ) : (
+      {!selectedEntity ? (
         <>
           <div className="country-intro">
-            <h2>Your version of the world</h2>
+            <h2>{showEditingFields ? "Choose a country" : "Divide a country"}</h2>
             <p>
               {showEditingFields
-                ? "Select a country on the map, or search by name."
-                : "Choose a country, then draw its new border."}
+                ? "Select a country on the map, or use Find a country."
+                : "Select a country to split, or use Find a country."}
             </p>
           </div>
-          <CountrySearchSelect
-            label="Country"
-            value={selectedEntityId}
-            options={entityOptions}
-            onChange={onSelectEntity}
-            placeholder="Search countries"
-          />
+
         </>
-      )}
+      ) : null}
 
       {selectedEntity && showEditingFields ? (
         <details className="country-appearance">
@@ -618,7 +586,7 @@ function CountryContext({
           </summary>
           <div className="country-edit-fields">
           <label className="field">
-            <span>Name</span>
+            <span>Country name</span>
             <input
               value={selectedEntity.name}
               disabled={readOnly}
@@ -662,7 +630,7 @@ function CountrySummary({ entity, onClear }: { entity: CountryEntity; onClear?: 
         <img className="country-summary-flag" src={getCountryFlagUrl(getCountryFlag(entity))} alt="" />
       </div>
       <div className="country-summary-text">
-        <h2 className="country-summary-name">{entity.name}</h2>
+        <h2 className="country-summary-name" title={entity.name}>{entity.name}</h2>
         <div className="country-summary-meta">
           <span className="country-swatch" style={{ backgroundColor: entity.color }} aria-hidden="true" />
           <span>{regionCount.toLocaleString()} {regionCount === 1 ? "region" : "regions"}</span>
@@ -670,7 +638,7 @@ function CountrySummary({ entity, onClear }: { entity: CountryEntity; onClear?: 
         </div>
       </div>
       {onClear ? (
-        <button className="country-summary-clear" onClick={onClear} title="Change country" aria-label="Change country">
+        <button className="country-summary-clear" onClick={onClear} title="Clear country selection" aria-label="Clear country selection">
           <X size={15} />
         </button>
       ) : null}
@@ -780,7 +748,7 @@ function FlagEditor({
   );
 }
 
-function CountrySearchSelect({
+export function CountrySearchSelect({
   label,
   value,
   options,
@@ -789,6 +757,7 @@ function CountrySearchSelect({
   placeholder,
   resetAfterChange = false,
   clearable = true,
+  clearLabel = "Clear country selection",
 }: {
   label: string;
   value: string;
@@ -798,6 +767,7 @@ function CountrySearchSelect({
   placeholder: string;
   resetAfterChange?: boolean;
   clearable?: boolean;
+  clearLabel?: string;
 }) {
   const listboxId = useId();
   const labelId = useId();
@@ -889,8 +859,8 @@ function CountrySearchSelect({
           <button
             type="button"
             className="country-search-clear"
-            title="Clear country"
-            aria-label="Clear country"
+            title={clearLabel}
+            aria-label={clearLabel}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               onChange("");
@@ -932,7 +902,7 @@ function CountrySearchSelect({
               </button>
             ))
           ) : (
-            <div className="country-search-empty" role="status">{label === "Choose a flag" ? "No matching flags" : "No matching countries"}</div>
+            <div className="country-search-empty" role="status">{label === "Choose a flag" ? "No flags found. Try another name." : "No countries found. Try another name."}</div>
           )}
         </div>
       ) : null}
@@ -1006,7 +976,7 @@ function CountryList({
           <button className="region-row" onClick={() => onSelect(entity.id)}>
             <span>{entity.name}</span>
           </button>
-          <button className="country-list-remove" aria-label={`Remove ${entity.name}`} onClick={() => onRemove(entity.id)}>
+          <button className="country-list-remove" aria-label={`Remove ${entity.name} from merge`} onClick={() => onRemove(entity.id)}>
             <X size={15} aria-hidden="true" />
           </button>
         </div>

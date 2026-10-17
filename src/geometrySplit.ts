@@ -123,10 +123,10 @@ export function buildCustomBoundaryEdges(
 
 export function splitCountryGeometry(regions: RegionRecord[], cutLine: Position[]): CountrySplit {
   if (regions.length === 0) {
-    return { ok: false, reason: "Select a country before drawing a border." };
+    return { ok: false, reason: "Select a country before setting a border." };
   }
   if (cutLine.length < 2) {
-    return { ok: false, reason: "Draw a longer border line across the selected country." };
+    return { ok: false, reason: "Add at least two points to make a border across the country." };
   }
 
   try {
@@ -153,10 +153,10 @@ export function splitCountryGeometry(regions: RegionRecord[], cutLine: Position[
     }
 
     if (splitComponents.length === 0) {
-      return { ok: false, reason: "Draw the line so it clearly enters and exits the selected country." };
+      return { ok: false, reason: "The line must cross the country. Place both ends outside its border." };
     }
     if (splitComponents.length > 1) {
-      return { ok: false, reason: "Draw a border that cuts one continuous part of the country." };
+      return { ok: false, reason: "The border crosses separate land areas. Cut one land area at a time." };
     }
 
     const pieces = splitComponents[0].map((piece) => ({
@@ -171,7 +171,7 @@ export function splitCountryGeometry(regions: RegionRecord[], cutLine: Position[
       untouchedGeometry: unionGeoJsonGeometries(untouched.map(writeGeometry)),
     };
   } catch {
-    return { ok: false, reason: "Could not split this country with the drawn line." };
+    return { ok: false, reason: "Could not divide this country. Reset the border and try another line." };
   }
 }
 
@@ -186,20 +186,20 @@ export function separateCountryIsland(regions: RegionRecord[], point: Position):
     );
     const components = decomposePolygonComponents(countryGeometry);
     if (components.length < 2) {
-      return { ok: false, reason: "This country has no separate island to detach." };
+      return { ok: false, reason: "This country has no separate island. Use Two points or Draw." };
     }
 
     const componentGeometries = components.map(writeGeometry);
     const islandIndex = componentGeometries.findIndex((geometry) => polygonalGeometryContainsPoint(geometry, point));
     if (islandIndex < 0) {
-      return { ok: false, reason: "Click a separate island inside the selected country." };
+      return { ok: false, reason: "Select an island that belongs to this country." };
     }
 
     const island = components[islandIndex];
     const remainderComponents = components.filter((_, index) => index !== islandIndex);
     const remainderGeometry = unionGeoJsonGeometries(remainderComponents.map(writeGeometry));
     if (!remainderGeometry) {
-      return { ok: false, reason: "This island cannot be separated from the selected country." };
+      return { ok: false, reason: "This island cannot be separated. Use Two points or Draw." };
     }
 
     const remainder = readGeometry(remainderGeometry);
@@ -220,7 +220,7 @@ export function separateCountryIsland(regions: RegionRecord[], point: Position):
       untouchedGeometry: null,
     };
   } catch {
-    return { ok: false, reason: "Could not separate this island from the selected country." };
+    return { ok: false, reason: "Could not separate this island. Use Two points or Draw." };
   }
 }
 

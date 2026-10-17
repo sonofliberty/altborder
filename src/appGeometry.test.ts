@@ -58,6 +58,17 @@ describe("map zoom helpers", () => {
     expect(zoomToBounds({ minX: 0, minY: 0, maxX: 10000, maxY: 10000 }, 50).k).toBe(0.8);
     expect(zoomToBounds({ minX: 0, minY: 0, maxX: 0.1, maxY: 0.1 }, 50).k).toBe(30);
   });
+
+  it("fits selected land within the map area left beside a floating panel", () => {
+    const land = { minX: 300, minY: 100, maxX: 600, maxY: 300 };
+    const viewport = { minX: -40, minY: 30, maxX: 680, maxY: 520 };
+    const zoom = zoomToBounds(land, 40, viewport);
+    expect(zoom.x + land.minX * zoom.k).toBeGreaterThanOrEqual(viewport.minX + 40);
+    expect(zoom.x + land.maxX * zoom.k).toBeLessThanOrEqual(viewport.maxX - 40);
+    expect(zoom.y + land.minY * zoom.k).toBeGreaterThanOrEqual(viewport.minY + 40);
+    expect(zoom.y + land.maxY * zoom.k).toBeLessThanOrEqual(viewport.maxY - 40 + 1e-8);
+    expect(zoom.x + (land.minX + land.maxX) / 2 * zoom.k).toBeCloseTo((viewport.minX + viewport.maxX) / 2);
+  });
 });
 
 describe("touch map navigation", () => {

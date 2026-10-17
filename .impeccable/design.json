@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-13T01:42:23.841315+00:00",
+  "generatedAt": "2026-10-17T20:56:16Z",
   "title": "Design System: AltBorder",
   "extensions": {
     "colorMeta": {
@@ -1080,23 +1080,23 @@
       },
       "editor-body": {
         "displayName": "Editor Body",
-        "purpose": "Existing editor text."
+        "purpose": "Sans-serif editor controls and tool text."
       },
       "editor-title": {
-        "displayName": "Editor Title",
-        "purpose": "Existing editor text."
+        "displayName": "Scenario Title",
+        "purpose": "Scenario title in the desktop header; the phone editor moves the field into More actions."
       },
       "editor-headline": {
-        "displayName": "Editor Headline",
-        "purpose": "Existing editor text."
+        "displayName": "Country Heading",
+        "purpose": "Selected country heading in the floating desktop panel."
       },
       "editor-label": {
-        "displayName": "Editor Label",
-        "purpose": "Existing editor text."
+        "displayName": "Compact Label",
+        "purpose": "Compact controls and the map theme options."
       },
       "editor-wordmark": {
-        "displayName": "Editor Wordmark",
-        "purpose": "Existing editor text."
+        "displayName": "Desktop Wordmark",
+        "purpose": "Uppercase AltBorder mark using the registered self-hosted Barlow Map family."
       },
       "map-eu4-country": {
         "displayName": "EU4 Country",
@@ -1105,6 +1105,50 @@
       "map-eu4-ocean": {
         "displayName": "EU4 Ocean",
         "purpose": "Cinzel ocean names; hidden at widths up to 640px."
+      },
+      "editor-panel-heading": {
+        "displayName": "Panel Heading",
+        "purpose": "Country tools or Merge countries when no country is selected."
+      },
+      "editor-intro": {
+        "displayName": "Tool Introduction",
+        "purpose": "Introductory heading inside the country tool body."
+      },
+      "editor-country-mobile": {
+        "displayName": "Phone Country Title",
+        "purpose": "Country name in the collapsible phone sheet header."
+      },
+      "editor-field-label": {
+        "displayName": "HUD Field Label",
+        "purpose": "HUD field labels and section headings."
+      },
+      "editor-small": {
+        "displayName": "HUD Small Text",
+        "purpose": "Region counts, step labels, and action hints."
+      },
+      "editor-input-mobile": {
+        "displayName": "Phone Input",
+        "purpose": "Text input size on phones and touch screens, including tablets."
+      },
+      "editor-hint": {
+        "displayName": "HUD Hint",
+        "purpose": "Supporting instructions in the country tool body."
+      },
+      "editor-tool-heading": {
+        "displayName": "Tool Heading",
+        "purpose": "Divide instruction heading."
+      },
+      "editor-status": {
+        "displayName": "HUD Status",
+        "purpose": "Ready border message in the country panel."
+      },
+      "editor-wordmark-mobile": {
+        "displayName": "Phone Wordmark",
+        "purpose": "Wordmark in the bottom-sheet layout."
+      },
+      "editor-wordmark-narrow": {
+        "displayName": "Narrow Wordmark",
+        "purpose": "Wordmark at widths up to 380px."
       }
     },
     "shadows": [
@@ -1116,12 +1160,27 @@
       {
         "name": "panel",
         "value": "-12px 0 32px rgba(4, 12, 16, 0.18)",
-        "purpose": "Existing editor panel depth."
+        "purpose": "Legacy sidebar variable in the base stylesheet; the floating HUD uses hud-panel and hud-sheet."
       },
       {
         "name": "dialog",
         "value": "0 24px 80px rgba(4, 12, 16, 0.5)",
         "purpose": "Existing editor dialog depth."
+      },
+      {
+        "name": "hud-panel",
+        "value": "0 16px 40px rgb(4 12 16 / 28%)",
+        "purpose": "Floating desktop country panel."
+      },
+      {
+        "name": "hud-sheet",
+        "value": "0 -6px 24px rgb(4 12 16 / 16%)",
+        "purpose": "Top edge of the phone country sheet."
+      },
+      {
+        "name": "hud-search",
+        "value": "0 5px 12px rgb(4 12 16 / 16%)",
+        "purpose": "Global country search; applied with filter: drop-shadow."
       }
     ],
     "motion": [
@@ -1139,16 +1198,59 @@
         "name": "map-transfer",
         "value": "1450ms linear",
         "purpose": "Existing transfer feedback; keep reduced-motion overrides."
+      },
+      {
+        "name": "hud-mode-state",
+        "value": "150ms ease",
+        "purpose": "Mode tab background, border, shadow, and text changes; disabled for HUD buttons under reduced motion."
+      },
+      {
+        "name": "hud-mode-enter",
+        "value": "180ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Existing mode body entry; reduced-motion rules suppress the animation."
+      },
+      {
+        "name": "hud-country-enter",
+        "value": "220ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Existing country summary entry; reduced-motion rules suppress the animation."
       }
     ],
     "breakpoints": [
       {
-        "name": "stacked-editor",
-        "value": "900px"
+        "name": "bottom-sheet-editor",
+        "value": "(max-width: 767px) and (min-height: 501px), (max-width: 539px)"
       },
       {
         "name": "compact-editor",
         "value": "640px"
+      },
+      {
+        "name": "short-landscape-hud",
+        "value": "(min-width: 540px) and (max-width: 900px) and (max-height: 500px)"
+      },
+      {
+        "name": "narrow-hud",
+        "value": "380px"
+      },
+      {
+        "name": "short-phone-sheet",
+        "value": "(max-width: 539px) and (max-height: 650px)"
+      },
+      {
+        "name": "compact-hud-header",
+        "value": "767px"
+      },
+      {
+        "name": "tablet-hud",
+        "value": "(min-width: 768px) and (max-width: 1100px)"
+      },
+      {
+        "name": "very-short-landscape-hud",
+        "value": "(min-width: 540px) and (max-width: 900px) and (max-height: 350px)"
+      },
+      {
+        "name": "short-map-canvas",
+        "value": "@container map-canvas (max-height: 240px) and (max-width: 539px)"
       }
     ]
   },
@@ -1162,36 +1264,36 @@
       "css": ".ds-button{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:var(--control-height,38px);padding:0 11px;border:1px solid var(--color-border-strong);border-radius:4px;background:var(--color-surface-elevated);color:var(--color-text);cursor:pointer;transition:background-color 130ms ease,border-color 130ms ease,color 130ms ease}.ds-button:hover{background:var(--color-surface-muted);border-color:var(--color-primary)}.ds-button:active{background:var(--color-primary-soft)}.ds-button:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}.ds-button:disabled{opacity:.54;cursor:not-allowed}"
     },
     {
-      "name": "Editor primary button",
+      "name": "HUD primary action",
       "kind": "button",
-      "refersTo": "editor-button-primary",
-      "description": "Existing main editor action.",
-      "html": "<button class=\"ds-button ds-primary\">Share</button>",
-      "css": ".ds-button{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:var(--control-height,38px);padding:0 11px;border:1px solid var(--color-border-strong);border-radius:4px;background:var(--color-surface-elevated);color:var(--color-text);cursor:pointer;transition:background-color 130ms ease,border-color 130ms ease,color 130ms ease}.ds-button:hover{background:var(--color-surface-muted);border-color:var(--color-primary)}.ds-button:active{background:var(--color-primary-soft)}.ds-button:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}.ds-button:disabled{opacity:.54;cursor:not-allowed}.ds-primary{background:var(--color-primary);border-color:var(--color-primary);color:var(--color-primary-ink);font-weight:700}.ds-primary:hover{background:var(--color-primary-hover);border-color:var(--color-primary-hover)}.ds-primary:active{background:var(--color-primary)}"
+      "refersTo": "editor-hud-action",
+      "description": "Full-width Transfer or ready Divide action in the fixed panel footer.",
+      "html": "<button class=\"ds-button ds-primary\"><span>Transfer 2 regions</span><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"m9 18 6-6-6-6\"/></svg></button>",
+      "css": ".ds-button{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:var(--control-height,38px);padding:0 11px;border:1px solid var(--color-border-strong);border-radius:4px;background:var(--color-surface-elevated);color:var(--color-text);cursor:pointer;transition:background-color 130ms ease,border-color 130ms ease,color 130ms ease}.ds-button:hover{background:var(--color-surface-muted);border-color:var(--color-primary)}.ds-button:active{background:var(--color-primary-soft)}.ds-button:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}.ds-button:disabled{opacity:.54;cursor:not-allowed}.ds-primary{background:var(--color-primary);border-color:var(--color-primary);color:var(--color-primary-ink);font-weight:700}.ds-primary:hover{background:var(--color-primary-hover);border-color:var(--color-primary-hover)}.ds-primary:active{background:var(--color-primary)}.ds-primary{width:100%;min-height:44px;padding:0 12px;font-size:13px;justify-content:space-between}.ds-primary svg{flex-shrink:0}@media(max-width:767px) and (min-height:501px),(max-width:539px){.ds-primary{min-height:46px}}@media(prefers-reduced-motion:reduce){.ds-button{transition:none}}"
     },
     {
       "name": "Editor text field",
       "kind": "input",
       "refersTo": "editor-input",
-      "description": "Existing country name or text field.",
+      "description": "Country name field in the tool body.",
       "html": "<label class=\"ds-field\"><span>Country name</span><input aria-label=\"Country name\" value=\"France\" /></label>",
-      "css": ".ds-field{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;display:grid;gap:6px;color:var(--color-muted);font-size:12px;font-weight:650}.ds-field input{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;background:var(--color-surface-elevated);color:var(--color-text);border:1px solid var(--color-input-border);border-radius:4px;min-height:var(--control-height,38px);padding:7px 9px;caret-color:var(--color-primary-hover);transition:border-color 130ms ease}.ds-field input:hover,.ds-field input:focus{border-color:var(--color-primary)}.ds-field input:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}.ds-field input::placeholder{color:var(--color-subtle);opacity:1}"
+      "css": ".ds-field{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;display:grid;gap:6px;color:var(--color-muted)}.ds-field>span{font-size:13px;font-weight:650}.ds-field input{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;font-size:16px;font-weight:400;background:var(--color-surface-elevated);color:var(--color-text);border:1px solid var(--color-input-border);border-radius:4px;min-height:var(--control-height,38px);padding:7px 9px;caret-color:var(--color-primary-hover);transition:border-color 130ms ease}.ds-field input:hover,.ds-field input:focus{border-color:var(--color-primary)}.ds-field input:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}.ds-field input::placeholder{color:var(--color-subtle);opacity:1}@media(max-width:767px) and (min-height:501px),(max-width:539px){.ds-field input{font-size:16px;min-height:44px}}"
     },
     {
       "name": "Editor mode navigation",
       "kind": "nav",
       "refersTo": "editor-mode-nav",
-      "description": "The current editing mode has a gold bottom mark.",
-      "html": "<nav class=\"ds-modes\" aria-label=\"Editor modes\"><button aria-pressed=\"true\">Inspect</button><button>Transfer</button><button>Divide</button><button>Merge</button></nav>",
-      "css": ".ds-modes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;padding:3px;background:var(--color-app-bg);border:1px solid var(--color-border);border-radius:4px}.ds-modes button{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;font-size:12px;min-height:34px;padding:0 5px;color:var(--color-text);background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer;transition:background-color 150ms ease,color 150ms ease}.ds-modes button:hover{background:var(--color-surface-muted);border-color:var(--color-primary)}.ds-modes button:active{background:var(--color-primary-soft)}.ds-modes button[aria-pressed=\"true\"]{background:var(--color-primary-soft);box-shadow:inset 0 -2px var(--color-primary);color:var(--color-primary-hover)}.ds-modes button:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}"
+      "description": "Flat tabs on the country panel; the current mode has gold text and a gold bottom mark.",
+      "html": "<nav class=\"ds-modes\" role=\"tablist\" aria-label=\"Editor mode\"><button role=\"tab\" aria-selected=\"false\">Inspect</button><button role=\"tab\" aria-selected=\"true\">Transfer</button><button role=\"tab\" aria-selected=\"false\">Divide</button><button role=\"tab\" aria-selected=\"false\">Merge</button></nav>",
+      "css": ".ds-modes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;padding:0;background:transparent;border:0;border-bottom:1px solid var(--color-border)}.ds-modes button{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:12px;min-height:48px;padding:0 8px;color:var(--color-text);background:transparent;border:1px solid transparent;border-radius:0;cursor:pointer;transition:background-color 150ms ease,border-color 150ms ease,box-shadow 150ms ease,color 150ms ease}.ds-modes button:hover{background:var(--color-surface-muted);border-color:var(--color-primary)}.ds-modes button:active{background:var(--color-primary-soft)}.ds-modes button[aria-selected=\"true\"]{background:transparent;border-color:transparent;box-shadow:inset 0 -2px var(--color-primary);color:var(--color-primary-hover)}.ds-modes button:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}@media(max-width:767px) and (min-height:501px),(max-width:539px){.ds-modes button{min-height:44px;font-size:13px}}@media(prefers-reduced-motion:reduce){.ds-modes button{transition:none}}"
     },
     {
-      "name": "Editor tool card",
+      "name": "Country tool panel",
       "kind": "card",
-      "refersTo": "editor-tool-card",
-      "description": "Existing container for tool controls.",
-      "html": "<section class=\"ds-card\"><strong>Divide country</strong><span>Draw a cut across the selected country.</span></section>",
-      "css": ".ds-card{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;display:grid;gap:12px;padding:12px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface-elevated);color:var(--color-text)}"
+      "refersTo": "editor-hud-panel",
+      "description": "Floating desktop country surface with a separate action footer; the phone sheet uses top corners only.",
+      "html": "<section class=\"ds-hud\"><header class=\"ds-hud-heading\"><h2>Germany</h2><span>16 regions</span></header><div class=\"ds-hud-body\"><strong>Choose regions</strong><p>Click regions on the map to select them.</p></div><footer class=\"ds-hud-footer\"><button disabled>Transfer 0 regions<svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"m9 18 6-6-6-6\"/></svg></button><p>Select regions on the map or by name.</p></footer></section>",
+      "css": ".ds-hud{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;flex-direction:column;width:326px;max-width:100%;overflow:hidden;border:0;border-radius:10px;background:var(--color-surface);color:var(--color-text);box-shadow:0 16px 40px rgb(4 12 16 / 28%)}.ds-hud-heading{padding:20px 20px 10px}.ds-hud-heading h2{margin:0;color:var(--color-text-strong);font-size:22px;font-weight:600;line-height:1.2;letter-spacing:-.02em}.ds-hud-heading span{display:block;margin-top:6px;font-size:11px;color:var(--color-muted)}.ds-hud-body{padding:20px}.ds-hud-body strong{font-size:13px;font-weight:650;color:var(--color-text-strong)}.ds-hud-body p{font-size:12px;line-height:1.5;color:var(--color-muted)}.ds-hud-footer{flex-shrink:0;border-top:1px solid var(--color-border);padding:16px 20px 18px}.ds-hud-footer button{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;align-items:center;justify-content:space-between;gap:7px;width:100%;min-height:44px;padding:0 12px;border:1px solid var(--color-primary);border-radius:4px;background:var(--color-primary);color:var(--color-primary-ink);font-size:13px;font-weight:700;cursor:pointer;transition:background-color 130ms ease,border-color 130ms ease}.ds-hud-footer button:not(:disabled):hover{background:var(--color-primary-hover);border-color:var(--color-primary-hover)}.ds-hud-footer button:not(:disabled):active{background:var(--color-primary)}.ds-hud-footer button:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}.ds-hud-footer button:disabled{opacity:.54;cursor:not-allowed}.ds-hud-footer p{margin:10px 0 0;text-align:center;font-size:11px;line-height:1.4;color:var(--color-muted)}@media(max-width:767px) and (min-height:501px),(max-width:539px){.ds-hud{width:100%;border-top:1px solid var(--color-border-strong);border-radius:14px 14px 0 0;box-shadow:0 -6px 24px rgb(4 12 16 / 16%)}.ds-hud-heading h2{font-size:20px;letter-spacing:normal}.ds-hud-body{padding:14px 20px}.ds-hud-footer{padding:12px 20px 16px}.ds-hud-footer button{min-height:46px}}@media(prefers-reduced-motion:reduce){.ds-hud-footer button{transition:none}}"
     },
     {
       "name": "Editor country swatch",
@@ -1221,24 +1323,33 @@
       "name": "Map theme control",
       "kind": "custom",
       "refersTo": "map-theme-selector",
-      "description": "Native radio group above the map controls, available in editor, shared, and presentation views. On a map canvas at most 240px high and 600px wide, use the lower-right compact layout beside zoom controls: hide the decorative label, retain the legend, and keep 44px option targets. Use 12px bottom and safe-area right insets. Keep the Divide guide at the top and hide the general touch hint while it is visible.",
+      "description": "Native radio group at the lower left, available in editor, shared, and presentation views. Phone layouts hide the decorative label, retain the legend, and keep touch targets. Zoom controls sit separately at the lower right.",
       "html": "<fieldset class=\"ds-theme-selector\"><legend class=\"ds-theme-legend\">Map theme</legend><span class=\"ds-theme-label\" aria-hidden=\"true\">Map theme</span><div class=\"ds-theme-options\"><label class=\"ds-theme-option\" title=\"Hearts of Iron IV\"><input type=\"radio\" name=\"ds-map-theme\" value=\"hoi4\" checked/><span>HOI4</span></label><label class=\"ds-theme-option\" title=\"Europa Universalis IV\"><input type=\"radio\" name=\"ds-map-theme\" value=\"eu4\"/><span>EU4</span></label></div></fieldset>",
-      "css": ".ds-theme-selector{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.ds-theme-selector {\n  align-items: center;\n  background: var(--color-surface);\n  border: 1px solid var(--color-border);\n  border-radius: 4px;\n  display: inline-flex;\n  gap: 10px;\n  margin: 0;\n  min-inline-size: 0;\n  padding: 3px 3px 3px 12px;\n}\n\n.ds-theme-legend {\n  clip-path: inset(50%);\n  height: 1px;\n  overflow: hidden;\n  padding: 0;\n  position: absolute;\n  white-space: nowrap;\n  width: 1px;\n}\n\n.ds-theme-label {\n  color: var(--color-muted);\n  font-size: 12px;\n  white-space: nowrap;\n}\n\n.ds-theme-options {\n  display: flex;\n  gap: 2px;\n}\n\n.ds-theme-option {\n  cursor: pointer;\n  position: relative;\n}\n\n.ds-theme-option input {\n  cursor: pointer;\n  height: 100%;\n  inset: 0;\n  margin: 0;\n  opacity: 0;\n  position: absolute;\n  width: 100%;\n}\n\n.ds-theme-option span {\n  align-items: center;\n  border: 1px solid transparent;\n  border-radius: 3px;\n  color: var(--color-text);\n  display: flex;\n  font-size: 12px;\n  font-weight: 650;\n  justify-content: center;\n  min-height: var(--control-height);\n  min-width: 50px;\n  padding: 0 10px;\n}\n\n.ds-theme-option:hover span {\n  background: var(--color-surface-muted);\n  border-color: var(--color-primary);\n}\n\n.ds-theme-option input:checked + span {\n  background: var(--color-primary);\n  border-color: var(--color-primary);\n  color: var(--color-primary-ink);\n}\n\n.ds-theme-option:hover input:checked + span {\n  background: var(--color-primary-hover);\n  border-color: var(--color-primary-hover);\n}\n\n.ds-theme-option input:focus-visible + span {\n  outline: 3px solid var(--color-focus);\n  outline-offset: 2px;\n}\n\n@media (max-width: 900px), (pointer: coarse) {\n  .ds-theme-option span {\n    min-height: 44px;\n  }\n}\n\n@media (forced-colors: active) {\n  .ds-theme-option input:checked + span {\n    border-color: Highlight;\n    outline: 2px solid Highlight;\n    outline-offset: -3px;\n  }\n}\n"
+      "css": ".ds-theme-selector{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.ds-theme-selector {\n  align-items: center;\n  background: var(--color-surface);\n  border: 1px solid var(--color-border);\n  border-radius: 4px;\n  display: inline-flex;\n  gap: 10px;\n  margin: 0;\n  min-inline-size: 0;\n  padding: 3px 3px 3px 12px;\n}\n\n.ds-theme-legend {\n  clip-path: inset(50%);\n  height: 1px;\n  overflow: hidden;\n  padding: 0;\n  position: absolute;\n  white-space: nowrap;\n  width: 1px;\n}\n\n.ds-theme-label {\n  color: var(--color-muted);\n  font-size: 12px;\n  white-space: nowrap;\n}\n\n.ds-theme-options {\n  display: flex;\n  gap: 2px;\n}\n\n.ds-theme-option {\n  cursor: pointer;\n  position: relative;\n}\n\n.ds-theme-option input {\n  cursor: pointer;\n  height: 100%;\n  inset: 0;\n  margin: 0;\n  opacity: 0;\n  position: absolute;\n  width: 100%;\n}\n\n.ds-theme-option span {\n  align-items: center;\n  border: 1px solid transparent;\n  border-radius: 3px;\n  color: var(--color-text);\n  display: flex;\n  font-size: 12px;\n  font-weight: 650;\n  justify-content: center;\n  min-height: var(--control-height);\n  min-width: 50px;\n  padding: 0 10px;\n}\n\n.ds-theme-option:hover span {\n  background: var(--color-surface-muted);\n  border-color: var(--color-primary);\n}\n\n.ds-theme-option input:checked + span {\n  background: var(--color-primary);\n  border-color: var(--color-primary);\n  color: var(--color-primary-ink);\n}\n\n.ds-theme-option:hover input:checked + span {\n  background: var(--color-primary-hover);\n  border-color: var(--color-primary-hover);\n}\n\n.ds-theme-option input:focus-visible + span {\n  outline: 3px solid var(--color-focus);\n  outline-offset: 2px;\n}\n\n@media (max-width: 900px), (pointer: coarse) {\n  .ds-theme-option span {\n    min-height: 44px;\n  }\n}\n\n@media (forced-colors: active) {\n  .ds-theme-option input:checked + span {\n    border-color: Highlight;\n    outline: 2px solid Highlight;\n    outline-offset: -3px;\n  }\n}\n@media(max-width:767px) and (min-height:501px),(max-width:539px){.ds-theme-selector{padding-left:3px;gap:0}.ds-theme-label{display:none}}"
+    },
+    {
+      "name": "Global country search",
+      "kind": "input",
+      "refersTo": "editor-map-search",
+      "description": "Map search at the top left, separate from destination fields in country tools.",
+      "html": "<label class=\"ds-map-search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input type=\"search\" aria-label=\"Find a country\" placeholder=\"Find a country\" /></label>",
+      "css": ".ds-map-search{position:relative;display:block;width:250px;max-width:100%;filter:drop-shadow(0 5px 12px rgb(4 12 16 / 16%))}.ds-map-search svg{position:absolute;left:10px;top:14px;pointer-events:none;color:var(--color-muted)}.ds-map-search input{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;width:100%;min-height:44px;padding:7px 48px 7px 32px;border:1px solid transparent;border-radius:6px;background:var(--color-surface);color:var(--color-text);font-size:13px;caret-color:var(--color-primary-hover);transition:border-color 130ms ease}.ds-map-search input:hover,.ds-map-search input:focus{border-color:var(--color-primary)}.ds-map-search input:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}.ds-map-search input::placeholder{color:var(--color-subtle);opacity:1}@media(max-width:767px) and (min-height:501px),(max-width:539px){.ds-map-search input{font-size:16px}}"
     }
   ],
   "narrative": {
     "northStar": "Two political maps, one editor",
-    "overview": "HOI4 uses dark blue water, muted country colors, strong terrain relief, thin borders, and outlined Barlow names. EU4 uses brighter political colors, pale coastal water, fine borders, subtle relief, and spaced Cinzel names. These are original AltBorder styles informed by the two games. HOI4 is the default theme.\n\nThe editor keeps its dark surfaces, warm gold actions, serif titles, and compact controls. The map combines SVG geometry with projected raster layers. A theme changes the map appearance. Country ownership, geometry, names, and explicit colors stay intact.",
+    "overview": "HOI4 uses dark blue water, muted country colors, strong terrain relief, thin borders, and outlined Barlow names. EU4 uses brighter political colors, pale coastal water, fine borders, subtle relief, and spaced Cinzel names. These are original AltBorder styles informed by the two games. HOI4 is the default theme.\n\nThe editor uses dark surfaces, warm gold actions, sans-serif headings, and compact controls. Country tools float over the desktop map and form a collapsible bottom sheet on phones. Flat mode tabs and a fixed action footer keep the active task clear. The map combines SVG geometry with projected raster layers. A theme changes the map appearance. Country ownership, geometry, names, and explicit colors stay intact.",
     "keyCharacteristics": [
       "Two distinct map palettes with thin country borders.",
       "Strong HOI4 relief and subtle EU4 relief over live country fills.",
       "Uppercase Barlow or Cinzel country names without map flags.",
-      "Existing dark editor with warm gold controls and a two-choice map theme control."
+      "Dark country tools with warm gold actions and a two-choice map theme control.",
+      "A full-width map, a floating country panel, and a phone bottom sheet with visible primary actions."
     ],
     "rules": [
       {
         "name": "The Map Scope Rule",
-        "body": "Apply theme colors and map fonts to the map. Keep the existing editor identity.",
+        "body": "Apply theme colors and map label styles to the map. Keep the dark and gold editor palette. The wordmark shares the self-hosted Barlow family; editor controls retain their sans-serif stack.",
         "section": "colors"
       },
       {
@@ -1247,13 +1358,23 @@
         "section": "colors"
       },
       {
+        "name": "The HUD Type Rule",
+        "body": "Use sans-serif headings in country tools. Keep the self-hosted Barlow wordmark separate from the map's outlined country labels.",
+        "section": "typography"
+      },
+      {
         "name": "The Map Name Rule",
         "body": "Use the selected theme's uppercase country names on the map. Keep flags in the editor.",
         "section": "typography"
       },
       {
+        "name": "The Visible Action Rule",
+        "body": "Keep Transfer and ready Divide actions outside the scrollable tool body. Preserve country context and mode access when the phone sheet is closed.",
+        "section": "layout"
+      },
+      {
         "name": "The Live Land Rule",
-        "body": "Align raster layers to the active map projection and clip land textures to the current country paths. Theme layers must not take pointer input. Preserve asset provenance in `public/map-themes/SOURCES.md` and the supplied font licenses. Use 2400px overview textures until the settled zoom, canvas size, and device pixel ratio require more pixels. Keep the overview visible while full detail loads and decodes, including when that request fails. Both levels use the same projection, colors, and clipping paths. Clip the ocean texture to the projected world outline to exclude pixels outside the poles and map edges.",
+        "body": "Align raster layers to the active map projection and clip land textures to the current country paths. Theme layers must not take pointer input. Preserve asset provenance in `public/map-themes/SOURCES.md` and the supplied font licenses.",
         "section": "elevation"
       }
     ],
@@ -1264,10 +1385,16 @@
       "Do preserve explicit country color values when themes change or scenarios load.",
       "Do show more region detail as the user zooms in.",
       "Do keep ocean labels at full opacity where they are visible.",
-      "Do keep selection feedback, keyboard focus, and reduced-motion behavior."
+      "Do keep selection feedback, keyboard focus, and reduced-motion behavior.",
+      "Do keep Transfer and ready Divide actions visible while tool settings scroll.",
+      "Do retain country context and all four mode tabs in the closed phone sheet.",
+      "Do keep the map full height beside a floating panel on portrait tablets.",
+      "Do give a focused phone form the available height while the software keyboard is open.",
+      "Do keep touch controls at least 44px and text inputs at 16px.",
+      "Do keep the landscape form and its action in the visible viewport while the software keyboard is open."
     ],
     "donts": [
-      "Don't apply the map palette or country font to editor controls.",
+      "Don't apply map colors or outlined country-label styles to editor controls.",
       "Don't add flags to country names on the map.",
       "Don't use the default palette to replace explicit scenario colors.",
       "Don't bake political colors into the terrain rasters.",

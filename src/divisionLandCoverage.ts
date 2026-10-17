@@ -5,7 +5,7 @@ import GeoJSONWriter from "jsts/org/locationtech/jts/io/GeoJSONWriter.js";
 import GeometryFactory from "jsts/org/locationtech/jts/geom/GeometryFactory.js";
 import type { Geometry, Position } from "geojson";
 import { overlayPolygonalGeometry } from "./polygonOverlay.mjs";
-import { combineRegionLand } from "./regionLandGeometry";
+import { combineRegionLand, removeCollapsedPolygonRings } from "./regionLandGeometry";
 import type { RegionDivision, RegionRecord } from "./types";
 
 type PolygonGeometry = {
@@ -23,7 +23,7 @@ const ringArea = (ring: Position[]) => Math.abs(ring.slice(1).reduce((sum, point
   sum + ring[index][0] * point[1] - point[0] * ring[index][1], 0) / 2);
 const area = (geometry: Geometry) => polygons(geometry).reduce((sum, polygon) =>
   sum + ringArea(polygon[0]) - polygon.slice(1).reduce((holes, ring) => holes + ringArea(ring), 0), 0);
-const reverseWinding = (geometry: Geometry): Geometry => ({
+const reverseWinding = (geometry: Geometry): Geometry => removeCollapsedPolygonRings({
   type: "MultiPolygon", coordinates: polygons(geometry).map((polygon) => polygon.map((ring) => [...ring].reverse())),
 });
 

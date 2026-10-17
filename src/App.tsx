@@ -96,7 +96,7 @@ import {
 } from "./transferContext";
 import { batchBoundaryPaths, batchBoundaryTransitionPaths, type BatchedBoundaryPaths, type ProjectedBoundaryEdge } from "./boundaryEdges";
 import { buildSelectedRegionAdjacency } from "./regionAdjacency";
-import { EditorSidePanel } from "./EditorSidePanel";
+import { CountrySearchSelect, EditorSidePanel } from "./EditorSidePanel";
 import { mapInBatches, yieldToMainThread } from "./mapWork";
 import { decodePackedMapDataInBatches } from "./mapDataPacking";
 import { prepareMapRendering, type PreparedMapRendering } from "./mapPreparation";
@@ -189,7 +189,7 @@ type ProjectedBoundaryEdgeWithBounds = ProjectedBoundaryEdge & {
   bounds: ProjectedBounds;
 };
 
-const compactLayoutQuery = "(max-width: 900px) and (min-height: 501px), (max-width: 599px)";
+const compactLayoutQuery = "(max-width: 767px) and (min-height: 501px), (max-width: 539px)";
 
 export default function App() {
   const [preparedMap, setPreparedMap] = useState<PreparedMapRendering | null>(null);
@@ -354,6 +354,22 @@ export default function App() {
       document.documentElement.style.removeProperty("--app-height");
     };
   }, []);
+
+  useEffect(() => {
+    if (!keyboardVisible) return;
+    const focused = document.activeElement;
+    if (!(focused instanceof HTMLElement)) return;
+    if (focused.closest(".map-country-search")) {
+      if (compactLayout) setMobilePanelExpanded(false);
+      return;
+    }
+    if (!focused.closest(".hud-panel")) return;
+    const frame = requestAnimationFrame(() => {
+      const field = focused.closest(".field") ?? focused;
+      field.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [keyboardVisible, compactLayout]);
 
   useEffect(() => {
     zoomRef.current = zoom;
@@ -1517,14 +1533,14 @@ export default function App() {
     : divideIsCalculating
       ? "Checking your new border..."
       : divideTerritories
-        ? "Select either side for the new country."
+        ? "Choose which side becomes the new country."
         : divideMethod === "island"
           ? "Select an island to make it a country."
           : divideMethod === "draw"
-            ? "Drag across the country to draw a border."
+            ? "Draw a line across the country, with both ends outside."
             : divideAwaitingEnd
-              ? "Place the second point across the country."
-              : "Place the first point near the country’s edge.";
+              ? "Place the second point outside the opposite edge."
+              : "Place the first point just outside the country.";
   useEffect(() => {
     if (!keyboardCutFinishRef.current || (!divideSplit.ok && !divideSplit.reason)) return;
     keyboardCutFinishRef.current = false;
@@ -1808,7 +1824,10 @@ export default function App() {
     setTargetEntityId("");
     setMergeSelection(new Set());
     clearDivideDraft();
-    if (entityId) zoomToEntity(entityId);
+    if (entityId) {
+      setMobilePanelExpanded(true);
+      zoomToEntity(entityId);
+    }
   }
 
   function applyZoom(nextZoom: ZoomState) {
@@ -1877,7 +1896,7 @@ export default function App() {
     if (!region) return;
     const bounds = projectedGeometryBounds(region.geometry, projection);
     if (!bounds) return;
-    animateZoomTo(zoomToBounds(bounds, 54));
+    animateZoomTo(zoomToBounds(bounds, 54, editorMapBounds()));
   }
 
   function zoomToEntity(entityId: string) {
@@ -1885,7 +1904,17 @@ export default function App() {
     const geometries = renderGeometriesByEntityId.get(entityId) ?? [];
     const bounds = projectedGeometriesBounds(geometries, projection);
     if (!bounds) return;
-    animateZoomTo(zoomToBounds(bounds, 44));
+    animateZoomTo(zoomToBounds(bounds, 44, editorMapBounds()));
+  }
+
+  function editorMapBounds(): ProjectedBounds | undefined {
+    if (compactLayout || isPresenting) return undefined;
+    const size = mapViewportSizeRef.current;
+    const scale = Math.min(size.width / viewportWidth, size.height / viewportHeight);
+    if (scale <= 0) return undefined;
+    const bounds = svgViewportBounds(size.width, size.height);
+    const panelWidth = document.querySelector(".hud-panel")?.getBoundingClientRect().width ?? 326;
+    return { ...bounds, minY: bounds.minY + 32 / scale, maxY: bounds.maxY - 48 / scale, maxX: bounds.maxX - (panelWidth + 48) / scale };
   }
 
   function focusInspectRegion(regionId: string) {
@@ -2275,7 +2304,7 @@ export default function App() {
     setTargetEntityId("");
     setTransferConfirmation({
       id: Date.now(),
-      message: `Moved ${regionIds.length} ${regionIds.length === 1 ? "region" : "regions"} to ${destinationName}`,
+      message: `Transferred ${regionIds.length} ${regionIds.length === 1 ? "region" : "regions"} to ${destinationName}`,
     });
   }
 
@@ -3116,6 +3145,14 @@ export default function App() {
                 <MoreHorizontal size={18} />
               </summary>
               <div className="topbar-menu-popover">
+                <div className="mobile-scenario-actions">
+                  <label className="field">
+                    <span>Scenario</span>
+                    <input aria-label="Scenario" value={snapshot.title} onChange={(event) => updateScenarioTitle(event.target.value)} onBlur={finishMetadataEdit} />
+                  </label>
+                  <button onClick={() => { if (actionsMenuRef.current) actionsMenuRef.current.open = false; togglePresentation(); }}><Maximize2 size={16} /> Present map</button>
+                  <button onClick={redo} disabled={history!.future.length === 0}><Redo2 size={16} /> Redo</button>
+                </div>
                 <button onClick={() => {
                   if (actionsMenuRef.current) actionsMenuRef.current.open = false;
                   resetMap();
@@ -3135,6 +3172,11 @@ export default function App() {
 
       <section className="workspace">
         <section className="map-stage" data-map-theme={mapTheme.id} aria-label={isPresenting ? "World map presentation" : "World map editor"}>
+          {!isPresenting ? (
+            <div className="map-country-search">
+              <CountrySearchSelect label="Find a country" value={selectedEntityId} options={entityOptions} onChange={changeSelectedEntity} placeholder="Find a country" />
+            </div>
+          ) : null}
           {loadError && !isPresenting ? (
             <div className="inline-error" role="alert">
               <span>{loadError}</span>
@@ -3314,10 +3356,15 @@ export default function App() {
           </div>
           {mode === "divide" && selectedEntity && !readOnly && !isPresenting ? (
             <div className="divide-map-guide">
-              <span>{mapNavigationEnabled ? "Move the map. Turn off Move map to continue your cut." : divideMapHint}</span>
+              <span>{mapNavigationEnabled ? "Turn off Move map to set the border." : divideMapHint}</span>
               {divideLine.length > 0 || divideIslandPoint ? (
-                <button className="compact" onClick={clearDivideDraft} aria-label="Clear border and start over"><RotateCcw size={14} aria-hidden="true" /></button>
+                <button className="compact" onClick={clearDivideDraft} aria-label="Reset border" title="Reset border"><RotateCcw size={14} aria-hidden="true" /></button>
               ) : null}
+            </div>
+          ) : null}
+          {mode === "transfer" && selectedEntity && !readOnly && !isPresenting ? (
+            <div className="transfer-map-guide" role="status">
+              <span>{mapNavigationEnabled ? "Turn off Move map to select regions." : brushEnabled ? "Drag across regions to select them." : "Select a region. Select it again to deselect it."}</span>
             </div>
           ) : null}
           <div className="map-theme-control">

@@ -72,19 +72,23 @@ export function interpolateZoom(start: ZoomState, end: ZoomState, progress: numb
   };
 }
 
-export function zoomToBounds(bounds: ProjectedBounds, padding: number): ZoomState {
+export function zoomToBounds(
+  bounds: ProjectedBounds,
+  padding: number,
+  viewport: ProjectedBounds = { minX: 0, minY: 0, maxX: viewportWidth, maxY: viewportHeight },
+): ZoomState {
   const width = Math.max(0.001, bounds.maxX - bounds.minX);
   const height = Math.max(0.001, bounds.maxY - bounds.minY);
-  const availableWidth = Math.max(1, viewportWidth - padding * 2);
-  const availableHeight = Math.max(1, viewportHeight - padding * 2);
+  const availableWidth = Math.max(1, viewport.maxX - viewport.minX - padding * 2);
+  const availableHeight = Math.max(1, viewport.maxY - viewport.minY - padding * 2);
   const k = clamp(Math.min(availableWidth / width, availableHeight / height), minZoom, maxZoom);
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const centerY = (bounds.minY + bounds.maxY) / 2;
 
   return {
     k,
-    x: viewportWidth / 2 - centerX * k,
-    y: viewportHeight / 2 - centerY * k,
+    x: (viewport.minX + viewport.maxX) / 2 - centerX * k,
+    y: (viewport.minY + viewport.maxY) / 2 - centerY * k,
   };
 }
 
