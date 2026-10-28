@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { geoIdentity, geoNaturalEarth1 } from "d3-geo";
+import { geoIdentity, geoNaturalEarth1, geoPath } from "d3-geo";
 import type { GeoProjection } from "d3-geo";
 import type { FeatureCollection, Geometry } from "geojson";
 import mapDataFixture from "../public/data/map-data.json";
@@ -43,6 +43,34 @@ describe("projected path layout", () => {
     expect(manual).not.toBeNull();
     expect(manual).toEqual(border);
     expect(stream).not.toHaveBeenCalled();
+  });
+
+  it("keeps antimeridian fill and clipped bounds with one D3 stream", () => {
+    const data = mapDataFixture as MapData;
+    const projection = makeMapProjection(data);
+    const geometry = getRegionGeometry(data, "NE-242-ALL");
+    const reference = geoPath(projection).digits(renderPathOptions.coordinatePrecision);
+    const d3Fill = reference(geometry);
+    const d3Bounds = reference.bounds(geometry);
+    const manual = projectGeometryStrokeToPathData(geometry, projection, renderPathOptions);
+    const emittedPoints: Array<[number, number]> = [];
+    const projectionStream = projection.stream;
+    const stream = vi.spyOn(projection, "stream").mockImplementation((sink) => projectionStream({
+      ...sink,
+      point: (x, y) => {
+        emittedPoints.push([x, y]);
+        sink.point(x, y);
+      },
+    }));
+
+    const projected = projectGeometryToPathData(geometry, projection, renderPathOptions);
+
+    expect(stream).toHaveBeenCalledTimes(1);
+    expect([
+      [Math.min(...emittedPoints.map(([x]) => x)), Math.min(...emittedPoints.map(([, y]) => y))],
+      [Math.max(...emittedPoints.map(([x]) => x)), Math.max(...emittedPoints.map(([, y]) => y))],
+    ]).toEqual(d3Bounds);
+    expect(projected).toEqual({ ...manual, pathData: d3Fill });
   });
 
   it("returns no border for geometry with no drawable linework", () => {

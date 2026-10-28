@@ -72,6 +72,38 @@ describe("viewport-bounded map masks", () => {
     expect(clipMapThemeCountryPaths([contained], viewport)[0]).toBe(contained);
   });
 
+  it("reuses a clipped fill in its terrain mask, then clips it for a smaller viewport", () => {
+    const country = { id: "land", pathData: "M0,0L100,0L100,100L0,100Z" };
+    const bounds = { ...viewport };
+    const fill = clipMapThemeCountryPaths([country], bounds);
+    const mask = clipMapThemeCountryPaths(fill, { ...bounds });
+    expect(mask[0]).toBe(fill[0]);
+    expect(contains(mask[0].pathData, 30, 50)).toBe(true);
+
+    bounds.minX = 40;
+    const moved = clipMapThemeCountryPaths(mask, bounds);
+    expect(contains(moved[0].pathData, 30, 50)).toBe(false);
+    expect(contains(moved[0].pathData, 50, 50)).toBe(true);
+    expect(contains(fill[0].pathData, 30, 50)).toBe(true);
+  });
+
+  it("uses changed source geometry after a previous viewport clip", () => {
+    const country = { id: "land", pathData: "M0,0L100,0L100,100L0,100Z" };
+    expect(contains(clipMapThemeCountryPaths([country], viewport)[0].pathData, 50, 50)).toBe(true);
+
+    country.pathData = "M0,0L40,0L40,100L0,100Z";
+    const changed = clipMapThemeCountryPaths([country], viewport);
+    expect(contains(changed[0].pathData, 30, 50)).toBe(true);
+    expect(contains(changed[0].pathData, 50, 50)).toBe(false);
+  });
+
+  it("does not reuse a viewport marker when the bounded path changes", () => {
+    const country = { id: "land", pathData: "M0,0L100,0L100,100L0,100Z" };
+    const bounded = clipMapThemeCountryPaths([country], viewport)[0];
+    bounded.pathData = "M100,100L150,100L150,150L100,150Z";
+    expect(clipMapThemeCountryPaths([bounded], viewport)).toEqual([]);
+  });
+
   it("preserves the original paths when no viewport is supplied", () => {
     const countries = [{ id: "land", pathData: "M0,0L100,0L100,100Z" }];
     expect(clipMapThemeCountryPaths(countries)).toBe(countries);

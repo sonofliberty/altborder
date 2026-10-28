@@ -302,7 +302,7 @@ export default function App() {
   const divideDrawRef = useRef<{ pointerId: number; moved: boolean } | null>(null);
   const divideTapRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
   const keyboardCutFinishRef = useRef(false);
-  const countryLabelLayoutCacheRef = useRef(new Map<string, FittedCountryLabel>());
+  const countryLabelLayoutCacheRef = useRef(new Map<string, FittedCountryLabel | null>());
   const countryUnderlayCacheRef = useRef(new Map<string, CountryUnderlay>());
   const countryUnderlaysInitializedRef = useRef(false);
   const baseProjectedRegionCacheRef = useRef(new Map<string, ProjectedPathData>());
@@ -484,38 +484,44 @@ export default function App() {
 
     async function load() {
       try {
-        const response = await fetch(`${import.meta.env.BASE_URL}data/map-data.packed.json`);
+        const encoded = readShareFromHash(window.location.hash);
+        const [response, decoded] = await Promise.all([
+          fetch(`${import.meta.env.BASE_URL}data/map-data.packed.json`),
+          encoded !== null ? decodeSharePayload(encoded) : null,
+        ]);
+        if (cancelled) return;
         if (!response.ok) {
           throw new Error(`${response.status} ${response.statusText}`);
         }
-        const decodedMapData = await decodePackedMapDataInBatches(await response.json(), () => cancelled);
+        const packedMapData: { renderPreparation?: unknown } = await response.json();
+        const decodedMapData = await decodePackedMapDataInBatches(packedMapData, () => cancelled);
         if (!decodedMapData || cancelled) return;
         await yieldToMainThread();
         if (cancelled) return;
         const mapData = applyPoliticalMapPalette(decodedMapData);
         await yieldToMainThread();
         if (cancelled) return;
-        const encoded = readShareFromHash(window.location.hash);
         let initial = createInitialSnapshot(mapData);
         let shouldReadOnly = false;
 
         if (encoded !== null) {
-          const decoded = await decodeSharePayload(encoded);
-          if (cancelled) return;
-          if (decoded.ok) {
+          if (decoded?.ok) {
             initial = applyScenarioPayload(mapData, decoded.payload);
             shouldReadOnly = !hashRequestsEdit(window.location.hash);
-          } else {
+          } else if (decoded) {
             setLoadError(decoded.error);
           }
         }
 
+        // Keep textures off the map-data download path. Their requests can
+        // overlap geometry preparation once the map body is available.
         clearPreloads = preloadMapThemeAssets(getMapTheme(initial.mapTheme).id);
         const prepared = await prepareMapRendering(
           mapData,
           [[16, 18], [viewportWidth - 16, viewportHeight - 22]],
           mapRenderSimplifyTolerance,
           () => cancelled,
+          packedMapData.renderPreparation,
         );
         if (!prepared || cancelled) return;
 
@@ -542,9 +548,10 @@ export default function App() {
   const regionOwners = snapshot?.regionOwners;
   const mapTheme = getMapTheme(snapshot?.mapTheme);
   const detailedMapRaster = mapViewMeasured && mapViewScale * settledZoom.k * window.devicePixelRatio * viewportWidth > mapThemeRaster.overviewWidth;
+  const storedEntities = snapshot?.entities;
   const entities = useMemo(
-    () => data && snapshot ? getThemedEntities(data, snapshot) : undefined,
-    [data, snapshot],
+    () => data && storedEntities ? getThemedEntities(data, { entities: storedEntities, mapTheme: mapTheme.id }) : undefined,
+    [data, storedEntities, mapTheme.id],
   );
   const regionNameOverrides = useMemo(() => snapshot?.regionNameOverrides ?? {}, [snapshot?.regionNameOverrides]);
 
@@ -1088,6 +1095,7 @@ export default function App() {
     const geometryClient = getCountryGeometryClient();
     const activeCacheKeys = new Set<string>();
     const labels: FittedCountryLabel[] = [];
+    const modifiedRegionIds = new Set(modifiedRegionRecords.map((region) => region.id));
     const entityMap = entities;
     const entityIds = [...activeEntityIds].sort((a, b) => {
       const regionCountDifference = (regionIdsByEntityId.get(b)?.length ?? 0) - (regionIdsByEntityId.get(a)?.length ?? 0);
@@ -1112,7 +1120,7 @@ export default function App() {
 
     function work() {
       void (async () => {
-        const { layoutCountryLabel: layoutCountryLabelFn } = await import("./labelLayout");
+        let layoutCountryLabelFn: typeof import("./labelLayout").layoutCountryLabel | undefined;
         await yieldToMainThread();
         if (cancelled) return;
 
@@ -1134,16 +1142,27 @@ export default function App() {
           const cacheKey = getCountryLabelCacheKey(entity.id, entity.name, regionIds);
           activeCacheKeys.add(cacheKey);
           const cached = countryLabelLayoutCacheRef.current.get(cacheKey);
-          if (cached) {
-            labels.push(cached);
+          if (cached !== undefined) {
+            if (cached) labels.push(cached);
             continue;
           }
 
           const baseCountry = baseCountryByEntityId.get(entity.id);
-          let geometries: Geometry[];
-          if (baseCountry && baseEntityById.has(entity.id) && !hasTransferredOwnershipChanges(
+          const baseEntity = baseEntityById.get(entity.id);
+          const hasBaseOwnership = baseEntity && !hasTransferredOwnershipChanges(
             entity.id, regionIds, baseEntityById, baseOwnerByRegionId,
-          )) {
+          );
+          // The shipped layouts use the same base geometry and projection.
+          // Changed countries still run the normal fitting code below.
+          if (hasBaseOwnership && entity.name === baseEntity.name
+            && !regionIds.some((id) => modifiedRegionIds.has(id)) && preparedMap?.baseCountryLabels.has(entity.id)) {
+            const preparedLabel = preparedMap.baseCountryLabels.get(entity.id) ?? null;
+            countryLabelLayoutCacheRef.current.set(cacheKey, preparedLabel);
+            if (preparedLabel) labels.push(preparedLabel);
+            continue;
+          }
+          let geometries: Geometry[];
+          if (baseCountry && hasBaseOwnership) {
             geometries = [baseCountry.geometry];
           } else if (!baseCountry || !baseEntityById.has(entity.id)) {
             geometries = renderGeometriesByEntityId.get(entity.id) ?? [];
@@ -1163,16 +1182,16 @@ export default function App() {
           if (cancelled) return;
           if (geometries.length === 0) continue;
 
+          layoutCountryLabelFn ??= (await import("./labelLayout")).layoutCountryLabel;
+          if (cancelled) return;
           const label = layoutCountryLabelFn({
             id: entity.id,
             name: entity.name,
             geometries,
             project: (position) => projection([position[0], position[1]]),
           });
-          if (label) {
-            countryLabelLayoutCacheRef.current.set(cacheKey, label);
-            labels.push(label);
-          }
+          countryLabelLayoutCacheRef.current.set(cacheKey, label);
+          if (label) labels.push(label);
         }
 
         if (cancelled) return;
@@ -1196,6 +1215,8 @@ export default function App() {
     data,
     entities,
     getCountryGeometryClient,
+    modifiedRegionRecords,
+    preparedMap,
     projection,
     regionById,
     regionIdsByEntityId,
@@ -1785,7 +1806,7 @@ export default function App() {
         if (affectedEntities.has(underlay.id)) countryUnderlayCacheRef.current.delete(key);
       }
       for (const [key, label] of countryLabelLayoutCacheRef.current) {
-        if (affectedEntities.has(label.id)) countryLabelLayoutCacheRef.current.delete(key);
+        if (!label || affectedEntities.has(label.id)) countryLabelLayoutCacheRef.current.delete(key);
       }
       return;
     }

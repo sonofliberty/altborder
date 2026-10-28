@@ -1,5 +1,5 @@
 import { geoPath } from "d3-geo";
-import type { GeoProjection } from "d3-geo";
+import type { GeoProjection, GeoStream } from "d3-geo";
 import type { Geometry, Position } from "geojson";
 import type { ProjectedBounds } from "./mapZoom";
 
@@ -81,7 +81,26 @@ export function projectGeometryToPathData(
       : null;
   }
 
-  let pathGenerator = geoPath(projection) as GeoPathWithDigits;
+  // The fill check needs D3's clipped bounds. Collect them while D3 writes
+  // the path instead of streaming and resampling the same polygon twice.
+  const d3Bounds: [[number, number], [number, number]] = [[Infinity, Infinity], [-Infinity, -Infinity]];
+  const fillProjection = options.preferD3Fill ? projection : {
+    stream: (sink: GeoStream) => projection.stream({
+      point: (x, y) => {
+        if (x < d3Bounds[0][0]) d3Bounds[0][0] = x;
+        if (y < d3Bounds[0][1]) d3Bounds[0][1] = y;
+        if (x > d3Bounds[1][0]) d3Bounds[1][0] = x;
+        if (y > d3Bounds[1][1]) d3Bounds[1][1] = y;
+        sink.point(x, y);
+      },
+      lineStart: () => sink.lineStart(),
+      lineEnd: () => sink.lineEnd(),
+      polygonStart: () => sink.polygonStart(),
+      polygonEnd: () => sink.polygonEnd(),
+      sphere: () => sink.sphere?.(),
+    }),
+  };
+  let pathGenerator = geoPath(fillProjection) as GeoPathWithDigits;
   if (pathGenerator.digits && options.coordinatePrecision !== undefined) {
     pathGenerator = pathGenerator.digits(options.coordinatePrecision) as GeoPathWithDigits;
   }
@@ -90,7 +109,7 @@ export function projectGeometryToPathData(
   if (!d3PathData) return null;
   const pathData =
     !options.preferD3Fill &&
-    shouldUseManualFillPath(d3PathData, pathGenerator.bounds(geometry), projectedStroke.bounds)
+    shouldUseManualFillPath(d3PathData, d3Bounds, projectedStroke.bounds)
       ? projectedStroke.pathData
       : d3PathData;
   if (!pathData) return null;

@@ -71,7 +71,61 @@ describe("packed map data", () => {
   it.each(["A", "g"])("rejects an incomplete coordinate pair %s", (coordinates) => {
     expect(() => decodePackedMapData({
       ...packed,
+      format: "polyline-variable",
       baseCountries: [{ ...packed.baseCountries[0], geometry: { type: "Polygon", coordinates: [coordinates] } }],
     })).toThrow("incomplete coordinate");
+  });
+
+  const indexed = {
+    ...minimal,
+    format: "point-index-1",
+    // Fine point, exact hundredths, then fine deltas from those hundredths.
+    points: "FHEGNP",
+    baseCountries: [{ entityId: "AAA", geometry: { type: "LineString", coordinates: "ACCB" } }],
+  };
+
+  it("restores mixed precision vertices and reverse index steps exactly", async () => {
+    const decoded = decodePackedMapData(indexed);
+    expect(decoded.baseCountries[0].geometry).toEqual({ type: "LineString", coordinates: [
+      [0.00001, -0.00002], [0.01, -0.02], [0.01003, -0.02004], [0.01, -0.02],
+    ] });
+    await expect(decodePackedMapDataInBatches(indexed, () => false)).resolves.toEqual(decoded);
+  });
+
+  it("keeps repeated vertices independent after decoding", () => {
+    const geometry = decodePackedMapData(indexed).baseCountries[0].geometry;
+    if (geometry.type !== "LineString") throw new Error("Expected a line");
+    geometry.coordinates[1][0] = 20;
+    expect(geometry.coordinates[3]).toEqual([0.01, -0.02]);
+  });
+
+  it.each(["B", "G", "g", "!"])("rejects an invalid or incomplete point reference %s", async (coordinates) => {
+    const data = { ...indexed, baseCountries: [
+      { entityId: "AAA", geometry: { type: "LineString", coordinates } },
+    ] };
+    expect(() => decodePackedMapData(data)).toThrow(/invalid coordinate|incomplete coordinate/);
+    await expect(decodePackedMapDataInBatches(data, () => false)).rejects.toThrow(/invalid coordinate|incomplete coordinate/);
+  });
+
+  it.each([undefined, "F", "!"])("rejects a missing or malformed point table %s", async (points) => {
+    expect(() => decodePackedMapData({ ...indexed, points })).toThrow(/invalid coordinate|incomplete coordinate/);
+    await expect(decodePackedMapDataInBatches({ ...indexed, points }, () => false)).rejects.toThrow(/invalid coordinate|incomplete coordinate/);
+  });
+
+  const batchedPoints = {
+    ...indexed,
+    points: "AA".repeat(4095) + "AgB",
+    baseCountries: [{ entityId: "AAA", geometry: { type: "LineString", coordinates: "-_H" } }],
+  };
+
+  it("continues a multi-character coordinate across a point-table batch boundary", async () => {
+    const decoded = await decodePackedMapDataInBatches(batchedPoints, () => false);
+    expect(decoded?.baseCountries[0].geometry).toEqual({ type: "LineString", coordinates: [[0, 0.08]] });
+    expect(decoded).toEqual(decodePackedMapData(batchedPoints));
+  });
+
+  it("can cancel inside the shared point table before geometry decoding", async () => {
+    let checks = 0;
+    await expect(decodePackedMapDataInBatches(batchedPoints, () => ++checks > 1)).resolves.toBeNull();
   });
 });

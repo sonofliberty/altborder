@@ -144,7 +144,7 @@ function getDefaultColors(data: MapData, theme: MapTheme): ReadonlyMap<string, s
  * in scenario state so a theme switch never overwrites an edit or changes land.
  * `data` is the same canonical data used by createInitialSnapshot.
  */
-export function getThemedEntities(data: MapData, snapshot: EditorSnapshot): Record<string, CountryEntity> {
+export function getThemedEntities(data: MapData, snapshot: Pick<EditorSnapshot, "entities" | "mapTheme">): Record<string, CountryEntity> {
   const colors = getDefaultColors(data, getMapTheme(snapshot.mapTheme));
   const baseById = new Map(data.countries.map((country) => [country.id, country]));
   return Object.fromEntries(Object.entries(snapshot.entities).map(([id, entity]) => {

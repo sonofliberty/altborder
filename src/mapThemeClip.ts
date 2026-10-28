@@ -4,7 +4,8 @@ export type MapThemeCountryPath = { id: string; pathData: string };
 type Point = readonly [number, number];
 type Ring = { points: readonly Point[]; bounds: ProjectedBounds; pathData: string };
 
-const parsedCountries = new WeakMap<MapThemeCountryPath, readonly Ring[] | null>();
+const parsedCountries = new WeakMap<MapThemeCountryPath, { pathData: string; rings: readonly Ring[] | null }>();
+const clippedCountryViewports = new WeakMap<MapThemeCountryPath, { pathData: string; viewportKey: string }>();
 const parsedPolygons = new Map<string, readonly Ring[] | null>();
 const maxPolygonCacheEntries = 8;
 const maxPolygonCachePoints = 100_000;
@@ -91,14 +92,23 @@ export function clipMapThemeCountryPaths<T extends MapThemeCountryPath>(
   bounds?: ProjectedBounds,
 ): readonly T[] {
   if (!bounds) return countries;
+  const viewportKey = `${bounds.minX},${bounds.minY},${bounds.maxX},${bounds.maxY}`;
   return countries.flatMap((country) => {
-    let rings = parsedCountries.get(country);
-    if (rings === undefined) {
-      rings = parsePolygonPath(country.pathData);
-      parsedCountries.set(country, rings);
+    // Country fills and the terrain mask share these bounded paths. The mask
+    // must not parse and clip the same result again on each camera update.
+    const clipped = clippedCountryViewports.get(country);
+    if (clipped?.pathData === country.pathData && clipped.viewportKey === viewportKey) return [country];
+
+    let parsed = parsedCountries.get(country);
+    if (!parsed || parsed.pathData !== country.pathData) {
+      parsed = { pathData: country.pathData, rings: parsePolygonPath(country.pathData) };
+      parsedCountries.set(country, parsed);
     }
-    const pathData = rings ? clipParsedPath(rings, bounds) : country.pathData;
-    return pathData ? [pathData === country.pathData ? country : { ...country, pathData }] : [];
+    const pathData = parsed.rings ? clipParsedPath(parsed.rings, bounds) : country.pathData;
+    if (!pathData) return [];
+    const result = pathData === country.pathData ? country : { ...country, pathData };
+    clippedCountryViewports.set(result, { pathData, viewportKey });
+    return [result];
   });
 }
 

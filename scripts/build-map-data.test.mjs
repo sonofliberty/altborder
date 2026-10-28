@@ -56,7 +56,8 @@ it.each(["prepare:data", "prepare:flags"])("%s packs the updated country flags",
     await mkdir(join(fixture, "scripts"));
     await mkdir(join(fixture, "public/data"), { recursive: true });
     await symlink(join(root, "node_modules"), join(fixture, "node_modules"));
-    for (const script of ["pack-map-data.mjs", "sync-flag-assets.mjs"]) {
+    await symlink(join(root, "src"), join(fixture, "src"));
+    for (const script of ["pack-map-data.mjs", "sync-flag-assets.mjs", "prepare-map-rendering.mjs", "map-render-preparation.ts"]) {
       await copyFile(join(root, "scripts", script), join(fixture, "scripts", script));
     }
     const source = {
