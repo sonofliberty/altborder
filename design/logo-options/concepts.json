@@ -1,0 +1,20 @@
+[
+  {
+    "id": "A",
+    "name": "Border A",
+    "description": "A border cuts through the letter A. Compact and bold.",
+    "file": "border-a-color.svg"
+  },
+  {
+    "id": "B",
+    "name": "New Territory",
+    "description": "Two map pieces form a new shape. Clear and playful.",
+    "file": "new-territory-color.svg"
+  },
+  {
+    "id": "C",
+    "name": "Alternate Atlas",
+    "description": "A changing border inside a world. A classic atlas style.",
+    "file": "alternate-atlas-color.svg"
+  }
+]

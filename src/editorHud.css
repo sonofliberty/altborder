@@ -2,8 +2,6 @@
 .app-shell { grid-template-rows: 64px minmax(0, 1fr); }
 .workspace, .editor-expanded .workspace, .editor-collapsed .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
 .topbar { grid-template-columns: minmax(0, 1fr) auto; padding: 10px max(24px, env(safe-area-inset-right)) 10px max(24px, env(safe-area-inset-left)); }
-.brand > svg, .brand-tagline { display: none; }
-.brand-wordmark strong { font-family: "Barlow Map", sans-serif; font-size: 21px; font-weight: 600; letter-spacing: .07em; }
 .title-field input, .scenario-title-text { font-family: inherit; font-size: 14px; }
 .mobile-scenario-actions { display: none; }
 
@@ -153,7 +151,7 @@
   .app-shell { grid-template-rows: auto minmax(0, 1fr); }
   .topbar { display: flex; justify-content: space-between; gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left)); min-height: 60px; }
   .topbar-main { display: block; min-width: 0; }
-  .brand-wordmark strong { font-size: 19px; letter-spacing: .06em; }
+  .brand-logo { width: 150px; }
   .topbar .title-field, .topbar .history-actions > button:last-child, .topbar .presentation-toggle:not([aria-pressed="true"]) { display: none; }
   .topbar-actions { gap: 4px; }
   .topbar-menu { order: 2; }
@@ -211,7 +209,7 @@
 
 @media (max-width: 380px) {
   .topbar { padding-inline: 12px; }
-  .brand-wordmark strong { font-size: 17px; }
+  .brand-logo { width: 138px; }
   .topbar-actions { gap: 2px; }
   .topbar-actions .primary { padding: 0 8px; }
   .topbar-actions .primary svg { display: none; }

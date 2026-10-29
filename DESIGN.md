@@ -2,6 +2,10 @@
 name: "AltBorder"
 description: "Two political map themes with dark country tools and gold actions."
 colors:
+  brand-orange: "#ff7a14"
+  brand-forest: "#123f29"
+  brand-cream: "#faf6e9"
+  brand-white: "#ffffff"
   editor-text: "#dddcd3"
   editor-text-strong: "#f3eedf"
   editor-muted: "#a8b0ad"
@@ -145,22 +149,8 @@ typography:
     fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
     fontSize: "13px"
     fontWeight: 400
-  editor-wordmark:
-    fontFamily: "\"Barlow Map\", sans-serif"
-    fontSize: "21px"
-    fontWeight: 600
-    letterSpacing: "0.07em"
-  editor-wordmark-mobile:
-    fontFamily: "\"Barlow Map\", sans-serif"
-    fontSize: "19px"
-    fontWeight: 600
-    letterSpacing: "0.06em"
-  editor-wordmark-narrow:
-    fontFamily: "\"Barlow Map\", sans-serif"
-    fontSize: "17px"
-    fontWeight: 600
-    letterSpacing: "0.06em"
 rounded:
+  brand-favicon: "13px"
   flat: "0px"
   map-overlay: "6px"
   hud-panel: "10px"
@@ -182,6 +172,20 @@ spacing:
   hud-section-gap: "18px"
   hud-panel: "20px"
 components:
+  brand-logo:
+    width: "166px"
+    height: "auto"
+  brand-logo-mobile:
+    width: "150px"
+    height: "auto"
+  brand-logo-narrow:
+    width: "138px"
+    height: "auto"
+  brand-favicon:
+    backgroundColor: "{colors.brand-forest}"
+    rounded: "{rounded.brand-favicon}"
+    width: "64px"
+    height: "64px"
   editor-button:
     backgroundColor: "{colors.editor-surface-elevated}"
     textColor: "{colors.editor-text}"
@@ -277,8 +281,11 @@ HOI4 uses dark blue water, muted country colors, strong terrain relief, thin bor
 
 The editor uses dark surfaces, warm gold actions, sans-serif headings, and compact controls. Country tools float over the desktop map and form a collapsible bottom sheet on phones. Flat mode tabs and a fixed action footer keep the active task clear. The map combines SVG geometry with projected raster layers. A theme changes the map appearance. Country ownership, geometry, names, and explicit colors stay intact.
 
+The approved Own World logo uses a flowing flag with two invented territories and custom title-case AltBorder lettering. Orange and cream identify the app on its dark header. The logo has its own palette; map themes and editor controls retain their existing colors.
+
 **Key Characteristics:**
 
+- A flowing two-territory flag and custom title-case AltBorder lettering.
 - Two distinct map palettes with thin country borders.
 - Strong HOI4 relief and subtle EU4 relief over live country fills.
 - Uppercase Barlow or Cinzel country names without map flags.
@@ -288,6 +295,15 @@ The editor uses dark surfaces, warm gold actions, sans-serif headings, and compa
 ## Colors
 
 The HOI4 palette is muted and dark. The EU4 palette is brighter, with clear political colors. The editor uses dark green-gray surfaces and warm gold controls. The frontmatter contains the exact color values.
+
+### Brand artwork
+
+- **Brand orange:** One territory of the flag in the two-color logos.
+- **Brand forest:** The light-surface lettering and flag, the forest monochrome artwork, and the favicon background.
+- **Brand cream:** The dark-surface lettering and flag in the orange-and-cream artwork.
+- **Brand white:** The white monochrome artwork for dark surfaces.
+
+Use the exact `brand-*` frontmatter values in the supplied SVG assets. These tokens apply to brand artwork only.
 
 ### Primary
 
@@ -310,7 +326,7 @@ The editor uses separate danger, warning, and success colors. Keep these for the
 
 The six `map-country-*` colors remain the canonical base-state palette in `src/mapVisualStyle.ts`. They support change detection and old shared scenarios. The unqualified `map-ocean`, `map-coast`, border, label, and graticule colors record the base CSS fallbacks. They do not define the active map theme. Active appearance uses `map-hoi4-*` or `map-eu4-*` tokens. The loaded theme stylesheet is authoritative for rendered coast and border values.
 
-**The Map Scope Rule.** Apply theme colors and map label styles to the map. Keep the dark and gold editor palette. The wordmark shares the self-hosted Barlow family; editor controls retain their sans-serif stack.
+**The Map Scope Rule.** Apply theme colors and map label styles to the map. Keep the dark and gold editor palette. The logo uses its own colors and custom paths; editor controls retain their sans-serif stack.
 
 **The Scenario Color Rule.** Derive default display colors from the selected theme and the canonical base map. Preserve custom countries and explicit entity colors, including an explicit choice equal to the stored base color. Raster shading may change their visible tone without changing their stored fill color.
 
@@ -324,21 +340,23 @@ Country label size and position depend on the available country area. The fittin
 
 **Ocean names:** Use the current theme font at (9px), in normal style. HOI4 uses spacing (0.16em) and an outline (0.13em). EU4 uses spacing (0.19em) and an outline (0.065em). Keep full fill opacity. Ocean names are hidden on narrow screens.
 
-**Editor font:** Use the existing system sans-serif stack for controls, scenario titles, country headings, and tool text. The wordmark uses the registered, self-hosted Barlow Map family. The atlas serif remains in supporting presentation text outside the country HUD. Region labels retain the editor sans-serif and use theme ink and outline colors. The base Trebuchet country font is a legacy CSS fallback, not the font for either active theme.
+**Editor font:** Use the existing system sans-serif stack for controls, scenario titles, country headings, and tool text. The logo lettering is supplied as SVG paths and needs no font. The atlas serif remains in supporting presentation text outside the country HUD. Region labels retain the editor sans-serif and use theme ink and outline colors. The base Trebuchet country font is a legacy CSS fallback, not the font for either active theme.
 
 ### Editor hierarchy
 
-- **Wordmark:** Use `editor-wordmark` on desktop, `editor-wordmark-mobile` in the bottom-sheet layout, and `editor-wordmark-narrow` at widths up to (380px). Keep uppercase letters.
+- **Logo lettering:** Keep the custom title-case paths in the supplied logo. Header width uses `brand-logo`, `brand-logo-mobile`, or `brand-logo-narrow`; it has no text font-size token.
 - **Country heading:** Use `editor-headline` for the desktop selected country and `editor-country-mobile` for the phone sheet title. Use `editor-panel-heading` when no country is selected.
 - **Intro and instructions:** Use `editor-intro` for the tool introduction and `editor-tool-heading` for Divide instructions. Supporting copy uses `editor-hint`.
 - **Fields and state:** Use `editor-field-label` for HUD section headings and field labels, `editor-label` for compact controls, `editor-status` for the ready message, and `editor-small` for region counts, step labels, and action hints. Phone text inputs use `editor-input-mobile`.
 - **Scenario title:** Use `editor-title`. In the phone editor, its field is inside More actions.
 
-**The HUD Type Rule.** Use sans-serif headings in country tools. Keep the self-hosted Barlow wordmark separate from the map's outlined country labels.
+**The HUD Type Rule.** Use sans-serif headings in country tools. Keep the custom logo lettering separate from the map's outlined country labels.
 
 **The Map Name Rule.** Use the selected theme's uppercase country names on the map. Keep flags in the editor.
 
 ## Layout
+
+The complete header logo is (166px) wide. At widths up to (767px), it is (150px); at widths up to (380px), it is (138px). Keep `height: auto` and the original aspect ratio. These width rules apply independently of the country-panel layout.
 
 The map fills the workspace below a desktop header (64px). Country tools form a floating panel (326px wide), placed (24px) from the right and (76px) from the workspace top. The panel height follows its content, with a maximum of `calc(100% - 100px)`. The country heading and mode tabs stay above a scrollable tool body. Transfer and ready Divide actions stay in a separate, non-shrinking footer. Body padding is (20px); body groups use gaps of (18px) or (20px).
 
@@ -382,11 +400,23 @@ During zoom and pan, move the cached map with a CSS transform. Refresh projected
 
 ## Shapes
 
+The brand flag has a flowing outline and a curved border between two territories. Keep its smooth SVG paths and flat fills. The favicon places the flag on a forest square with a (64px) viewBox and corners (13px).
+
 Country shapes come from the map geometry. Borders use rounded joins and non-scaling strokes. Country border width is (0.95px) for HOI4 and (0.8px) for EU4. Both themes use a coastline width of (0.6px). Theme CSS overrides the legacy country-width presentation attribute; do not restore its heavier zoom-based border as the active theme rule.
 
 The editor keeps small control corners, larger tool-card corners, and near-square flag frames. The floating panel uses `hud-panel` corners; the phone sheet uses `hud-sheet` corners on its top edge only. Map search, map guidance, and zoom controls use `map-overlay` corners. Mode tabs and the region selection disclosure are flat. The frontmatter records these radii. Do not apply card corners to map geometry.
 
 ## Components
+
+### AltBorder logo and favicon
+
+Use `public/brand/altborder-logo-light.svg` in the dark app header. Its orange-and-cream artwork combines the flag and custom title-case lettering. The image has the accessible name AltBorder and intrinsic dimensions (166 by 40); CSS sets the width and preserves the aspect ratio. It is a static image with no hover or active treatment.
+
+Use `altborder-logo-dark.svg` in orange and forest on light surfaces. Forest and white monochrome logos use `altborder-logo-forest.svg` and `altborder-logo-white.svg`. The matching flag-only files are `altborder-mark-color.svg`, `altborder-mark-forest.svg`, and `altborder-mark-white.svg`. Keep transparent backgrounds.
+
+Use the complete logo at widths of at least (138px). Below that size, use the flag alone. Leave clear space of at least one quarter of the flag height on each side. Do not stretch or redraw the lettering or flag.
+
+`public/brand/favicon.svg` uses the color flag on forest. The supplied PNG favicon is (32px) and the touch icon is (180px). See `design/brand-f/README.md` for exports, source paths, and the asset build. The approved reference is `design/logo-options/round-2/f-own-world.png`.
 
 ### Political map
 
@@ -459,6 +489,8 @@ Rapid transfers keep earlier destination colors below the latest sweep, in trans
 
 ### Do:
 
+- Do use the supplied Own World SVG artwork and preserve its aspect ratio.
+- Do keep brand colors within brand artwork.
 - Do use the selected theme for default country display colors.
 - Do keep the six-color canonical baseline for state and shared-link compatibility.
 - Do keep country borders thin: HOI4 (0.95px) and EU4 (0.8px).
@@ -471,6 +503,8 @@ Rapid transfers keep earlier destination colors below the latest sweep, in trans
 
 ### Don't:
 
+- Don't replace the custom logo lettering with a font.
+- Don't use the complete logo below (138px) wide; use the flag alone.
 - Don't apply map colors or outlined country-label styles to editor controls.
 - Don't add flags to country names on the map.
 - Don't use the default palette to replace explicit scenario colors.

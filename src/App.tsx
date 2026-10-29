@@ -3101,11 +3101,7 @@ export default function App() {
       <header className="topbar">
         <div className="topbar-main">
           <div className="brand">
-            <Globe2 aria-hidden="true" />
-            <span className="brand-wordmark">
-              <strong>AltBorder</strong>
-              <span className="brand-tagline">History is optional.</span>
-            </span>
+            <img className="brand-logo" src="/brand/altborder-logo-light.svg" alt="AltBorder" width="166" height="40" />
           </div>
           <label className="title-field">
             {readOnly || isPresenting ? (
