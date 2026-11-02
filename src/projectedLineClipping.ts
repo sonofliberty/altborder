@@ -13,6 +13,26 @@ const maxCachedPaths = 24;
 const maxCachedCharacters = 6_000_000;
 let cachedCharacters = 0;
 
+/** Clip geometry once, before the same edges are grouped into display styles. */
+export function clipProjectedLinePaths<T extends { pathData: string; bounds: ProjectedBounds }>(
+  paths: readonly T[],
+  viewport: ProjectedBounds,
+): readonly T[] {
+  if (!validBounds(viewport)) return paths;
+  return paths.flatMap((path) => {
+    // Projection bounds precede SVG coordinate rounding. Round outward so
+    // endpoints near a viewport edge still go through the exact clipper.
+    const minX = Math.floor(path.bounds.minX);
+    const minY = Math.floor(path.bounds.minY);
+    const maxX = Math.ceil(path.bounds.maxX);
+    const maxY = Math.ceil(path.bounds.maxY);
+    if (maxX < viewport.minX || minX > viewport.maxX || maxY < viewport.minY || minY > viewport.maxY) return [];
+    if (minX >= viewport.minX && maxX <= viewport.maxX && minY >= viewport.minY && maxY <= viewport.maxY) return [path];
+    const pathData = clipProjectedLinePath(path.pathData, viewport);
+    return pathData ? [pathData === path.pathData ? path : { ...path, pathData }] : [];
+  });
+}
+
 /** Clip original M/L/Z edges without adding borders along the viewport. */
 export function clipProjectedLinePath(pathData: string, viewport: ProjectedBounds): string {
   if (!pathData || !validBounds(viewport)) return pathData;

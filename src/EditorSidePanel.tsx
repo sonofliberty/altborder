@@ -69,9 +69,8 @@ type EditorSidePanelProps = {
   selectedTransferRegions: RegionPanelRow[];
   transferRegionRows: RegionPanelRow[];
   onToggleTransferRegion: (regionId: string) => void;
-  focusedTransferRegion?: RegionPanelRow;
   onFocusTransferRegion: (regionId: string) => void;
-  onSeparateRegion: (regionId: string) => void;
+  onSeparateRegions: (regionIds: string[]) => void;
   transferTargetOptions: CountrySearchOption[];
   targetEntityId: string;
   onSelectTransferTarget: (entityId: string) => void;
@@ -174,7 +173,7 @@ function PanelAction(props: EditorSidePanelProps) {
     return (
       <footer className="panel-action">
         <p className="region-country-name">{region.displayName}</p>
-        <button className="primary wide" onClick={() => props.onSeparateRegion(region.id)}>
+        <button className="primary wide" onClick={() => props.onSeparateRegions([region.id])}>
           <span>Make region a country</span><Split size={17} aria-hidden="true" />
         </button>
         <p className="action-hint">Keeps its borders and name. You can undo this change.</p>
@@ -284,11 +283,11 @@ function TransferPanel(props: EditorSidePanelProps) {
         </div>
         <TransferSelectionControls {...props} />
         {selectedCount === 0 ? <p className="hint">{props.brushEnabled ? "Drag across regions to select them." : "Select regions on the map or from the list below."}</p> : null}
-        {props.focusedTransferRegion && !props.readOnly ? (
+        {selectedCount > 0 && !props.readOnly ? (
           <div className="region-country-action">
-            <p className="region-country-name">{props.focusedTransferRegion.displayName}</p>
-            <button className="wide" onClick={() => props.onSeparateRegion(props.focusedTransferRegion!.id)}>
-              <Split size={16} aria-hidden="true" /> Make region a country
+            <p className="region-country-name">{selectedCount === 1 ? props.selectedTransferRegions[0].displayName : `${selectedCount} selected regions`}</p>
+            <button className="wide" onClick={() => props.onSeparateRegions(props.selectedTransferRegions.map((region) => region.id))}>
+              <Split size={16} aria-hidden="true" /> {selectedCount === 1 ? "Make region a country" : `Make ${selectedCount} regions a country`}
             </button>
           </div>
         ) : null}

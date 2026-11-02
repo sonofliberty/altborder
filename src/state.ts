@@ -192,30 +192,53 @@ export function separateRegionAsCountry(
   name: string,
   color: string,
 ): { snapshot: EditorSnapshot; entityId: string } | null {
-  const sourceEntityId = snapshot.regionOwners[regionId];
-  const sourceEntity = sourceEntityId ? getOwnValue(snapshot.entities, sourceEntityId) : undefined;
+  return separateRegionsAsCountry(snapshot, [regionId], name, color);
+}
+
+export function separateRegionsAsCountry(
+  snapshot: EditorSnapshot,
+  selectedRegionIds: Iterable<string>,
+  name: string,
+  color: string,
+): { snapshot: EditorSnapshot; entityId: string } | null {
+  const regionIds = [...new Set(selectedRegionIds)];
   const trimmedName = name.trim();
-  if (!sourceEntity || !trimmedName) return null;
+  if (regionIds.length === 0 || !trimmedName) return null;
+  const sourceEntityIds = new Set<string>();
+  for (const regionId of regionIds) {
+    const sourceEntityId = snapshot.regionOwners[regionId];
+    const sourceEntity = sourceEntityId ? getOwnValue(snapshot.entities, sourceEntityId) : undefined;
+    if (!sourceEntity?.regionIds.includes(regionId)) return null;
+    sourceEntityIds.add(sourceEntityId);
+  }
 
   const next = { ...snapshot };
   const newEntityId = allocateCustomEntityId(next);
   const nextEntities = { ...snapshot.entities };
-  nextEntities[sourceEntityId] = {
-    ...sourceEntity,
-    regionIds: sourceEntity.regionIds.filter((ownedRegionId) => ownedRegionId !== regionId),
-  };
+  const selectedIds = new Set(regionIds);
+  for (const sourceEntityId of sourceEntityIds) {
+    const sourceEntity = snapshot.entities[sourceEntityId];
+    nextEntities[sourceEntityId] = {
+      ...sourceEntity,
+      regionIds: sourceEntity.regionIds.filter((regionId) => !selectedIds.has(regionId)),
+    };
+  }
   nextEntities[newEntityId] = {
     id: newEntityId,
     name: trimmedName,
     color,
     flag: { ...neutralCountryFlag },
-    regionIds: [regionId],
+    regionIds,
     isCustom: true,
   };
   const nextCustomRegions = { ...snapshot.customRegions };
-  const customRegion = nextCustomRegions[regionId];
-  if (customRegion) {
-    nextCustomRegions[regionId] = withCurrentRegionOwner(customRegion, newEntityId);
+  const nextRegionOwners = { ...snapshot.regionOwners };
+  for (const regionId of regionIds) {
+    nextRegionOwners[regionId] = newEntityId;
+    const customRegion = nextCustomRegions[regionId];
+    if (customRegion) {
+      nextCustomRegions[regionId] = withCurrentRegionOwner(customRegion, newEntityId);
+    }
   }
 
   return {
@@ -224,10 +247,7 @@ export function separateRegionAsCountry(
       ...next,
       entities: nextEntities,
       customRegions: nextCustomRegions,
-      regionOwners: {
-        ...snapshot.regionOwners,
-        [regionId]: newEntityId,
-      },
+      regionOwners: nextRegionOwners,
     },
   };
 }

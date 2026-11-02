@@ -48,7 +48,7 @@ import {
   divideCountry,
   allocateCustomEntityId,
   renameRegion,
-  separateRegionAsCountry,
+  separateRegionsAsCountry,
   transferRegions,
   updateEntityRegions,
 } from "./state";
@@ -82,7 +82,7 @@ import { MapThemeCoasts, MapThemeLand, MapThemeOcean } from "./MapThemeLayers";
 import { MapChangeBorders, MapChangeOverlay } from "./MapChangeOverlay";
 import { createMapChange, getTransferReveal, type MapChangeAnimation } from "./mapChange";
 import { clipMapThemeCountryPaths, clipMapThemePolygonPath } from "./mapThemeClip";
-import { clipProjectedLinePath } from "./projectedLineClipping";
+import { clipProjectedLinePath, clipProjectedLinePaths } from "./projectedLineClipping";
 import mapThemeRaster from "./mapThemeRaster.json";
 import { preloadMapThemeAssets } from "./mapThemeAssets";
 import { boundsIntersect, projectedViewportBounds, shouldCullPaths, shouldRefreshCullingZoom } from "./mapCulling";
@@ -95,7 +95,7 @@ import {
   isValidTransferTarget,
   orderTransferTargetEntities,
 } from "./transferContext";
-import { batchBoundaryPaths, batchBoundaryTransitionPaths, type BatchedBoundaryPaths, type ProjectedBoundaryEdge } from "./boundaryEdges";
+import { batchBoundaryPaths, batchBoundaryTransitionPaths, type ProjectedBoundaryEdge } from "./boundaryEdges";
 import { buildSelectedRegionAdjacency } from "./regionAdjacency";
 import { CountrySearchSelect, EditorSidePanel } from "./EditorSidePanel";
 import { mapInBatches, yieldToMainThread } from "./mapWork";
@@ -1355,9 +1355,6 @@ export default function App() {
     });
   }, [entities, getRegionDisplayName, regionById, regionOwners, selectedRegions]);
 
-  const focusedTransferRegion =
-    selectedTransferRegions.find((region) => region.id === transferFocusedRegionId) ?? selectedTransferRegions[0];
-
   useEffect(() => {
     if (!regionOwners || mode !== "transfer" || selectedRegions.size === 0) {
       setNeighborTargetEntityIds(new Set());
@@ -1976,25 +1973,32 @@ export default function App() {
     );
   }
 
-  function separateRegion(regionId: string) {
-    if (!snapshot || !history || !regionId || readOnly) return;
+  function separateRegions(selectedRegionIds: string[]) {
+    if (!snapshot || !history || selectedRegionIds.length === 0 || readOnly) return;
+    const regionIds = [...new Set(selectedRegionIds)];
+    const firstRegionId = regionIds[0];
     finishMetadataEdit();
-    const regionName = getRegionDisplayName(regionId);
-    const result = separateRegionAsCountry(
+    const countryName = regionIds.length === 1
+      ? getRegionDisplayName(firstRegionId)
+      : `New ${snapshot.entities[snapshot.regionOwners[firstRegionId]]?.name ?? "country"}`;
+    const result = separateRegionsAsCountry(
       snapshot,
-      regionId,
-      regionName,
-      getFallbackCountryColor(regionName),
+      regionIds,
+      countryName,
+      getFallbackCountryColor(countryName),
     );
     if (!result) return;
 
-    const bounds = getRegionBounds(regionId);
+    const bounds = regionIds.reduce<ProjectedBounds | null>((combined, regionId) => {
+      const regionBounds = getRegionBounds(regionId);
+      return regionBounds ? mergeBounds(combined, regionBounds) : combined;
+    }, null);
     if (bounds) {
-      showMapChange([{
+      showMapChange(regionIds.map((regionId) => ({
         path: getRegionPath(regionId),
         fromColor: entities?.[regionOwners?.[regionId] ?? ""]?.color ?? "#d7d2c8",
         toColor: result.snapshot.entities[result.entityId].color,
-      }], {
+      })), {
         kind: "point",
         x: (bounds.minX + bounds.maxX) / 2,
         y: (bounds.minY + bounds.maxY) / 2,
@@ -2011,10 +2015,12 @@ export default function App() {
     });
     setSelectedEntityId(result.entityId);
     setTargetEntityId("");
-    setSelectedRegions(new Set([regionId]));
-    setTransferFocusedRegionId(regionId);
+    setSelectedRegions(new Set(regionIds));
+    setTransferFocusedRegionId(firstRegionId);
     setInspectFocusedRegionId("");
-    setTransferConfirmation({ id: Date.now(), message: `${regionName} is now a country` });
+    setTransferConfirmation({ id: Date.now(), message: regionIds.length === 1
+      ? `${countryName} is now a country`
+      : `Created ${countryName} from ${regionIds.length} regions` });
   }
 
   function handleRegionClick(regionId: string) {
@@ -2956,11 +2962,13 @@ export default function App() {
     regionsToRender,
   ]);
 
+  const visibleBoundaryEdges = useMemo(() => shouldCullMapPaths
+    ? clipProjectedLinePaths(projectedBoundaryEdges, renderViewportBounds)
+    : projectedBoundaryEdges,
+  [projectedBoundaryEdges, renderViewportBounds, shouldCullMapPaths]);
+
   const boundaryRenderPaths = useMemo(() => {
     if (!regionOwners) return null;
-    const visibleEdges = shouldCullMapPaths
-      ? projectedBoundaryEdges.filter((edge) => boundsIntersect(edge.bounds, renderViewportBounds))
-      : projectedBoundaryEdges;
     const activeAdministrativeEntityId =
       !isPresenting && selectedEntityId && (mode === "transfer" || mode === "divide")
         ? selectedEntityId
@@ -2970,26 +2978,21 @@ export default function App() {
       selectedEntityId: isPresenting ? undefined : selectedEntityId || undefined,
     };
     const result = mapChange
-      ? batchBoundaryTransitionPaths(visibleEdges, mapChange.previousRegionOwners, regionOwners, options)
-      : { stable: batchBoundaryPaths(visibleEdges, regionOwners, options), previous: null, next: null };
+      ? batchBoundaryTransitionPaths(visibleBoundaryEdges, mapChange.previousRegionOwners, regionOwners, options)
+      : { stable: batchBoundaryPaths(visibleBoundaryEdges, regionOwners, options), previous: null, next: null };
     if (mapChange) {
       result.stable.selectedCountryPath = batchBoundaryPaths(
-        visibleEdges, mapChange.settling ? regionOwners : mapChange.previousRegionOwners, options,
+        visibleBoundaryEdges, mapChange.settling ? regionOwners : mapChange.previousRegionOwners, options,
       ).selectedCountryPath;
     }
-    const clip = (paths: BatchedBoundaryPaths | null) => !paths || !shouldCullMapPaths ? paths
-      : Object.fromEntries(Object.entries(paths).map(([kind, pathData]) =>
-        [kind, clipProjectedLinePath(pathData, renderViewportBounds)])) as BatchedBoundaryPaths;
-    return { stable: clip(result.stable)!, previous: clip(result.previous), next: clip(result.next) };
+    return result;
   }, [
     isPresenting,
     mapChange,
     mode,
-    projectedBoundaryEdges,
+    visibleBoundaryEdges,
     regionOwners,
     selectedEntityId,
-    renderViewportBounds,
-    shouldCullMapPaths,
   ]);
   const boundaryPaths = boundaryRenderPaths?.stable;
 
@@ -3490,9 +3493,8 @@ export default function App() {
           selectedTransferRegions={selectedTransferRegions}
           transferRegionRows={inspectRegionRows}
           onToggleTransferRegion={toggleTransferRegion}
-          focusedTransferRegion={focusedTransferRegion}
           onFocusTransferRegion={focusTransferRegion}
-          onSeparateRegion={separateRegion}
+          onSeparateRegions={separateRegions}
           transferTargetOptions={transferTargetOptions}
           targetEntityId={targetEntityId}
           onSelectTransferTarget={setTargetEntityId}

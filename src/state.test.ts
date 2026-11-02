@@ -7,6 +7,7 @@ import {
   createScenarioPayload,
   renameRegion,
   separateRegionAsCountry,
+  separateRegionsAsCountry,
   transferRegions,
 } from "./state";
 
@@ -576,6 +577,75 @@ describe("region transfers", () => {
     expect(result?.entityId).toBe("CUSTOM_002");
     expect(result?.snapshot.regionOwners[customRegion.id]).toBe("CUSTOM_002");
     expect(result?.snapshot.customRegions[customRegion.id].ownerId).toBe("CUSTOM_002");
+  });
+
+  it("makes all selected regions one country and leaves unselected regions with their owner", () => {
+    const data = makeMapData();
+    const snapshot = createInitialSnapshot(data);
+    snapshot.entities.BBB.regionIds = [...snapshot.entities.BBB.regionIds, "BBB_3"];
+    snapshot.regionOwners.BBB_3 = "BBB";
+    const original = structuredClone(snapshot);
+
+    const result = separateRegionsAsCountry(snapshot, ["BBB_1", "BBB_2"], "New Beta", "#A85F4F")!;
+
+    expect(result.snapshot.entities[result.entityId].regionIds).toEqual(["BBB_1", "BBB_2"]);
+    expect(result.snapshot.regionOwners).toMatchObject({
+      BBB_1: result.entityId,
+      BBB_2: result.entityId,
+      BBB_3: "BBB",
+    });
+    expect(result.snapshot.entities.BBB.regionIds).toEqual(["BBB_3"]);
+    expect(result.snapshot.entities.AAA).toBe(snapshot.entities.AAA);
+    expect(result.snapshot.customCounter).toBe(snapshot.customCounter + 1);
+    expect(snapshot).toEqual(original);
+  });
+
+  it("preserves a selection of native and custom regions through sharing", () => {
+    const data = makeMapData();
+    const snapshot = createInitialSnapshot(data);
+    const customId = "CUSTOM_001-TERRITORY";
+    snapshot.customCounter = 2;
+    snapshot.customRegions[customId] = {
+      ...data.regions[0], id: customId, name: "Newland", ownerId: "BBB",
+    };
+    snapshot.entities.BBB.regionIds = [...snapshot.entities.BBB.regionIds, customId];
+    snapshot.regionOwners[customId] = "BBB";
+    snapshot.regionNameOverrides.BBB_1 = "Renamed coast";
+    snapshot.regionLandAdditions = { BBB_1: data.regions[0].geometry };
+
+    const result = separateRegionsAsCountry(snapshot, ["BBB_1", customId], "New Beta", "#A85F4F")!;
+    const restored = applyScenarioPayload(data, createScenarioPayload(data, result.snapshot));
+
+    expect(result.snapshot.customRegions[customId].ownerId).toBe(result.entityId);
+    expect(snapshot.customRegions[customId].ownerId).toBe("BBB");
+    expect(restored.entities[result.entityId].regionIds).toEqual(["BBB_1", customId]);
+    expect(restored.regionOwners.BBB_1).toBe(result.entityId);
+    expect(restored.regionOwners[customId]).toBe(result.entityId);
+    expect(restored.customRegions[customId].ownerId).toBe(result.entityId);
+    expect(restored.entities.BBB.regionIds).toEqual(["BBB_2"]);
+    expect(restored.regionNameOverrides.BBB_1).toBe("Renamed coast");
+    expect(restored.regionLandAdditions).toEqual(snapshot.regionLandAdditions);
+  });
+
+  it("creates only one country when the selection contains duplicate IDs", () => {
+    const snapshot = createInitialSnapshot(makeMapData());
+    const result = separateRegionsAsCountry(snapshot, ["BBB_1", "BBB_2", "BBB_1"], "New Beta", "#A85F4F")!;
+
+    expect(result.snapshot.entities[result.entityId].regionIds).toEqual(["BBB_1", "BBB_2"]);
+    expect(result.snapshot.entities.BBB.regionIds).toEqual([]);
+    expect(result.snapshot.customCounter).toBe(2);
+  });
+
+  it.each([
+    { regionIds: [] },
+    { regionIds: ["MISSING"] },
+    { regionIds: ["BBB_1", "MISSING"] },
+  ])("rejects an empty or invalid selection without moving any regions: $regionIds", ({ regionIds }) => {
+    const snapshot = createInitialSnapshot(makeMapData());
+    const original = structuredClone(snapshot);
+
+    expect(separateRegionsAsCountry(snapshot, regionIds, "New Beta", "#A85F4F")).toBeNull();
+    expect(snapshot).toEqual(original);
   });
 
   it("keeps transferred custom region owner metadata in sync", () => {

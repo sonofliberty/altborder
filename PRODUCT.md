@@ -41,7 +41,7 @@ A scenario is carried in a compressed URL. Normal editing and sharing must conti
 - Choose HOI4 or EU4 map appearance in the editor, a shared map, or Present map. HOI4 is the default. Theme changes preserve territory, names, and explicit country colors.
 - Inspect countries and their regions. Change country names, colors, and flags, and rename regions.
 - Choose a bundled flag or upload a supported image.
-- Transfer selected regions to another country, or separate a region as a new country.
+- Transfer selected regions to another country, or separate all selected regions as one new country.
 - Divide a country with a drawn cut or a keyboard cut. A separate island can also become a new country.
 - Divide also supports a two-point cut. Unchanged subdivisions keep their geometry and names. Only subdivisions crossed by the new border are split.
 - Merge selected countries into one entity.

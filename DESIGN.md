@@ -467,7 +467,7 @@ Tool cards, including the Merge selection card, retain an elevated surface, a th
 
 ### Transfer workflow
 
-Make region a country is a direct action when a region is selected. Inspect shows it in the fixed action footer with the region name. Transfer shows it above the region picker, outside all disclosures, with the affected region name. With multiple regions selected, it applies only to that named region. Keep the existing borders, name, creation feedback, and Undo. Shared viewers do not show this edit action.
+Make region a country is a direct action when a region is selected. Inspect shows it in the fixed action footer with the region name. Transfer shows it above the region picker, outside all disclosures. With multiple regions selected, show their count and Make N regions a country. All selected regions form one new country in one undoable change; unselected regions keep their owners. A single region keeps its name. Multiple regions default to New followed by the source country name, which can be changed in Inspect. Preserve region borders, names, and creation feedback. Shared viewers do not show this edit action.
 
 Keep region selection above the destination field. Select and Brush are explicit methods; Select all and Clear remain beside them. The destination field is named Destination country. Desktop shows up to three selected region rows with focus and deselect actions, then a disclosure for more. The phone sheet uses one selected-region disclosure. The footer shows the source-to-destination route on desktop, the region count in the primary action, and the next required step while the action is disabled. A valid phone action hides the extra hint.
 
