@@ -521,6 +521,30 @@ textarea {
   pointer-events: auto;
 }
 
+.map-stage .map-navigation-guide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding-block: 4px;
+}
+
+.map-navigation-guide button {
+  min-height: 44px;
+  padding-inline: 10px;
+}
+
+@container map-canvas (max-height: 240px) and (max-width: 900px) {
+  .map-stage .map-navigation-guide {
+    top: 0;
+    min-height: 44px;
+    padding-block: 0;
+  }
+
+  .map-stage:has(.map-navigation-guide) .map-country-search {
+    display: none;
+  }
+}
+
 .ocean {
   fill: var(--color-map-ocean);
 }

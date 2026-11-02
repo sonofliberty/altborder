@@ -348,7 +348,7 @@ Country label size and position depend on the available country area. The fittin
 - **Country heading:** Use `editor-headline` for the desktop selected country and `editor-country-mobile` for the phone sheet title. Use `editor-panel-heading` when no country is selected.
 - **Intro and instructions:** Use `editor-intro` for the tool introduction and `editor-tool-heading` for Divide instructions. Supporting copy uses `editor-hint`.
 - **Fields and state:** Use `editor-field-label` for HUD section headings and field labels, `editor-label` for compact controls, `editor-status` for the ready message, and `editor-small` for region counts, step labels, and action hints. Phone text inputs use `editor-input-mobile`.
-- **Scenario title:** Use `editor-title`. In the phone editor, its field is inside More actions.
+- **Scenario title:** Use `editor-title`. The desktop input has a maximum width of (32ch), followed by a quiet Rename button. In the phone editor, its field is inside More actions. Share provides Rename scenario, which closes the dialog and focuses the existing title field.
 
 **The HUD Type Rule.** Use sans-serif headings in country tools. Keep the custom logo lettering separate from the map's outlined country labels.
 
@@ -364,7 +364,7 @@ Country search sits at the map's top left with offsets (24px), width (250px), an
 
 Use the bottom-sheet layout at widths up to (767px) with height from (501px), or at any width up to (539px). Portrait tablets from (768px) retain a floating panel and a full-height map. At widths from (768px) to (1100px), map guidance moves below country search and the decorative theme label is hidden.
 
-Below (768px), the header has a minimum height of (60px). The scenario field, Present map, and Redo move into More actions. Undo and Share remain in the header. Country context and all four mode tabs remain visible when the phone sheet is closed. Show tools opens the scrollable body; Hide tools closes it to show more map. The accessible names include these visible labels. Selecting a mode opens its tools; selecting a country in Inspect opens its details.
+Below (768px), the header has a minimum height of (60px). The scenario field, Present map, and Redo move into More actions. Undo and Share remain in the header. Shared viewers show the logo and scenario title in one row, with actions in a second row. Their More actions menu provides Present map without edit or reset controls. Country context and all four mode tabs remain visible when the phone sheet is closed. Show tools opens the scrollable body; Hide tools closes it to show more map. The accessible names include these visible labels. Selecting a mode opens its tools; selecting a country in Inspect opens its details.
 
 The open sheet uses `min(460px, max(408px, 52%))` of workspace height. At widths up to (539px) and heights up to (650px), it uses (68%) with a map row of at least (100px). When the software keyboard is open and a panel field has focus, the form fills the workspace and scrolls that field into view. Searching for a country on the map closes the sheet body while the keyboard is open; selecting a country opens its tools again. Search selection dismisses the touch keyboard.
 
@@ -377,6 +377,10 @@ Phone country search moves to offsets (16px), with width `min(250px, calc(100% -
 Short landscape screens from (540px) to (900px), with height up to (500px), retain a floating panel (300px wide) with top and right offsets (12px). The country heading uses one line; region metadata is hidden. The panel uses horizontal padding (16px). Its footer shows the action without the extra route or hint. Country search is up to (220px) wide. Theme controls sit above the lower row; zoom controls stay clear of the panel. At heights up to (350px), the destination or new-country name comes first in the scrollable body; the other tools remain available below it. With the software keyboard open and focus inside the panel, the form fills the visible viewport. Hide its heading, tabs, and background map until text entry is complete. Keep the action footer in view when focus moves from a field to its action. Country search hides the panel while typing on the map.
 
 At widths up to (640px), ocean labels are hidden. Pinch zoom and two-finger panning work in every mode. Move map enables single-finger or mouse panning without editing; choosing a mode returns to editing. Hide the general touch hint while a Transfer or Divide guide is visible.
+
+While Move map is active in the editor, show Move map on and Resume editing in the map guide. Resume preserves the mode and draft and returns focus to the hand button. Hide duplicate tool guides. On maps at most (900px) wide and (240px) high, including short landscape screens, this status uses the search row; search returns when panning ends.
+
+Undo uses Ctrl/Cmd+Z. Redo uses Ctrl/Cmd+Shift+Z or Ctrl+Y. Keep native text-field undo and do not apply editor history shortcuts in shared viewers, presentation, or the Share dialog. Include shortcut hints in history tooltips.
 
 **The Visible Action Rule.** Keep Transfer and ready Divide actions outside the scrollable tool body. Preserve country context and mode access when the phone sheet is closed.
 

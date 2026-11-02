@@ -3,6 +3,10 @@
 .workspace, .editor-expanded .workspace, .editor-collapsed .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
 .topbar { grid-template-columns: minmax(0, 1fr) auto; padding: 10px max(24px, env(safe-area-inset-right)) 10px max(24px, env(safe-area-inset-left)); }
 .title-field input, .scenario-title-text { font-family: inherit; font-size: 14px; }
+.title-field input { max-width: 32ch; }
+.scenario-rename { flex-shrink: 0; font-size: 12px; }
+.share-rename { justify-self: start; }
+.viewer-actions-menu { display: none; }
 .mobile-scenario-actions { display: none; }
 
 .map-country-search {
@@ -160,6 +164,11 @@
   .mobile-scenario-actions .field { margin-bottom: 6px; }
   .mobile-scenario-actions button { justify-content: start; }
   .topbar-actions .primary { padding: 0 10px; font-size: 13px; }
+  .topbar-viewer { flex-wrap: wrap; }
+  .topbar-viewer .topbar-main { display: flex; align-items: center; gap: 16px; width: 100%; }
+  .topbar-viewer .title-field { display: flex; flex: 1; padding-left: 12px; }
+  .topbar-viewer .topbar-actions { width: 100%; }
+  .topbar-viewer .viewer-actions-menu { display: block; }
 }
 
 @media (max-width: 767px) and (min-height: 501px), (max-width: 539px) {

@@ -98,6 +98,7 @@ import { batchBoundaryPaths, batchBoundaryTransitionPaths, type BatchedBoundaryP
 import { buildSelectedRegionAdjacency } from "./regionAdjacency";
 import { CountrySearchSelect, EditorSidePanel } from "./EditorSidePanel";
 import { mapInBatches, yieldToMainThread } from "./mapWork";
+import { useHistoryShortcuts } from "./useHistoryShortcuts";
 import { decodePackedMapDataInBatches } from "./mapDataPacking";
 import { prepareMapRendering, type PreparedMapRendering } from "./mapPreparation";
 import {
@@ -262,6 +263,8 @@ export default function App() {
   const oceanLabelRefs = useRef<(SVGTextElement | null)[]>([]);
   const presentationToggleRef = useRef<HTMLButtonElement | null>(null);
   const actionsMenuRef = useRef<HTMLDetailsElement | null>(null);
+  const scenarioTitleRef = useRef<HTMLInputElement | null>(null);
+  const mobileScenarioTitleRef = useRef<HTMLInputElement | null>(null);
   const shareTriggerRef = useRef<HTMLButtonElement | null>(null);
   const shareDialogRef = useRef<HTMLDialogElement | null>(null);
   const shareUrlRef = useRef<HTMLInputElement | null>(null);
@@ -312,6 +315,14 @@ export default function App() {
   const geometryWorkerRequestIdRef = useRef(0);
   const countryGeometryClientRef = useRef<CountryGeometryWorkerClient | null>(null);
   const mapChangeIdRef = useRef(0);
+
+  useHistoryShortcuts({
+    enabled: !readOnly && !isPresenting && !share,
+    canUndo: Boolean(history?.past.length),
+    canRedo: Boolean(history?.future.length),
+    undo,
+    redo,
+  });
 
   const getCountryGeometryClient = useCallback(() => {
     countryGeometryClientRef.current ??= new CountryGeometryWorkerClient();
@@ -1726,6 +1737,15 @@ export default function App() {
     });
   }
 
+  function focusScenarioTitle() {
+    if (readOnly) return;
+    const mobile = window.matchMedia("(max-width: 767px)").matches;
+    if (mobile && actionsMenuRef.current) actionsMenuRef.current.open = true;
+    const input = mobile ? mobileScenarioTitleRef.current : scenarioTitleRef.current;
+    input?.focus();
+    input?.select();
+  }
+
   function undo() {
     if (!history || readOnly || history.past.length === 0) return;
     const previous = history.past[history.past.length - 1];
@@ -3098,25 +3118,29 @@ export default function App() {
 
   return (
     <main className={`app-shell${isPresenting ? " is-presenting" : ""}${mobilePanelExpanded ? " editor-expanded" : " editor-collapsed"}${keyboardVisible ? " keyboard-open" : ""}`}>
-      <header className="topbar">
+      <header className={`topbar${readOnly ? " topbar-viewer" : ""}`}>
         <div className="topbar-main">
           <div className="brand">
             <img className="brand-logo" src="/brand/altborder-logo-light.svg" alt="AltBorder" width="166" height="40" />
           </div>
-          <label className="title-field">
+          <div className="title-field">
             {readOnly || isPresenting ? (
               <strong className="scenario-title-text" title={snapshot.title || "Untitled Border Experiment"}>
                 {snapshot.title || "Untitled Border Experiment"}
               </strong>
             ) : (
-              <input
-                aria-label="Scenario"
-                value={snapshot.title}
-                onChange={(event) => updateScenarioTitle(event.target.value)}
-                onBlur={finishMetadataEdit}
-              />
+              <>
+                <input
+                  ref={scenarioTitleRef}
+                  aria-label="Scenario"
+                  value={snapshot.title}
+                  onChange={(event) => updateScenarioTitle(event.target.value)}
+                  onBlur={finishMetadataEdit}
+                />
+                <button className="quiet-action scenario-rename" onClick={focusScenarioTitle} aria-label="Rename scenario">Rename</button>
+              </>
             )}
-          </label>
+          </div>
         </div>
         <div className="topbar-actions">
           <button
@@ -3136,18 +3160,18 @@ export default function App() {
             </button>
           ) : (
             <div className="history-actions">
-              <button className="icon-button" onClick={undo} disabled={history!.past.length === 0} title="Undo" aria-label="Undo">
+              <button className="icon-button" onClick={undo} disabled={history!.past.length === 0} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" aria-keyshortcuts="Control+Z Meta+Z">
                 <Undo2 size={16} />
               </button>
-              <button className="icon-button" onClick={redo} disabled={history!.future.length === 0} title="Redo" aria-label="Redo">
+              <button className="icon-button" onClick={redo} disabled={history!.future.length === 0} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y">
                 <Redo2 size={16} />
               </button>
             </div>
           ))}
-          {!readOnly && !isPresenting ? (
+          {!isPresenting ? (
             <details
               ref={actionsMenuRef}
-              className="topbar-menu"
+              className={`topbar-menu${readOnly ? " viewer-actions-menu" : ""}`}
               onBlur={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
               }}
@@ -3163,19 +3187,19 @@ export default function App() {
               </summary>
               <div className="topbar-menu-popover">
                 <div className="mobile-scenario-actions">
-                  <label className="field">
+                  {!readOnly ? <label className="field">
                     <span>Scenario</span>
-                    <input aria-label="Scenario" value={snapshot.title} onChange={(event) => updateScenarioTitle(event.target.value)} onBlur={finishMetadataEdit} />
-                  </label>
+                    <input ref={mobileScenarioTitleRef} aria-label="Scenario" value={snapshot.title} onChange={(event) => updateScenarioTitle(event.target.value)} onBlur={finishMetadataEdit} />
+                  </label> : null}
                   <button onClick={() => { if (actionsMenuRef.current) actionsMenuRef.current.open = false; togglePresentation(); }}><Maximize2 size={16} /> Present map</button>
-                  <button onClick={redo} disabled={history!.future.length === 0}><Redo2 size={16} /> Redo</button>
+                  {!readOnly ? <button onClick={redo} disabled={history!.future.length === 0} title="Redo (Ctrl/Cmd+Shift+Z)" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y"><Redo2 size={16} /> Redo</button> : null}
                 </div>
-                <button onClick={() => {
+                {!readOnly ? <button onClick={() => {
                   if (actionsMenuRef.current) actionsMenuRef.current.open = false;
                   resetMap();
                 }}>
                   <RotateCcw size={16} /> Reset map
-                </button>
+                </button> : null}
               </div>
             </details>
           ) : null}
@@ -3371,17 +3395,26 @@ export default function App() {
           </svg>
           </div>
           </div>
-          {mode === "divide" && selectedEntity && !readOnly && !isPresenting ? (
+          {mapNavigationEnabled && !readOnly && !isPresenting ? (
+            <div className="divide-map-guide map-navigation-guide">
+              <span role="status">Move map on</span>
+              <button onClick={(event) => {
+                setMapNavigationEnabled(false);
+                event.currentTarget.closest(".map-stage")?.querySelector<HTMLButtonElement>(".map-pan-toggle")?.focus();
+              }}>Resume editing</button>
+            </div>
+          ) : null}
+          {mode === "divide" && selectedEntity && !mapNavigationEnabled && !readOnly && !isPresenting ? (
             <div className="divide-map-guide">
-              <span>{mapNavigationEnabled ? "Turn off Move map to set the border." : divideMapHint}</span>
+              <span>{divideMapHint}</span>
               {divideLine.length > 0 || divideIslandPoint ? (
                 <button className="compact" onClick={clearDivideDraft} aria-label="Reset border" title="Reset border"><RotateCcw size={14} aria-hidden="true" /></button>
               ) : null}
             </div>
           ) : null}
-          {mode === "transfer" && selectedEntity && !readOnly && !isPresenting ? (
+          {mode === "transfer" && selectedEntity && !mapNavigationEnabled && !readOnly && !isPresenting ? (
             <div className="transfer-map-guide" role="status">
-              <span>{mapNavigationEnabled ? "Turn off Move map to select regions." : brushEnabled ? "Drag across regions to select them." : "Select a region. Select it again to deselect it."}</span>
+              <span>{brushEnabled ? "Drag across regions to select them." : "Select a region. Select it again to deselect it."}</span>
             </div>
           ) : null}
           <div className="map-theme-control">
@@ -3499,9 +3532,10 @@ export default function App() {
           className="share-dialog"
           aria-labelledby="share-dialog-title"
           aria-describedby="share-dialog-description"
-          onClose={() => {
+          onClose={(event) => {
             setShare(null);
-            shareTriggerRef.current?.focus();
+            if (event.currentTarget.returnValue === "rename") focusScenarioTitle();
+            else shareTriggerRef.current?.focus();
           }}
           onKeyDown={(event) => {
             if (event.key !== "Tab") return;
@@ -3531,6 +3565,11 @@ export default function App() {
                 <X size={17} aria-hidden="true" />
               </button>
             </div>
+            {!readOnly ? (
+              <button className="quiet-action share-rename" onClick={() => shareDialogRef.current?.close("rename")}>
+                Rename scenario
+              </button>
+            ) : null}
             <label className="field">
               <span>Share link</span>
               <input ref={shareUrlRef} readOnly value={share.url} onFocus={(event) => event.currentTarget.select()} />
