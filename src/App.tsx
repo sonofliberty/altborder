@@ -10,6 +10,7 @@ import {
   Minus,
   MoreHorizontal,
   PaintBucket,
+  PencilLine,
   Plus,
   RotateCcw,
   Share2,
@@ -3132,12 +3133,14 @@ export default function App() {
               <>
                 <input
                   ref={scenarioTitleRef}
-                  aria-label="Scenario"
+                  aria-label="Scenario name"
                   value={snapshot.title}
                   onChange={(event) => updateScenarioTitle(event.target.value)}
                   onBlur={finishMetadataEdit}
                 />
-                <button className="quiet-action scenario-rename" onClick={focusScenarioTitle} aria-label="Rename scenario">Rename</button>
+                <button className="quiet-action scenario-rename" onClick={focusScenarioTitle} aria-label="Rename scenario" title="Rename scenario">
+                  <PencilLine size={15} aria-hidden="true" /><span>Rename</span>
+                </button>
               </>
             )}
           </div>
@@ -3149,21 +3152,21 @@ export default function App() {
             onClick={togglePresentation}
             aria-pressed={isPresenting}
             aria-label={isPresenting ? readOnly ? "Exit presentation" : "Back to editor" : "Present map"}
-            title={isPresenting ? "Exit presentation (Escape)" : "Present map"}
+            title={isPresenting ? readOnly ? "Exit presentation (Escape)" : "Back to editor (Escape)" : "Present map without editing tools"}
           >
             {isPresenting ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             <span>{isPresenting ? readOnly ? "Exit presentation" : "Back to editor" : "Present map"}</span>
           </button>
           {!isPresenting && (readOnly ? (
-            <button className="primary" onClick={remix}>
-              <PaintBucket size={16} /> Remix/Edit
+            <button className="primary" onClick={remix} title="Edit your own copy of this map">
+              <PaintBucket size={16} /> Edit a copy
             </button>
           ) : (
-            <div className="history-actions">
-              <button className="icon-button" onClick={undo} disabled={history!.past.length === 0} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" aria-keyshortcuts="Control+Z Meta+Z">
+            <div className="history-actions" role="group" aria-label="Edit history">
+              <button className="icon-button" onClick={undo} disabled={history!.past.length === 0} title={history!.past.length === 0 ? "Nothing to undo" : "Undo last change (Ctrl/Cmd+Z)"} aria-label="Undo" aria-keyshortcuts="Control+Z Meta+Z">
                 <Undo2 size={16} />
               </button>
-              <button className="icon-button" onClick={redo} disabled={history!.future.length === 0} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y">
+              <button className="icon-button" onClick={redo} disabled={history!.future.length === 0} title={history!.future.length === 0 ? "Nothing to redo" : "Redo last undone change (Ctrl/Cmd+Shift+Z)"} aria-label="Redo" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y">
                 <Redo2 size={16} />
               </button>
             </div>
@@ -3188,23 +3191,26 @@ export default function App() {
               <div className="topbar-menu-popover">
                 <div className="mobile-scenario-actions">
                   {!readOnly ? <label className="field">
-                    <span>Scenario</span>
-                    <input ref={mobileScenarioTitleRef} aria-label="Scenario" value={snapshot.title} onChange={(event) => updateScenarioTitle(event.target.value)} onBlur={finishMetadataEdit} />
+                    <span>Scenario name</span>
+                    <input ref={mobileScenarioTitleRef} aria-label="Scenario name" value={snapshot.title} onChange={(event) => updateScenarioTitle(event.target.value)} onBlur={finishMetadataEdit} />
                   </label> : null}
-                  <button onClick={() => { if (actionsMenuRef.current) actionsMenuRef.current.open = false; togglePresentation(); }}><Maximize2 size={16} /> Present map</button>
-                  {!readOnly ? <button onClick={redo} disabled={history!.future.length === 0} title="Redo (Ctrl/Cmd+Shift+Z)" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y"><Redo2 size={16} /> Redo</button> : null}
+                  <button title="Present map without editing tools" onClick={() => { if (actionsMenuRef.current) actionsMenuRef.current.open = false; togglePresentation(); }}><Maximize2 size={16} /> Present map</button>
+                  {!readOnly ? <button onClick={redo} disabled={history!.future.length === 0} title={history!.future.length === 0 ? "Nothing to redo" : "Redo last undone change (Ctrl/Cmd+Shift+Z)"} aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y"><Redo2 size={16} /> Redo</button> : null}
                 </div>
-                {!readOnly ? <button onClick={() => {
-                  if (actionsMenuRef.current) actionsMenuRef.current.open = false;
-                  resetMap();
-                }}>
-                  <RotateCcw size={16} /> Reset map
-                </button> : null}
+                {!readOnly ? <>
+                  <button aria-describedby="reset-map-help" onClick={() => {
+                    if (actionsMenuRef.current) actionsMenuRef.current.open = false;
+                    resetMap();
+                  }}>
+                    <RotateCcw size={16} /> Reset all edits
+                  </button>
+                  <p id="reset-map-help" className="toolbar-action-help">Restore the original map. You can undo this.</p>
+                </> : null}
               </div>
             </details>
           ) : null}
           {!isPresenting ? (
-            <button ref={shareTriggerRef} className="primary" onClick={makeShare}>
+            <button ref={shareTriggerRef} className="primary" onClick={makeShare} title="Share a link to this map">
               <Share2 size={16} /> Share
             </button>
           ) : null}
@@ -3397,7 +3403,7 @@ export default function App() {
           </div>
           {mapNavigationEnabled && !readOnly && !isPresenting ? (
             <div className="divide-map-guide map-navigation-guide">
-              <span role="status">Move map on</span>
+              <span role="status">Drag to move the map.</span>
               <button onClick={(event) => {
                 setMapNavigationEnabled(false);
                 event.currentTarget.closest(".map-stage")?.querySelector<HTMLButtonElement>(".map-pan-toggle")?.focus();
@@ -3420,18 +3426,18 @@ export default function App() {
           <div className="map-theme-control">
             <MapThemeSelector theme={mapTheme.id} onChange={changeMapTheme} />
           </div>
-          <div className="map-controls" role="group" aria-label="Map zoom controls">
+          <div className="map-controls" role="group" aria-label="Map navigation">
             <button onClick={() => zoomBy(1.25)} disabled={zoom.k >= maxZoom} title="Zoom in" aria-label="Zoom in">
               <Plus size={17} />
             </button>
             <button onClick={() => zoomBy(1 / 1.25)} disabled={zoom.k <= minZoom} title="Zoom out" aria-label="Zoom out">
               <Minus size={17} />
             </button>
-            <button onClick={resetMapView} title="Show whole world" aria-label="Show whole world">
+            <button className="map-world-view" onClick={resetMapView} title="Show whole world. Your edits stay unchanged." aria-label="Show whole world">
               <Globe2 size={17} />
             </button>
             {!isPresenting ? (
-              <button className="map-pan-toggle" onClick={() => setMapNavigationEnabled((value) => !value)} aria-label="Move map" aria-pressed={mapNavigationEnabled} title="Move map">
+              <button className="map-pan-toggle" onClick={() => setMapNavigationEnabled((value) => !value)} aria-label="Move map" aria-pressed={mapNavigationEnabled} title={mapNavigationEnabled ? "Move map is on. Select again to stop." : "Move map: drag without selecting regions."}>
                 <Hand size={17} />
               </button>
             ) : null}
@@ -3559,7 +3565,7 @@ export default function App() {
             <div className="share-dialog-header">
               <div>
                 <h2 id="share-dialog-title">Share map</h2>
-                <p id="share-dialog-description">Shared links open read-only by default. Use Remix/Edit to make a copy.</p>
+                <p id="share-dialog-description">Shared links open in view-only mode. Choose Edit a copy to make changes.</p>
               </div>
               <button className="icon-button" aria-label="Close Share dialog" onClick={() => shareDialogRef.current?.close()}>
                 <X size={17} aria-hidden="true" />
@@ -3582,10 +3588,10 @@ export default function App() {
                 <Copy size={16} /> Copy link
               </button>
               <a href={share.url} target="_blank" rel="noreferrer">
-                <Eye size={16} /> View
+                <Eye size={16} /> View map
               </a>
               <a href={share.editableUrl} target="_blank" rel="noreferrer">
-                <PaintBucket size={16} /> Editable
+                <PaintBucket size={16} /> Edit a copy
               </a>
             </div>
             {copyFeedback ? (

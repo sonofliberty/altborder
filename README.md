@@ -15,7 +15,7 @@ The app is intentionally a lightweight visual editor, not a GIS tool. Administra
 - Merge multiple countries into one entity.
 - Undo, redo, and reset for the current editing session.
 - Share links that encode the scenario in the URL hash.
-- Read-only shared-map mode with Remix/Edit support.
+- Read-only shared-map mode with Edit a copy support.
 
 ## Tech Stack
 

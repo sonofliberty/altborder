@@ -169,6 +169,18 @@ export function EditorSidePanel(props: EditorSidePanelProps) {
 
 function PanelAction(props: EditorSidePanelProps) {
   if (props.readOnly || !props.selectedEntity) return null;
+  if (props.mode === "inspect" && props.inspectFocusedRegion) {
+    const region = props.inspectFocusedRegion;
+    return (
+      <footer className="panel-action">
+        <p className="region-country-name">{region.displayName}</p>
+        <button className="primary wide" onClick={() => props.onSeparateRegion(region.id)}>
+          <span>Make region a country</span><Split size={17} aria-hidden="true" />
+        </button>
+        <p className="action-hint">Keeps its borders and name. You can undo this change.</p>
+      </footer>
+    );
+  }
   const count = props.selectedTransferRegions.length;
   if (props.mode === "transfer") {
     const target = props.transferTargetOptions.find((option) => option.id === props.targetEntityId);
@@ -272,6 +284,14 @@ function TransferPanel(props: EditorSidePanelProps) {
         </div>
         <TransferSelectionControls {...props} />
         {selectedCount === 0 ? <p className="hint">{props.brushEnabled ? "Drag across regions to select them." : "Select regions on the map or from the list below."}</p> : null}
+        {props.focusedTransferRegion && !props.readOnly ? (
+          <div className="region-country-action">
+            <p className="region-country-name">{props.focusedTransferRegion.displayName}</p>
+            <button className="wide" onClick={() => props.onSeparateRegion(props.focusedTransferRegion!.id)}>
+              <Split size={16} aria-hidden="true" /> Make region a country
+            </button>
+          </div>
+        ) : null}
         <TransferRegionPicker
           key={props.selectedEntityId}
           regions={props.transferRegionRows}
@@ -279,13 +299,7 @@ function TransferPanel(props: EditorSidePanelProps) {
           readOnly={props.readOnly}
           onToggle={props.onToggleTransferRegion}
           selectionControls={<TransferSelectionControls {...props} />}
-        >
-          {props.focusedTransferRegion ? <details className="transfer-extra">
-            <summary>More region tools <ChevronDown size={14} aria-hidden="true" /></summary>
-            <p className="hint">{props.focusedTransferRegion.displayName}</p>
-            <button className="compact" disabled={props.readOnly} onClick={() => props.onSeparateRegion(props.focusedTransferRegion!.id)}><Split size={15} /> Make region a country</button>
-          </details> : null}
-        </TransferRegionPicker>
+        />
         {selectedCount > 0 ? <div className="transfer-selected-list">
           {props.selectedTransferRegions.slice(0, 3).map(selectedRow)}
           {selectedCount > 3 ? <details className="transfer-more-regions"><summary>Show {selectedCount - 3} more selected {selectedCount === 4 ? "region" : "regions"} <ChevronDown size={14} aria-hidden="true" /></summary>{props.selectedTransferRegions.slice(3).map(selectedRow)}</details> : null}
@@ -436,14 +450,12 @@ function TransferRegionPicker({
   readOnly,
   onToggle,
   selectionControls,
-  children,
 }: {
   regions: RegionPanelRow[];
   selectedRegions: RegionPanelRow[];
   readOnly: boolean;
   onToggle: (regionId: string) => void;
   selectionControls: React.ReactNode;
-  children?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const selectedIds = useMemo(() => new Set(selectedRegions.map((region) => region.id)), [selectedRegions]);
@@ -474,7 +486,6 @@ function TransferRegionPicker({
             </label>
           )) : <p className="hint">No regions found. Try another name.</p>}
         </div>
-        {children}
       </div>
     </details>
   );

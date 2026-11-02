@@ -22,7 +22,7 @@ Success means that a casual user can create a scenario, correct an unwanted chan
 
 AltBorder is a lightweight editor for alternate-border scenarios. Its scope is creative map experiments.
 
-A scenario is carried in a compressed URL. Normal editing and sharing must continue to work without an account or an application backend. A recipient can view the shared map or use Remix/Edit to change a copy.
+A scenario is carried in a compressed URL. Normal editing and sharing must continue to work without an account or an application backend. A recipient can view the shared map or use Edit a copy to change a copy.
 
 ## Operating Context
 
@@ -46,7 +46,7 @@ A scenario is carried in a compressed URL. Normal editing and sharing must conti
 - Divide also supports a two-point cut. Unchanged subdivisions keep their geometry and names. Only subdivisions crossed by the new border are split.
 - Merge selected countries into one entity.
 - Undo, redo, and reset edits in the current session.
-- Open shared scenarios in read-only mode by default. Remix/Edit makes the scenario editable.
+- Open shared scenarios in read-only mode by default. Edit a copy makes the scenario editable.
 - Use keyboard search, keyboard mode selection, visible focus marks, touch controls, and reduced-motion support.
 
 ### Lasting rules

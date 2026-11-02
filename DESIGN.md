@@ -348,7 +348,7 @@ Country label size and position depend on the available country area. The fittin
 - **Country heading:** Use `editor-headline` for the desktop selected country and `editor-country-mobile` for the phone sheet title. Use `editor-panel-heading` when no country is selected.
 - **Intro and instructions:** Use `editor-intro` for the tool introduction and `editor-tool-heading` for Divide instructions. Supporting copy uses `editor-hint`.
 - **Fields and state:** Use `editor-field-label` for HUD section headings and field labels, `editor-label` for compact controls, `editor-status` for the ready message, and `editor-small` for region counts, step labels, and action hints. Phone text inputs use `editor-input-mobile`.
-- **Scenario title:** Use `editor-title`. The desktop input has a maximum width of (32ch), followed by a quiet Rename button. In the phone editor, its field is inside More actions. Share provides Rename scenario, which closes the dialog and focuses the existing title field.
+- **Scenario title:** Use `editor-title`. The desktop input has a maximum width of (32ch), followed by a quiet Rename button with a pencil icon. From (768px) to (1100px), show only the icon while keeping its accessible name and tooltip. In the phone editor, its field is inside More actions. Share provides Rename scenario, which closes the dialog and focuses the existing title field.
 
 **The HUD Type Rule.** Use sans-serif headings in country tools. Keep the custom logo lettering separate from the map's outlined country labels.
 
@@ -378,9 +378,13 @@ Short landscape screens from (540px) to (900px), with height up to (500px), reta
 
 At widths up to (640px), ocean labels are hidden. Pinch zoom and two-finger panning work in every mode. Move map enables single-finger or mouse panning without editing; choosing a mode returns to editing. Hide the general touch hint while a Transfer or Divide guide is visible.
 
-While Move map is active in the editor, show Move map on and Resume editing in the map guide. Resume preserves the mode and draft and returns focus to the hand button. Hide duplicate tool guides. On maps at most (900px) wide and (240px) high, including short landscape screens, this status uses the search row; search returns when panning ends.
+While Move map is active in the editor, show “Drag to move the map.” and Resume editing in the map guide. Resume preserves the mode and draft and returns focus to the hand button. Hide duplicate tool guides. On maps at most (900px) wide and (240px) high, including short landscape screens, this status uses the search row; search returns when panning ends.
 
 Undo uses Ctrl/Cmd+Z. Redo uses Ctrl/Cmd+Shift+Z or Ctrl+Y. Keep native text-field undo and do not apply editor history shortcuts in shared viewers, presentation, or the Share dialog. Include shortcut hints in history tooltips.
+
+Header and map toolbar controls use (44px) minimum targets. Header action text uses (13px); history buttons have a (4px) gap and an accessible Edit history group. Keep phone actions in DOM order: Undo, More actions, Share. Anchor the phone menu to the header's right edge, limit its height to the visible viewport, and allow internal scrolling. Constrain the app grid to one shrinking column so long shared titles truncate without widening the map. Map controls use (4px) padding and separate Zoom in/out from Show whole world with a thin divider. Their height aligns with the theme selector.
+
+Toolbar copy names the result of each action. Use Scenario name for the title field and Edit a copy in the shared viewer and Share dialog. Reset all edits restores the original map; its visible help explains that Undo can restore the edits. Show whole world changes only the view. Tooltips explain presentation, sharing, and map movement, and distinguish an available Undo/Redo from an empty history. Keep Move map as the stable toggle name with its pressed state.
 
 **The Visible Action Rule.** Keep Transfer and ready Divide actions outside the scrollable tool body. Preserve country context and mode access when the phone sheet is closed.
 
@@ -441,7 +445,7 @@ Use an alpha mask bounded by the prepared viewport for land textures. Paint each
 
 A fieldset named Map theme contains native radio inputs for HOI4 and EU4. Keep one radio group, its visible label, full theme-name tooltips, and keyboard focus. The selected option uses editor gold and dark text; hover uses the brighter gold. Other options use editor text and gain a muted surface with a gold border on hover.
 
-The fieldset has a thin editor border, corners (4px), and padding (3px 3px 3px 12px). Options have corners (3px), minimum width (50px), padding (0px 10px), and the standard control height (38px). At widths up to (900px), or with a coarse pointer, their minimum height is (44px). Focus uses an outline (3px) with offset (2px). Forced-colors mode marks the checked radio with a Highlight border and inset outline.
+The fieldset has a thin editor border, corners (4px), and padding (3px 3px 3px 12px). Options have corners (3px), minimum width (50px), padding (0px 10px), and a minimum control height of (44px) at every viewport size. Focus uses an outline (3px) with offset (2px). Forced-colors mode marks the checked radio with a Highlight border and inset outline.
 
 Selecting a theme changes the map immediately. Editable scenarios record that choice in Undo history. A shared-map viewer can change the display without entering edit mode. Sharing includes the selected theme through the existing scenario format.
 
@@ -462,6 +466,8 @@ Four flat tabs sit directly on the panel surface above a thin divider. They have
 Tool cards, including the Merge selection card, retain an elevated surface, a thin border, and padding (12px). Transfer and Divide use the main panel surface with spacing and dividers between groups. Country flags are compact beside the heading; desktop metadata sits below the name. Country swatches remain in appearance controls; the small desktop summary swatch is hidden.
 
 ### Transfer workflow
+
+Make region a country is a direct action when a region is selected. Inspect shows it in the fixed action footer with the region name. Transfer shows it above the region picker, outside all disclosures, with the affected region name. With multiple regions selected, it applies only to that named region. Keep the existing borders, name, creation feedback, and Undo. Shared viewers do not show this edit action.
 
 Keep region selection above the destination field. Select and Brush are explicit methods; Select all and Clear remain beside them. The destination field is named Destination country. Desktop shows up to three selected region rows with focus and deselect actions, then a disclosure for more. The phone sheet uses one selected-region disclosure. The footer shows the source-to-destination route on desktop, the region count in the primary action, and the next required step while the action is disabled. A valid phone action hides the extra hint.
 

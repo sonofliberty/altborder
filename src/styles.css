@@ -318,7 +318,7 @@ textarea {
   border: 1px solid var(--color-border-strong);
   border-radius: 7px;
   box-shadow: var(--shadow-dialog);
-  min-width: 160px;
+  min-width: 240px;
   padding: 5px;
   position: absolute;
   right: 0;
@@ -445,9 +445,8 @@ textarea {
   width: var(--control-height);
 }
 
-.map-controls button:last-child {
+.map-controls .map-world-view {
   border-left-color: var(--color-border);
-  border-radius: 0 3px 3px 0;
   margin-left: 2px;
 }
 
@@ -2323,6 +2322,10 @@ details[open] > summary > .disclosure-icon {
 
   .share-dialog .dialog-actions > :first-child {
     grid-column: 1 / -1;
+  }
+
+  .share-dialog .dialog-actions > a {
+    font-size: 14px;
   }
 
   .country-summary-flag {
